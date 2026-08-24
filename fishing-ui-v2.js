@@ -22,7 +22,6 @@
 
   // XIVAPI can expose a numeric-looking PlaceName.Name for some fishing spots.
   // Reject those values and fall back to PlaceNameSub / PlaceNameMain.
-  // This overrides the global helper used by normalizeFishingRow / normalizeSpearRow.
   window.locationParts=function(spot){
     const sf=spot?.fields||{},territory=sf.TerritoryType,tf=territory?.fields||{};
     const spotName=relationName(sf.PlaceName)||relationName(sf.PlaceNameSub)||relationName(sf.PlaceNameMain)||'未知釣點';
@@ -80,6 +79,46 @@
   function resetPicker(){
     const r=document.getElementById('fish-picker-region');if(r)r.value='';fillZones();fillSpots();const q=document.getElementById('fish-search');if(q){q.value='';q.dispatchEvent(new Event('input',{bubbles:true}))}updateCurrent();
   }
+
+  // Marking one fish should not rebuild the entire catalog. Keep the current scroll,
+  // open region/spot details, and only update the affected row + counters.
+  function updateCatalogSummary(){
+    const summary=document.getElementById('fish-map-summary');if(!summary)return;
+    const all=catalog(),caught=new Set(typeof getCaughtIds==='function'?getCaughtIds():readStore('fishCaughtIds',[])),skipped=new Set(typeof getSkippedIds==='function'?getSkippedIds():readStore('fishSkippedIds',[]));
+    const ordinaryRemaining=all.filter(x=>!caught.has(Number(x.itemId))&&!x.bigFish&&!skipped.has(Number(x.itemId))).length;
+    summary.innerHTML=`外部圖鑑：${all.length} 筆　｜　已知已釣 ID：${caught.size}　｜　<strong>未記錄普通魚：${ordinaryRemaining}</strong>　｜　先跳過：${skipped.size}<br><span class="muted">魚糕可能漏記，所以「未記錄」不等於一定沒釣過。預設把魚王隱藏，優先拿普通魚掃圖。</span>`;
+  }
+  function decrementBadge(details){
+    if(!details)return;
+    const badge=details.querySelector(':scope > summary .badge');if(!badge)return;
+    const next=Math.max(0,(Number(badge.textContent)||0)-1);badge.textContent=String(next);
+  }
+  function markCaughtInPlace(itemId){
+    itemId=Number(itemId);if(!Number.isFinite(itemId))return;
+    const ids=typeof getCaughtIds==='function'?getCaughtIds():readStore('fishCaughtIds',[]).map(Number);
+    if(!ids.includes(itemId)){
+      if(typeof setCaughtIds==='function')setCaughtIds([...ids,itemId]);
+      else localStorage.setItem('fishCaughtIds',JSON.stringify([...ids,itemId]));
+    }
+    if(typeof renderFish==='function')renderFish();
+    updateCatalogSummary();
+
+    const button=document.querySelector(`#fish-catalog [data-caught="${itemId}"]`),row=button?.closest('.fish-row');
+    if(row){
+      const spot=row.closest('details.spot'),zone=row.closest('details.zone'),onlyMissing=document.getElementById('fish-only-missing')?.checked??true;
+      if(onlyMissing){
+        row.remove();decrementBadge(spot);decrementBadge(zone);
+        const list=spot?.querySelector('.fish-list');if(list&&!list.querySelector('.fish-row'))spot.remove();
+        if(zone&&!zone.querySelector('details.spot'))zone.remove();
+      }else if(button){
+        const done=document.createElement('span');done.className='done';done.textContent='✓ 已記錄';button.replaceWith(done);
+      }
+    }
+    // These depend on caught IDs but can update independently without rebuilding fish-catalog.
+    try{if(typeof renderBaitShoppingList==='function')renderBaitShoppingList()}catch{}
+    try{if(typeof renderRoutePlanner==='function')renderRoutePlanner()}catch{}
+  }
+  window.markCaught=markCaughtInPlace;
 
   function hasBrokenSpotNames(){return catalog().some(x=>/^\d+$/.test(String(x.spotName||'').trim()))}
   async function repairCatalogIfNeeded(){
