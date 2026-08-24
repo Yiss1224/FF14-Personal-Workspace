@@ -63,16 +63,66 @@
   };
   const oceanStop=stop=>!!stop&&(oceanText(stop.regionName)||oceanText(stop.zoneName)||oceanText(stop.spotName));
 
+  // The location picker is authoritative. Search text is useful for free search, but
+  // when a region/map/spot is selected the route planner must never leak in another map.
+  function pickerSelection(){
+    return {
+      region:document.getElementById('fish-picker-region')?.value||'',
+      zone:document.getElementById('fish-picker-zone')?.value||'',
+      spot:document.getElementById('fish-picker-spot')?.value||''
+    };
+  }
+  function matchesPicker(stop){
+    const p=pickerSelection();
+    if(p.region&&String(stop?.regionName||'')!==p.region)return false;
+    if(p.zone&&String(stop?.zoneName||'')!==p.zone)return false;
+    if(p.spot&&String(stop?.spotName||'')!==p.spot)return false;
+    return true;
+  }
+
   if(typeof window.fgBuildSpotPlan==='function'){
     const baseBuildSpotPlan=window.fgBuildSpotPlan;
     window.fgBuildSpotPlan=function(){
-      return (baseBuildSpotPlan.apply(this,arguments)||[]).filter(stop=>!oceanStop(stop));
+      return (baseBuildSpotPlan.apply(this,arguments)||[])
+        .filter(stop=>!oceanStop(stop))
+        .filter(matchesPicker);
     };
   }
   window.isOceanFishingRouteStop=oceanStop;
 
+  // cloud.js used substring replacement, so "Thavnair" could turn
+  // "The Thavnairian Coast" into "The 薩維奈島ian Coast". Keep replacement only
+  // when the English term is not embedded inside another ASCII word.
+  function regexEsc(v){return String(v).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
+  if(typeof ff14TcReplaceTextNode==='function'&&typeof ff14TcCache!=='undefined'){
+    ff14TcReplaceTextNode=function(node){
+      const raw=node?.nodeValue;
+      if(!raw||!/[A-Za-z]/.test(raw))return;
+      let next=raw;
+      const maps=[ff14TcCache.itemEnglish||{},ff14TcCache.places||{},ff14TcCache.weather||{}];
+      for(const map of maps){
+        for(const [en,tc] of Object.entries(map)){
+          if(!en||!tc||!next.includes(en))continue;
+          const re=new RegExp(`(^|[^A-Za-z])${regexEsc(en)}(?=$|[^A-Za-z])`,'g');
+          next=next.replace(re,(match,prefix)=>prefix+tc);
+        }
+      }
+      if(next!==raw)node.nodeValue=next;
+    };
+  }
+
+  function rerenderRoute(){
+    try{if(typeof window.renderRoutePlanner==='function')window.renderRoutePlanner()}catch(e){console.warn('route planner refresh failed',e)}
+    // Re-apply TC after route HTML is freshly rebuilt.
+    setTimeout(()=>{try{if(typeof ff14TcApply==='function')ff14TcApply()}catch{}},0);
+  }
+
+  document.addEventListener('change',e=>{
+    if(['fish-picker-region','fish-picker-zone','fish-picker-spot'].includes(e.target?.id))setTimeout(rerenderRoute,0);
+  });
+
   queueMicrotask(()=>{
     try{window.renderFish()}catch(e){console.warn('live fishing progress render failed',e)}
-    try{if(typeof window.renderRoutePlanner==='function')window.renderRoutePlanner()}catch(e){console.warn('ocean route filter render failed',e)}
+    rerenderRoute();
   });
 })();
