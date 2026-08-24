@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FF14 Personal Workspace</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>FF14 Personal Workspace</h1>
+    <p>日課、練等、釣魚進度集中管理</p>
+  </header>
+
+  <nav>
+    <button class="active" data-tab="dashboard">首頁</button>
+    <button data-tab="leveling">練等預估</button>
+    <button data-tab="fishing">釣魚 1140</button>
+  </nav>
+
+  <main>
+    <section id="dashboard" class="tab active">
+      <div class="grid">
+        <article>
+          <h2>今日 Daily</h2>
+          <div id="daily-list"></div>
+        </article>
+        <article>
+          <h2>練等 ETA</h2>
+          <div id="level-summary"></div>
+        </article>
+        <article>
+          <h2>釣魚 ETA</h2>
+          <div id="fish-summary"></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="leveling" class="tab">
+      <article>
+        <h2>練等預估器</h2>
+        <div class="row">
+          <label>職業 <input id="job-name" value="武僧"></label>
+          <label>目前等級 <input id="level-current" type="number" min="1" max="99" value="65"></label>
+          <label>目前 EXP <input id="level-exp" type="number" min="0" value="0"></label>
+          <label>目標等級 <input id="level-target" type="number" min="2" max="100" value="71"></label>
+        </div>
+        <p class="hint">每日隨機 EXP 會隨角色等級與實際抽到的副本浮動。此版先用「目前等級 EXP 條比例」逐日模擬，比例可以自行校正。</p>
+        <div id="roulette-config"></div>
+        <button id="calc-level">計算</button>
+        <div id="level-result" class="result"></div>
+      </article>
+    </section>
+
+    <section id="fishing" class="tab">
+      <article>
+        <h2>輝煌釣竿進度</h2>
+        <div class="row">
+          <label>目前已記錄魚種 <input id="fish-count" type="number" min="0" value="300"></label>
+          <label>目標 <input id="fish-target" type="number" min="1" value="1140"></label>
+        </div>
+        <div class="row">
+          <button id="save-fish">記錄今天</button>
+          <button id="import-fishcake">匯入魚糕 JSON</button>
+          <input id="fishcake-file" type="file" accept="application/json,.json" hidden>
+        </div>
+        <div id="fish-result" class="result"></div>
+        <h3>歷史</h3>
+        <div id="fish-history"></div>
+        <h3>外部魚資料</h3>
+        <p class="hint">下一版會接外部資料，顯示版本 → 地圖 → 釣點 → 尚缺魚種。</p>
+        <div id="fish-import-status"></div>
+      </article>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
