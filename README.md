@@ -33,13 +33,29 @@
   - 依地區 → 釣點顯示尚未記錄魚種
   - 可隱藏魚王、刺魚、已完成或先跳過項目
   - 每隻魚可跳回魚糕查詢
+- 魚餌 / 釣法 / 秒數
+  - 讀取 Carbuncle Plushy 的社群釣法資料，顯示推薦起始餌、泳餌路線、`! / !! / !!!`、提鉤、ET 時間、天氣、Snagging、傳承錄
+  - 每隻魚可標記「萬能餌可用 / 不可用 / 未確認」；未確認預設為先試萬能餌，不會把推薦餌誤判成必須攜帶
+  - 可從 Lodinn 的釣點社群統計讀取咬鉤秒數範圍，優先匹配推薦起始餌；資料不足時保留手動秒數
+  - 秒數資料只在本次頁面工作階段快取，避免大型釣點統計塞爆 `localStorage`
+- 魚餌採買與掃圖路線
+  - 依目前篩選與「萬能餌不可用」判定，自動整理指定魚餌購物清單
+  - 可標記已持有魚餌與自己的取得備註
+  - 透過 XIVAPI 解析 Item ID，再用 Garland Tools item 資料嘗試列出 Gil NPC、特殊商店、價格、區域、座標，以及製作 / 採集 / 精選 / 掉落等其他來源
+  - 可把同一 NPC 能買到的多種餌合併成採買點，減少跑腿
+  - 掃圖路線會優先推薦「目前餌已備妥、可以直接處理最多缺魚」的釣點；若缺指定餌會標出卡住數量與缺哪幾種餌
 - Supabase 雲端同步
   - Daily / 單職與多職練等設定 / 今晚排程 / 釣魚歷史 / 已知魚 ID / 跳過清單同步
+  - 萬能餌人工判定、魚餌持有狀態、魚餌備註、手動秒數與釣魚 UI 偏好同步
   - RLS 限制每個登入帳號只能讀寫自己的資料
 
 ## 資料來源與限制
 
 - XIVAPI 只提供遊戲客戶端的靜態資料，不知道玩家本人是否釣過某隻魚。
+- Carbuncle Plushy 的 `fishData.yaml` 是社群整理的釣法資料；`bestCatchPath` 用來當推薦起始餌 / 泳餌路線，不代表其他餌一定無效。
+- 萬能餌是否可用由使用者自行確認；只有明確標記「不可用」的魚才會被當成指定餌硬需求。
+- Lodinn 秒數是社群實測統計，不是官方固定秒數。工具顯示的是資料中的 bite-time 範圍，且會受使用魚餌與樣本情況影響；沒有可靠資料時不硬填。
+- Garland Tools 的 NPC / 商店資料由瀏覽器即時查詢。若外部服務或 CORS 無法使用，工具仍保留 Teamcraft / Garland 連結與手動備註，不會把缺資料假裝成「買不到」。
 - Dungeon Base EXP 由 FFXIV Wiki 的 Semantic MediaWiki `Has duty experience` / `Has duty level requirement` 等屬性取得，快取 7 天。
 - 6.0 後普通迷宮小怪不再直接給 EXP，等值 EXP 轉移到 Boss；因此 Wiki 的 Base EXP 可作為刷本模型基準。
 - 兵裝加成會影響擊敗敵人 / Dungeon Boss 的 EXP，但不影響 Duty Roulette 每日 Bonus；休息、食物、部隊效果目前尚未加入多職業 ETA，因此刷本部分偏保守。
@@ -55,4 +71,7 @@
 - Supabase Auth + Postgres (RLS)
 - XIVAPI v2
 - FFXIV Wiki Semantic MediaWiki API
+- Carbuncle Plushy fish data
+- Lodinn community bite-time data
+- Garland Tools item / vendor data
 - localStorage 離線快取
