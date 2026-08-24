@@ -34,6 +34,11 @@ async function initCloud(){
   c.auth.onAuthStateChange((event,session)=>{ff14User=session?.user||null;authUi();if(event==='SIGNED_IN'&&ff14User)setTimeout(()=>cloudLoad(),0)});
 }
 
+// Seed one stable row before leveling.js DOMContentLoaded handlers run. Without this, unsaved default rows would get a new random id on each read.
+if(typeof getLevelJobs==='function'&&typeof saveLevelJobs==='function'&&!store.get('levelJobs',null)){
+  saveLevelJobs([{id:lvlUid(),name:'MNK',role:'dps',level:65,exp:0,target:71,armoury:true,queueMin:10}])
+}
+
 // Multi-job placeholder rows are for editing convenience only; never include a blank row in the ETA simulation.
 if(typeof renderMultiSchedule==='function'){
   const renderMultiScheduleBase=renderMultiSchedule;
