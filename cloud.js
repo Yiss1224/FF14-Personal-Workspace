@@ -1,6 +1,6 @@
 const FF14_SUPABASE_URL='https://sxfvfiukywcgteioxsva.supabase.co';
 const FF14_SUPABASE_KEY='sb_publishable_lgNIyKPIds4TFc7H23xIlA_HSAv1Q9f';
-const FF14_SYNC_KEYS=['roulettes','dailyDone','levelPlan','levelJobs','levelSchedulerSettings','levelMultiPlan','tonightSettings','tonightPlan','fishHistory','fishTarget','fishCurrentCount','fishcakeCaughtIds','fishCaughtIds','fishSkippedIds','fishUniversalLureOverrides','fishBaitOwned','fishBaitNotes'];
+const FF14_SYNC_KEYS=['roulettes','dailyDone','levelPlan','levelJobs','levelSchedulerSettings','levelMultiPlan','tonightSettings','tonightPlan','fishHistory','fishTarget','fishCurrentCount','fishcakeCaughtIds','fishCaughtIds','fishSkippedIds','fishUniversalLureOverrides','fishBaitOwned','fishBaitNotes','fishBiteTimeOverrides','fishBaitOnlyRequired','fishRouteReadyOnly'];
 let ff14Client=null,ff14User=null,ff14Saving=false,ff14Loading=false,ff14SyncTimer=null;
 
 function syncStatus(t){const el=document.getElementById('sync-status');if(el)el.textContent=t}
