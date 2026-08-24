@@ -5,15 +5,16 @@
 
   const EN_ITEM_URL='https://raw.githubusercontent.com/xivapi/ffxiv-datamining/master/csv/en/Item.csv';
   const EN_CACHE_KEY='ff14FishEnglishNamesV2';
+  const OWNER='single-v3';
   let enById=readJson(EN_CACHE_KEY,{})||{};
   let enLoadPromise=null;
+  let fillTimer=0;
 
   function readJson(key,def){try{return JSON.parse(localStorage.getItem(key)||'null')??def}catch{return def}}
   function writeJson(key,value){try{localStorage.setItem(key,JSON.stringify(value))}catch{}}
   function catalog(){return readJson('fishCatalog',[])||[]}
-  function norm(v){return String(v??'').trim().toLowerCase()}
   function tc(v){try{return typeof window.ff14TcText==='function'?window.ff14TcText(v):String(v??'')}catch{return String(v??'')}}
-  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
+  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
   function csvLine(line){
     const out=[];let cur='',quoted=false;
@@ -63,12 +64,24 @@
   }
 
   function itemIdFromRow(row){
+    const explicit=row?.dataset?.itemId;
+    if(explicit&&Number(explicit))return Number(explicit);
     const caught=row?.querySelector?.('[data-caught]')?.dataset?.caught;
     if(caught&&Number(caught))return Number(caught);
     const skip=row?.querySelector?.('[data-skip]')?.dataset?.skip;
     if(skip&&Number(skip))return Number(skip);
     const href=row?.querySelector?.('a[href*="/fish/"]')?.getAttribute('href')||'';
-    const m=href.match(/\/fish\/(\d+)/);return m?Number(m[1])||0:0;
+    const m=href.match(/\/fish\/(\d+)/);
+    if(m&&Number(m[1]))return Number(m[1]);
+
+    // Last-resort fallback: match the row's visible spot/fish text against catalog.
+    const visible=row?.querySelector?.(':scope > div:first-child > strong')?.textContent?.trim()||'';
+    const small=row?.querySelector?.(':scope > div:first-child > small')?.textContent||'';
+    const parts=small.split('/').map(x=>x.trim()).filter(Boolean),spot=parts[parts.length-1]||'';
+    const rows=catalog();
+    let hit=rows.find(x=>String(x.spotName||'')===spot&&(String(x.name||'')===visible||tc(x.name)===visible));
+    if(!hit)hit=rows.find(x=>String(x.name||'')===visible||tc(x.name)===visible);
+    return Number(hit?.itemId)||0;
   }
 
   function catalogRow(itemId){return catalog().find(x=>Number(x.itemId)===Number(itemId))||null}
@@ -87,7 +100,6 @@
     return null;
   }
 
-  // Every guide feature that asks row metadata gets a stable lookup name when available.
   window.fgFishMetaFromRow=function(row){
     const meta=rowMeta(row);
     return {
@@ -121,42 +133,64 @@
     });
   }
 
-  // Replace the original renderer. It only fills missing panels; it never tears down an existing one.
-  window.augmentFishMethodRows=function(){
-    document.querySelectorAll('#fish-catalog .fish-row').forEach(row=>{
-      if(row.querySelector('.fish-method'))return;
+  function buildPanel(row,meta,m){
+    const path=typeof fgPathNames==='function'?fgPathNames(m.bestCatchPath):[];
+    const first=path[0]||'未提供';
+    const state=typeof fgUniversalState==='function'?fgUniversalState(meta.itemId):'unknown';
+    const manual=typeof fgBiteOverride==='function'?fgBiteOverride(meta.itemId):'';
+    const spotId=Number(meta.catalog?.spotId)||0;
+    const cachedBite=spotId&&typeof biteSpotMemory!=='undefined'?biteSpotMemory.get(spotId)?.data:null;
+    const panel=document.createElement('div');
+    panel.className='fish-method';
+    panel.dataset.fgOwner=OWNER;
+    const display=meta.visibleName||tc(meta.englishName||meta.catalogName);
+    const route=path.length?`${path.map(x=>esc(tc(x))).join(' → ')} → <strong>${esc(display)}</strong>`:`<strong>${esc(display)}</strong>`;
+    const tug=typeof fgTugText==='function'?fgTugText(m.tug):(m.tug||'—');
+    const hook=typeof fgHookText==='function'?fgHookText(m.hookset):(m.hookset||'—');
+    const time=typeof fgTimeText==='function'?fgTimeText(m):'—';
+    const lodinn=typeof fgLodinnUrl==='function'?fgLodinnUrl(meta.catalog?.spotName||m.location):'#';
+
+    panel.innerHTML=`<div class="fish-method-grid"><span>🪱 <b>推薦路線</b> ${route}</span><span>🎣 <b>咬鉤</b> ${esc(tug)} · ${esc(hook)}</span><span>⏰ <b>時間</b> ${esc(time)}</span><span>🌦 <b>天氣</b> ${esc(weatherTc(m))}</span>${m.snagging===true?'<span>🧲 <b>Snagging</b> ON</span>':''}${m.folklore?'<span>📖 <b>傳承錄</b> 需要</span>':''}<span class="fish-bite-line">⏱ <b>秒數</b> <span class="fish-bite-value">${manual?`${esc(manual)}（手動）`:(cachedBite?'已載入釣點資料，按「算秒數」':'尚未載入')}</span> ${spotId&&first!=='未提供'?`<button type="button" class="mini-btn" data-fg-bite="${meta.itemId}" data-fg-spot="${spotId}" data-fg-bait="${esc(first)}">算秒數</button>`:''} <button type="button" class="mini-btn" data-fg-bite-edit="${meta.itemId}">手動</button> <a href="${esc(lodinn)}" target="_blank" rel="noopener">Lodinn</a></span></div><label class="universal-lure-select">萬能餌 <select data-fg-universal="${meta.itemId}"><option value="unknown" ${state==='unknown'?'selected':''}>未確認／先試萬能餌</option><option value="yes" ${state==='yes'?'selected':''}>可用</option><option value="no" ${state==='no'?'selected':''}>不可用／要指定餌</option></select></label>`;
+    return panel;
+  }
+
+  // This renderer owns every fish-method panel. If an older renderer inserts one,
+  // replace it once with the stable TC panel. Existing owned panels are untouched.
+  function fillPanels(){
+    const root=document.getElementById('fish-catalog');if(!root)return;
+    root.querySelectorAll('.fish-row').forEach(row=>{
+      const existing=row.querySelector('.fish-method');
+      if(existing?.dataset?.fgOwner===OWNER)return;
       const meta=rowMeta(row);
       if(!meta.itemId||meta.catalog?.type==='spearfishing')return;
       const m=methodFor(meta);if(!m)return;
-
-      const path=typeof fgPathNames==='function'?fgPathNames(m.bestCatchPath):[];
-      const first=path[0]||'未提供';
-      const state=typeof fgUniversalState==='function'?fgUniversalState(meta.itemId):'unknown';
-      const manual=typeof fgBiteOverride==='function'?fgBiteOverride(meta.itemId):'';
-      const spotId=Number(meta.catalog?.spotId)||0;
-      const cachedBite=spotId&&typeof biteSpotMemory!=='undefined'?biteSpotMemory.get(spotId)?.data:null;
-      const panel=document.createElement('div');panel.className='fish-method';
-      const display=meta.visibleName||tc(meta.englishName||meta.catalogName);
-      const route=path.length?`${path.map(x=>esc(tc(x))).join(' → ')} → <strong>${esc(display)}</strong>`:`<strong>${esc(display)}</strong>`;
-      const tug=typeof fgTugText==='function'?fgTugText(m.tug):(m.tug||'—');
-      const hook=typeof fgHookText==='function'?fgHookText(m.hookset):(m.hookset||'—');
-      const time=typeof fgTimeText==='function'?fgTimeText(m):'—';
-      const lodinn=typeof fgLodinnUrl==='function'?fgLodinnUrl(meta.catalog?.spotName||m.location):'#';
-
-      panel.innerHTML=`<div class="fish-method-grid"><span>🪱 <b>推薦路線</b> ${route}</span><span>🎣 <b>咬鉤</b> ${esc(tug)} · ${esc(hook)}</span><span>⏰ <b>時間</b> ${esc(time)}</span><span>🌦 <b>天氣</b> ${esc(weatherTc(m))}</span>${m.snagging===true?'<span>🧲 <b>Snagging</b> ON</span>':''}${m.folklore?'<span>📖 <b>傳承錄</b> 需要</span>':''}<span class="fish-bite-line">⏱ <b>秒數</b> <span class="fish-bite-value">${manual?`${esc(manual)}（手動）`:(cachedBite?'已載入釣點資料，按「算秒數」':'尚未載入')}</span> ${spotId&&first!=='未提供'?`<button type="button" class="mini-btn" data-fg-bite="${meta.itemId}" data-fg-spot="${spotId}" data-fg-bait="${esc(first)}">算秒數</button>`:''} <button type="button" class="mini-btn" data-fg-bite-edit="${meta.itemId}">手動</button> <a href="${esc(lodinn)}" target="_blank" rel="noopener">Lodinn</a></span></div><label class="universal-lure-select">萬能餌 <select data-fg-universal="${meta.itemId}"><option value="unknown" ${state==='unknown'?'selected':''}>未確認／先試萬能餌</option><option value="yes" ${state==='yes'?'selected':''}>可用</option><option value="no" ${state==='no'?'selected':''}>不可用／要指定餌</option></select></label>`;
-      row.querySelector(':scope > div:first-child')?.appendChild(panel);
+      if(existing)existing.remove();
+      const host=row.querySelector(':scope > div:first-child')||row;
+      host.appendChild(buildPanel(row,meta,m));
     });
-    bindPanelActions(document.getElementById('fish-catalog')||document);
-  };
+    bindPanelActions(root);
+  }
 
-  // If the current browser has a translated fishCatalog cache, build the English ID map
-  // and only fill the missing panels afterwards. No catalog re-render / no collapsed spots.
-  ensureEnglishNames().then(()=>{
-    try{window.augmentFishMethodRows()}catch(e){console.warn('guide panel fill failed',e)}
-    try{if(typeof renderBaitShoppingList==='function')renderBaitShoppingList()}catch{}
-    try{if(typeof renderRoutePlanner==='function')renderRoutePlanner()}catch{}
+  function scheduleFill(delay=30){
+    clearTimeout(fillTimer);
+    fillTimer=setTimeout(()=>{try{fillPanels()}catch(e){console.warn('guide panel fill failed',e)}},delay);
+  }
+
+  // Keep compatibility with fishing-guide.js, but do not rely on its closed-over hook.
+  window.augmentFishMethodRows=fillPanels;
+
+  ensureEnglishNames().then(()=>scheduleFill(0));
+  queueMicrotask(()=>scheduleFill(0));
+
+  window.addEventListener('DOMContentLoaded',()=>{
+    const root=document.getElementById('fish-catalog');
+    if(root){
+      const observer=new MutationObserver(()=>scheduleFill(20));
+      observer.observe(root,{childList:true,subtree:true});
+    }
+    scheduleFill(0);
+    setTimeout(()=>scheduleFill(0),400);
+    setTimeout(()=>scheduleFill(0),1200);
+    setTimeout(()=>scheduleFill(0),3000);
   });
-
-  // Existing rows may already be present before this final override loads.
-  queueMicrotask(()=>{try{window.augmentFishMethodRows()}catch{}});
 })();
