@@ -1,4 +1,4 @@
-// Keep fishing method / bait / bite-time panels stable, including fish not covered by fishData.yaml.
+// Keep fishing method / bait / bite-time panels stable without fighting the TC display layer.
 (function(){
   'use strict';
 
@@ -28,7 +28,8 @@
     return null;
   }
 
-  // Make the original fishing-guide lookup independent from the translated visible fish name.
+  // Keep the original fishing-guide lookup on the stable catalog/source name,
+  // not on whatever translated text happens to be visible in the DOM.
   try{
     if(typeof fgFishMetaFromRow==='function'){
       const originalMeta=fgFishMetaFromRow;
@@ -42,7 +43,7 @@
   function pathNames(value){
     const out=[];
     const walk=v=>{if(v==null)return;if(Array.isArray(v)){v.forEach(walk);return}if(typeof v==='object'){if(v.name)out.push(String(v.name));return}const s=String(v).trim();if(s)out.push(s)};
-    walk(value);return out;
+    walk(value);return out
   }
   function tugText(v){const t=norm(v);if(t==='light')return '! 弱咬';if(t==='medium')return '!! 強咬';if(t==='heavy'||t==='legendary')return '!!! 大咬';return v?String(v):'—'}
   function hookText(v){const t=norm(v);if(t==='precision')return '精準提鉤';if(t==='powerful')return '強力提鉤';return v?String(v):'—'}
@@ -68,7 +69,7 @@
   }
 
   function makeRecoveredPanel(row,meta,m){
-    const host=row.querySelector(':scope > div:first-child');if(!host)return;
+    const host=row.querySelector(':scope > div:first-child');if(!host||row.querySelector('.fish-method'))return;
     const path=pathNames(m.bestCatchPath),first=path[0]||'',rest=path.slice(1),spotId=Number(meta.catalog?.spotId)||0,state=universalState(meta.itemId),panel=document.createElement('div');
     panel.className='fish-method fish-method-recovered';
     const display=meta.visibleName||tc(meta.sourceName),route=path.length?(rest.length?`${path.map(x=>esc(tc(x))).join(' → ')} → <strong>${esc(display)}</strong>`:`${esc(tc(first))} → <strong>${esc(display)}</strong>`):'<span class="muted">來源未提供餌路線</span>';
@@ -79,7 +80,7 @@
   }
 
   function makeFallbackPanel(row,meta){
-    const host=row.querySelector(':scope > div:first-child');if(!host)return;
+    const host=row.querySelector(':scope > div:first-child');if(!host||row.querySelector('.fish-method'))return;
     const panel=document.createElement('div');panel.className='fish-method fish-method-fallback';
     const spotId=Number(meta.catalog?.spotId)||0,spotName=meta.catalog?.spotName||'',biteButton=spotId?'<button type="button" class="mini-btn" data-fgs-bite>查秒數</button>':'';
     panel.innerHTML=`<div class="fish-method-grid"><span>🪱 <b>推薦路線</b> <span class="muted">目前釣法來源未收錄這隻魚</span></span><span>🎣 <b>咬鉤／提鉤</b> <span class="muted">來源未提供</span></span><span>⏰ <b>時間／天氣</b> <span class="muted">來源未提供</span></span><span class="fish-bite-line">⏱ <b>秒數</b> <span class="fish-bite-value">尚未載入</span> ${biteButton} <a href="https://lodinn.github.io/biterates?spot=${encodeURIComponent(spotName)}" target="_blank" rel="noopener">Lodinn</a></span></div>`;
@@ -95,18 +96,20 @@
     });
   }
 
-  let repairTimer=0,repairing=false;
-  function repairPanels(){
-    if(repairing)return;clearTimeout(repairTimer);
-    repairTimer=setTimeout(()=>{
-      repairing=true;
-      try{
-        // Give the original guide first chance to draw its richer panel.
-        if(typeof window.renderFishingGuide==='function'){try{window.renderFishingGuide()}catch(e){console.warn('regular fishing guide render failed',e)}}
-        // Then hard-guarantee that every ordinary fishing row has a panel.
-        setTimeout(fillEveryMissingPanel,20);
-      }finally{repairing=false}
-    },60);
+  let repairTimer=0;
+  function scheduleRepair(delay=80){
+    clearTimeout(repairTimer);
+    repairTimer=setTimeout(fillEveryMissingPanel,delay);
+  }
+
+  // Only react when fish rows themselves are inserted/replaced. Do NOT watch text changes
+  // and do NOT call renderFishingGuide() from here; doing either creates an English/TC
+  // repaint loop with the translation layer.
+  function mutationNeedsRepair(records){
+    return records.some(record=>[...record.addedNodes].some(node=>{
+      if(node.nodeType!==Node.ELEMENT_NODE)return false;
+      return node.matches?.('.fish-row, details.spot, details.zone')||!!node.querySelector?.('.fish-row');
+    }));
   }
 
   function addStyles(){
@@ -120,8 +123,9 @@
     if(catalog){
       catalog.addEventListener('click',e=>{const b=e.target.closest('[data-fgs-bite]');if(b){e.preventDefault();loadBite(b)}});
       catalog.addEventListener('change',e=>{const s=e.target.closest('[data-fgs-universal]');if(s)saveUniversal(Number(s.dataset.fgsUniversal),s.value)});
-      new MutationObserver(repairPanels).observe(catalog,{childList:true,subtree:true,characterData:true});
+      new MutationObserver(records=>{if(mutationNeedsRepair(records))scheduleRepair()}).observe(catalog,{childList:true,subtree:true});
     }
-    repairPanels();[500,1200,2500,5000].forEach(ms=>setTimeout(repairPanels,ms));
+    // Initial safety passes only. These only fill missing panels and never rebuild existing ones.
+    scheduleRepair(60);[500,1500].forEach(ms=>setTimeout(fillEveryMissingPanel,ms));
   });
 })();
