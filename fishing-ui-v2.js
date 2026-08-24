@@ -20,8 +20,6 @@
   function validName(v){const s=String(v||'').trim();return s&&!/^\d+$/.test(s)?s:''}
   function relationName(v){return validName(v?.fields?.Name??v?.Name??'')}
 
-  // XIVAPI can expose a numeric-looking PlaceName.Name for some fishing spots.
-  // Reject those values and fall back to PlaceNameSub / PlaceNameMain.
   window.locationParts=function(spot){
     const sf=spot?.fields||{},territory=sf.TerritoryType,tf=territory?.fields||{};
     const spotName=relationName(sf.PlaceName)||relationName(sf.PlaceNameSub)||relationName(sf.PlaceNameMain)||'未知釣點';
@@ -80,25 +78,19 @@
     const r=document.getElementById('fish-picker-region');if(r)r.value='';fillZones();fillSpots();const q=document.getElementById('fish-search');if(q){q.value='';q.dispatchEvent(new Event('input',{bubbles:true}))}updateCurrent();
   }
 
-  // app.js creates a spot-group key as "spotId|||spotName" but originally destructures
-  // the raw string instead of split('|||'), so the summary becomes the 2nd character
-  // of spotId (1/2/3...). The fish row itself still contains the correct spot name.
-  // Repair only the summary label from that known-good row text.
+  // app.js makes key "spotId|||spotName" but destructures the raw string.
+  // Repair the outer summary from the known-good row text.
   function fixSpotSummaryNames(){
     document.querySelectorAll('#fish-catalog details.spot').forEach(details=>{
-      const summary=details.querySelector(':scope > summary');
-      const small=details.querySelector('.fish-row small');
+      const summary=details.querySelector(':scope > summary'),small=details.querySelector('.fish-row small');
       if(!summary||!small)return;
-      const parts=small.textContent.split('/').map(x=>x.trim()).filter(Boolean);
-      const spotName=parts[parts.length-1];
+      const parts=small.textContent.split('/').map(x=>x.trim()).filter(Boolean),spotName=parts[parts.length-1];
       if(!spotName||/^\d+$/.test(spotName))return;
       const textNode=[...summary.childNodes].find(n=>n.nodeType===Node.TEXT_NODE);
       if(textNode&&textNode.nodeValue.trim()!==spotName)textNode.nodeValue=spotName+' ';
     });
   }
 
-  // Marking one fish should not rebuild the entire catalog. Keep the current scroll,
-  // open region/spot details, and only update the affected row + counters.
   function updateCatalogSummary(){
     const summary=document.getElementById('fish-map-summary');if(!summary)return;
     const all=catalog(),caught=new Set(typeof getCaughtIds==='function'?getCaughtIds():readStore('fishCaughtIds',[])),skipped=new Set(typeof getSkippedIds==='function'?getSkippedIds():readStore('fishSkippedIds',[]));
@@ -108,7 +100,7 @@
   function decrementBadge(details){
     if(!details)return;
     const badge=details.querySelector(':scope > summary .badge');if(!badge)return;
-    const next=Math.max(0,(Number(badge.textContent)||0)-1);badge.textContent=String(next);
+    badge.textContent=String(Math.max(0,(Number(badge.textContent)||0)-1));
   }
   function markCaughtInPlace(itemId){
     itemId=Number(itemId);if(!Number.isFinite(itemId))return;
@@ -137,6 +129,17 @@
   }
   window.markCaught=markCaughtInPlace;
 
+  // IMPORTANT: app.js already attached onclick handlers that call the old markCaught(),
+  // which rebuilds all of #fish-catalog. Intercept in capture phase before those handlers.
+  function interceptCaughtClick(e){
+    const button=e.target?.closest?.('#fish-catalog [data-caught]');
+    if(!button)return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    markCaughtInPlace(Number(button.dataset.caught));
+  }
+
   function hasBrokenSpotNames(){return catalog().some(x=>/^\d+$/.test(String(x.spotName||'').trim()))}
   async function repairCatalogIfNeeded(){
     if(!hasBrokenSpotNames()||typeof refreshFishCatalog!=='function')return;
@@ -150,6 +153,7 @@
 
   window.addEventListener('DOMContentLoaded',()=>{
     addStyles();ensurePicker();refreshPicker();fixSpotSummaryNames();
+    document.addEventListener('click',interceptCaughtClick,true);
     setTimeout(repairCatalogIfNeeded,600);
     setTimeout(()=>{refreshPicker();fixSpotSummaryNames()},1500);
     setTimeout(()=>{refreshTc();refreshPicker();fixSpotSummaryNames()},2500);
