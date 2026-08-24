@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>FF14 Personal Workspace</title>
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -13,18 +14,81 @@
     <div id="sync-box" class="sync-box"><span id="sync-status">未登入</span><button id="sync-login">登入同步</button><button id="sync-now" hidden>立即同步</button><button id="sync-logout" hidden>登出</button></div>
   </header>
   <div id="auth-panel" class="auth-panel" hidden>
-    <label>Supabase Publishable Key <input id="auth-key" type="password" placeholder="sb_publishable_..."></label>
-    <label>Email <input id="auth-email" type="email" placeholder="you@example.com"></label>
-    <label>密碼 <input id="auth-password" type="password" minlength="6"></label>
+    <h3>雲端同步</h3>
+    <label>Email <input id="auth-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
+    <label>密碼 <input id="auth-password" type="password" autocomplete="current-password" minlength="6"></label>
     <div class="row"><button id="auth-signin">登入</button><button id="auth-signup">建立帳號</button><button id="auth-cancel">取消</button></div>
-    <div id="auth-message" class="muted">Publishable Key 只會存在這台裝置的 localStorage。</div>
+    <div id="auth-message" class="muted">登入同一個帳號後，手機、家裡與其他裝置會共用進度；localStorage 仍保留作離線快取。</div>
   </div>
-  <nav><button class="active" data-tab="dashboard">首頁</button><button data-tab="leveling">練等預估</button><button data-tab="fishing">釣魚 1140</button></nav>
+
+  <nav>
+    <button class="active" data-tab="dashboard">首頁</button>
+    <button data-tab="leveling">練等預估</button>
+    <button data-tab="fishing">釣魚 1140</button>
+  </nav>
+
   <main>
-    <section id="dashboard" class="tab active"><div class="grid"><article><h2>今日 Daily</h2><div id="daily-list"></div></article><article><h2>練等 ETA</h2><div id="level-summary"></div></article><article><h2>釣魚 ETA</h2><div id="fish-summary"></div></article></div></section>
-    <section id="leveling" class="tab"><article><h2>練等預估器</h2><div class="row"><label>職業 <input id="job-name" value="武僧"></label><label>目前等級 <input id="level-current" type="number" min="1" max="99" value="65"></label><label>目前 EXP <input id="level-exp" type="number" min="0" value="0"></label><label>目標等級 <input id="level-target" type="number" min="2" max="100" value="71"></label></div><p class="hint">每日隨機 EXP 會隨角色等級與實際抽到的副本浮動。此版先用「目前等級 EXP 條比例」逐日模擬，比例可以自行校正。</p><div id="roulette-config"></div><button id="calc-level">計算</button><div id="level-result" class="result"></div></article></section>
-    <section id="fishing" class="tab"><article><h2>輝煌釣竿進度</h2><div class="row"><label>目前已記錄魚種 <input id="fish-count" type="number" min="0" value="300"></label><label>目標 <input id="fish-target" type="number" min="1" value="1140"></label></div><div class="row"><button id="save-fish">記錄今天</button><button id="import-fishcake">匯入魚糕 JSON</button><input id="fishcake-file" type="file" accept="application/json,.json" hidden></div><div id="fish-result" class="result"></div><h3>歷史</h3><div id="fish-history"></div><h3>外部魚資料</h3><p class="hint">下一版會接外部資料，顯示版本 → 地圖 → 釣點 → 尚缺魚種。</p><div id="fish-import-status"></div></article></section>
+    <section id="dashboard" class="tab active">
+      <div class="grid">
+        <article><h2>今日 Daily</h2><div id="daily-list"></div></article>
+        <article><h2>練等 ETA</h2><div id="level-summary"></div></article>
+        <article><h2>釣魚 ETA</h2><div id="fish-summary"></div></article>
+      </div>
+    </section>
+
+    <section id="leveling" class="tab">
+      <article>
+        <h2>練等預估器</h2>
+        <div class="row">
+          <label>職業 <input id="job-name" value="武僧"></label>
+          <label>目前等級 <input id="level-current" type="number" min="1" max="99" value="65"></label>
+          <label>目前 EXP <input id="level-exp" type="number" min="0" value="0"></label>
+          <label>目標等級 <input id="level-target" type="number" min="2" max="100" value="71"></label>
+        </div>
+        <label class="inline-check"><input id="level-use-remaining" type="checkbox" checked> 今天已經勾掉的 Daily 不再計入今天</label>
+        <p class="hint">每日隨機 EXP 並不是固定數字：獎勵會依目前職業等級與抽到的任務內容變動。這裡用可調整的「EXP 條比例」做逐日、逐級模擬，適合回答「我只吃這些日隨，大約幾天到目標」。</p>
+        <div id="roulette-config"></div>
+        <button id="calc-level">計算</button>
+        <div id="level-result" class="result"></div>
+      </article>
+    </section>
+
+    <section id="fishing" class="tab">
+      <article>
+        <h2>輝煌釣竿進度</h2>
+        <div class="row">
+          <label>目前圖鑑魚種 <input id="fish-count" type="number" min="0" value="300"></label>
+          <label>目標 <input id="fish-target" type="number" min="1" value="1140"></label>
+        </div>
+        <div class="row">
+          <button id="save-fish">記錄今天</button>
+          <button id="import-fishcake">匯入魚糕 JSON</button>
+          <input id="fishcake-file" type="file" accept="application/json,.json" hidden>
+        </div>
+        <div id="fish-result" class="result"></div>
+        <div id="fish-import-status" class="hint">支援魚糕常見輸出 <code>{"completed":[itemId,…]}</code>。匯入採聯集，只會增加已知魚種，不會因漏記把既有紀錄刪掉。</div>
+
+        <h3>歷史</h3>
+        <div id="fish-history"></div>
+
+        <div class="section-head">
+          <div><h3>掃圖導航</h3><p class="hint">XIVAPI 提供遊戲靜態魚類／釣點資料；你的「釣過沒」仍以魚糕匯入與手動標記為準。</p></div>
+          <button id="refresh-fish-data">更新外部魚資料</button>
+        </div>
+        <div id="fish-catalog-status" class="muted">尚未讀取外部資料</div>
+        <div class="filter-bar">
+          <label class="inline-check"><input id="fish-only-missing" type="checkbox" checked> 只看未記錄</label>
+          <label class="inline-check"><input id="fish-hide-big" type="checkbox" checked> 隱藏魚王</label>
+          <label class="inline-check"><input id="fish-include-spear" type="checkbox" checked> 包含刺魚</label>
+          <label class="inline-check"><input id="fish-hide-skipped" type="checkbox" checked> 隱藏先跳過</label>
+          <input id="fish-search" type="search" placeholder="搜尋魚／地區／釣點">
+        </div>
+        <div id="fish-map-summary" class="result"></div>
+        <div id="fish-catalog"></div>
+      </article>
+    </section>
   </main>
+
   <script src="app.js"></script>
   <script src="cloud.js"></script>
 </body>
