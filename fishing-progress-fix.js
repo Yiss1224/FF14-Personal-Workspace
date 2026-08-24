@@ -47,5 +47,32 @@
     }
   };
 
-  queueMicrotask(()=>{try{window.renderFish()}catch(e){console.warn('live fishing progress render failed',e)}});
+  // Ocean Fishing is not an overworld "run from spot to spot" activity, so keep it
+  // in the catalog/method panels but remove it from the normal route planner.
+  const oceanNames=new Set([
+    'the high seas','high seas','the endeavor','endeavor',
+    'galadion bay','the southern strait of merlthor','southern strait of merlthor',
+    'the northern strait of merlthor','northern strait of merlthor','rhotano sea',
+    'the cieldalaes','cieldalaes','rothlyt sound','the bloodbrine sea','bloodbrine sea',
+    'the sirensong sea','sirensong sea','公海','海釣','遠洋漁業'
+  ]);
+  const norm=v=>String(v??'').trim().toLowerCase();
+  const oceanText=v=>{
+    const s=norm(v);
+    return !!s&&(oceanNames.has(s)||s.includes('ocean fishing')||s.includes('the endeavor')||s.includes('high seas'));
+  };
+  const oceanStop=stop=>!!stop&&(oceanText(stop.regionName)||oceanText(stop.zoneName)||oceanText(stop.spotName));
+
+  if(typeof window.fgBuildSpotPlan==='function'){
+    const baseBuildSpotPlan=window.fgBuildSpotPlan;
+    window.fgBuildSpotPlan=function(){
+      return (baseBuildSpotPlan.apply(this,arguments)||[]).filter(stop=>!oceanStop(stop));
+    };
+  }
+  window.isOceanFishingRouteStop=oceanStop;
+
+  queueMicrotask(()=>{
+    try{window.renderFish()}catch(e){console.warn('live fishing progress render failed',e)}
+    try{if(typeof window.renderRoutePlanner==='function')window.renderRoutePlanner()}catch(e){console.warn('ocean route filter render failed',e)}
+  });
 })();
