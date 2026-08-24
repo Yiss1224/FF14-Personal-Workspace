@@ -56,6 +56,7 @@ const FF14_EN_BASE='https://raw.githubusercontent.com/xivapi/ffxiv-datamining/ma
 let ff14TcBusy=false;
 let ff14TcObserver=null;
 let ff14TcApplyTimer=null;
+let ff14TcApplying=false;
 let ff14TcCache={ts:0,items:{},places:{},weather:{},itemEnglish:{}};
 
 function ff14TcLoadCache(){
@@ -129,19 +130,23 @@ function ff14TcApplyFishRows(){
   const catalog=store.get('fishCatalog',[])||[],byId=new Map(catalog.map(x=>[Number(x.itemId),x]));
   document.querySelectorAll('#fish-catalog .fish-row').forEach(row=>{
     const href=row.querySelector('a[href*="/fish/"]')?.getAttribute('href')||'',m=href.match(/\/fish\/(\d+)/),id=m?Number(m[1]):0,fish=byId.get(id),name=row.querySelector(':scope > div:first-child > strong');
-    if(name&&ff14TcCache.items[id])name.textContent=ff14TcCache.items[id];
-    const small=row.querySelector(':scope > div:first-child > small');if(small&&fish)small.textContent=[fish.regionName,fish.zoneName,fish.spotName].map(ff14TcText).join(' / ');
+    if(name&&ff14TcCache.items[id]&&name.textContent!==ff14TcCache.items[id])name.textContent=ff14TcCache.items[id];
+    const small=row.querySelector(':scope > div:first-child > small');if(small&&fish){const next=[fish.regionName,fish.zoneName,fish.spotName].map(ff14TcText).join(' / ');if(small.textContent!==next)small.textContent=next}
     const method=row.querySelector('.fish-method');if(method)ff14TcWalkText(method)
   });
-  document.querySelectorAll('#fish-catalog details.zone > summary').forEach(s=>{const strong=s.querySelector('strong'),region=s.querySelector('span:not(.badge)');if(strong)strong.textContent=ff14TcText(strong.textContent);if(region)region.textContent=ff14TcText(region.textContent)});
-  document.querySelectorAll('#fish-catalog details.spot > summary').forEach(s=>{for(const n of [...s.childNodes])if(n.nodeType===Node.TEXT_NODE)n.nodeValue=ff14TcText(n.nodeValue.trim())+' '});
+  document.querySelectorAll('#fish-catalog details.zone > summary').forEach(s=>{const strong=s.querySelector('strong'),region=s.querySelector('span:not(.badge)');if(strong){const next=ff14TcText(strong.textContent);if(strong.textContent!==next)strong.textContent=next}if(region){const next=ff14TcText(region.textContent);if(region.textContent!==next)region.textContent=next}});
+  document.querySelectorAll('#fish-catalog details.spot > summary').forEach(s=>{for(const n of [...s.childNodes])if(n.nodeType===Node.TEXT_NODE){const next=ff14TcText(n.nodeValue.trim())+' ';if(n.nodeValue!==next)n.nodeValue=next}});
 }
-function ff14TcApply(){ff14TcLoadCache();ff14TcApplyFishRows();const bait=document.getElementById('fish-bait-list');if(bait)ff14TcWalkText(bait);const vendor=document.getElementById('fish-vendor-plan');if(vendor)ff14TcWalkText(vendor);const route=document.getElementById('fish-route-result');if(route)ff14TcWalkText(route)}
-function ff14TcScheduleApply(){clearTimeout(ff14TcApplyTimer);ff14TcApplyTimer=setTimeout(ff14TcApply,40)}
+function ff14TcApply(){
+  if(ff14TcApplying)return;ff14TcApplying=true;
+  try{ff14TcLoadCache();ff14TcApplyFishRows();const bait=document.getElementById('fish-bait-list');if(bait)ff14TcWalkText(bait);const vendor=document.getElementById('fish-vendor-plan');if(vendor)ff14TcWalkText(vendor);const route=document.getElementById('fish-route-result');if(route)ff14TcWalkText(route)}
+  finally{ff14TcApplying=false}
+}
+function ff14TcScheduleApply(){if(ff14TcApplying)return;clearTimeout(ff14TcApplyTimer);ff14TcApplyTimer=setTimeout(ff14TcApply,40)}
 function ff14TcInit(){
   ff14TcLoadCache();const refresh=document.getElementById('refresh-fish-data');if(refresh&&!document.getElementById('refresh-tc-terms')){const b=document.createElement('button');b.id='refresh-tc-terms';b.textContent='台服繁中名詞';b.title='重新下載台服繁中遊戲資料並更新顯示名稱';b.onclick=()=>ff14TcRefresh(true);refresh.insertAdjacentElement('afterend',b)}
   const target=document.getElementById('fishing');if(target){ff14TcObserver=new MutationObserver(ff14TcScheduleApply);ff14TcObserver.observe(target,{childList:true,subtree:true})}
-  ff14TcApply();setTimeout(()=>ff14TcRefresh(false),1200)
+  ff14TcApply();setTimeout(()=>ff14TcRefresh(false),1200);setTimeout(()=>ff14TcRefresh(false),8000)
 }
 window.addEventListener('DOMContentLoaded',ff14TcInit);
 window.refreshFF14TcTerms=()=>ff14TcRefresh(true);
