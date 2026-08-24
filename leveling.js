@@ -1,6 +1,5 @@
 const LEVEL_JOB_DEFAULTS=[
-  {id:'mnk',name:'MNK',role:'dps',level:65,exp:0,target:71,armoury:true,queueMin:10},
-  {id:'alt2',name:'',role:'dps',level:1,exp:0,target:100,armoury:true,queueMin:10}
+  {id:'mnk',name:'MNK',role:'dps',level:65,exp:0,target:71,armoury:true,queueMin:10}
 ];
 const LEVEL_ROLE_LABELS={tank:'TANK',healer:'HEALER',dps:'DPS'};
 const DUNGEON_EXP_CACHE_MS=7*24*60*60*1000;
@@ -9,13 +8,16 @@ let dungeonExpCatalog=[];
 
 function lvlEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function lvlUid(){return 'j'+Math.random().toString(36).slice(2,9)}
-function getLevelJobs(){const saved=store.get('levelJobs',null);return Array.isArray(saved)&&saved.length?saved:LEVEL_JOB_DEFAULTS.map(x=>({...x,id:lvlUid()}))}
+function getLevelJobs(){
+  const saved=store.get('levelJobs',null);if(Array.isArray(saved)&&saved.length)return saved;
+  const initial=LEVEL_JOB_DEFAULTS.map(x=>({...x,id:lvlUid()}));store.set('levelJobs',initial);return initial
+}
 function saveLevelJobs(v){store.set('levelJobs',v)}
 function getLevelSchedulerSettings(){return {...{mode:'focus',dungeonRuns:0,useRemainingToday:true,includeDungeonExp:true},...(store.get('levelSchedulerSettings',{})||{})}}
 function saveLevelSchedulerSettings(v){store.set('levelSchedulerSettings',v)}
 
 function normalizeLevelJob(j){return {
-  id:j.id||lvlUid(),name:String(j.name||'').trim()||'未命名',role:['tank','healer','dps'].includes(j.role)?j.role:'dps',
+  id:j.id||lvlUid(),name:String(j.name||'').trim(),role:['tank','healer','dps'].includes(j.role)?j.role:'dps',
   level:Math.max(1,Math.min(99,Number(j.level)||1)),exp:Math.max(0,Number(j.exp)||0),target:Math.max(2,Math.min(100,Number(j.target)||100)),
   armoury:j.armoury!==false,queueMin:Math.max(0,Number(j.queueMin)||0)
 }}
@@ -54,7 +56,7 @@ function dungeonIsLeveling(d){const r=String(d.roulette||'').toLowerCase();retur
 function bestDungeonForLevel(level){
   const eligible=dungeonExpCatalog.filter(d=>d.level<=level&&d.level<100&&d.baseExp>0&&d.level%10!==0);
   const leveling=eligible.filter(dungeonIsLeveling);const pool=leveling.length?leveling:eligible;
-  return pool.sort((a,b)=>b.level-a.level||b.baseExp-a.baseExp)[0]||null
+  return pool.slice().sort((a,b)=>b.level-a.level||b.baseExp-a.baseExp)[0]||null
 }
 function dungeonGainForJob(job,d){return d?Math.round(d.baseExp*armouryMultiplier(job)):0}
 
@@ -91,7 +93,7 @@ function schedulerDailyActivities(roulettes,day,useRemaining){const done=(typeof
 function chooseFocusJob(jobs){return jobs.find(j=>!isJobDone(j))||null}
 function chooseRoundJob(jobs,pointer){const active=jobs.filter(j=>!isJobDone(j));if(!active.length)return {job:null,pointer};const idx=pointer%active.length;return {job:active[idx],pointer:pointer+1}}
 function simulateMultiJobs(inputJobs,roulettes,settings){
-  const jobs=inputJobs.map(normalizeLevelJob).map(x=>({...x})),completed={},trace=[];let day=0,pointer=0,totalDungeonRuns=0;
+  const jobs=inputJobs.map(normalizeLevelJob).filter(j=>j.name).map(x=>({...x})),completed={},trace=[];let day=0,pointer=0,totalDungeonRuns=0;
   while(jobs.some(j=>!isJobDone(j))&&day<3650){
     const events=[],acts=schedulerDailyActivities(roulettes,day,settings.useRemainingToday);
     for(const a of acts){let job;if(settings.mode==='round'){const pick=chooseRoundJob(jobs,pointer);job=pick.job;pointer=pick.pointer}else job=chooseFocusJob(jobs);if(!job)break;const before=`Lv${job.level}`;const earned=addPercentBar(job,Number(a.pct)||0);events.push({kind:'daily',name:a.name,job:job.name,before,after:`Lv${job.level}`,earned});if(isJobDone(job)&&completed[job.id]==null)completed[job.id]=day+1}
