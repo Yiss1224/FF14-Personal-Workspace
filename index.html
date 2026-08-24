@@ -5,12 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FF14 Personal Workspace</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <header>
-    <h1>FF14 Personal Workspace</h1>
-    <p>日課、練等、釣魚進度集中管理</p>
+    <div>
+      <h1>FF14 Personal Workspace</h1>
+      <p>日課、練等、釣魚進度集中管理</p>
+    </div>
+    <div id="sync-box" class="sync-box">
+      <span id="sync-status">未登入</span>
+      <button id="sync-login">登入同步</button>
+      <button id="sync-now" hidden>立即同步</button>
+      <button id="sync-logout" hidden>登出</button>
+    </div>
   </header>
+
+  <div id="auth-panel" class="auth-panel" hidden>
+    <label>Email <input id="auth-email" type="email" placeholder="you@example.com"></label>
+    <label>密碼 <input id="auth-password" type="password" minlength="6"></label>
+    <div class="row">
+      <button id="auth-signin">登入</button>
+      <button id="auth-signup">建立帳號</button>
+      <button id="auth-cancel">取消</button>
+    </div>
+    <div id="auth-message" class="muted"></div>
+  </div>
 
   <nav>
     <button class="active" data-tab="dashboard">首頁</button>
@@ -21,18 +41,9 @@
   <main>
     <section id="dashboard" class="tab active">
       <div class="grid">
-        <article>
-          <h2>今日 Daily</h2>
-          <div id="daily-list"></div>
-        </article>
-        <article>
-          <h2>練等 ETA</h2>
-          <div id="level-summary"></div>
-        </article>
-        <article>
-          <h2>釣魚 ETA</h2>
-          <div id="fish-summary"></div>
-        </article>
+        <article><h2>今日 Daily</h2><div id="daily-list"></div></article>
+        <article><h2>練等 ETA</h2><div id="level-summary"></div></article>
+        <article><h2>釣魚 ETA</h2><div id="fish-summary"></div></article>
       </div>
     </section>
 
