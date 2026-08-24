@@ -1,12 +1,12 @@
 const FF14_SUPABASE_URL='https://sxfvfiukywcgteioxsva.supabase.co';
 const FF14_SUPABASE_KEY='sb_publishable_lgNIyKPIds4TFc7H23xIlA_HSAv1Q9f';
-const FF14_SYNC_KEYS=['roulettes','dailyDone','levelPlan','levelJobs','levelSchedulerSettings','levelMultiPlan','tonightSettings','tonightPlan','fishHistory','fishTarget','fishCurrentCount','fishcakeCaughtIds','fishCaughtIds','fishSkippedIds'];
+const FF14_SYNC_KEYS=['roulettes','dailyDone','levelPlan','levelJobs','levelSchedulerSettings','levelMultiPlan','tonightSettings','tonightPlan','fishHistory','fishTarget','fishCurrentCount','fishcakeCaughtIds','fishCaughtIds','fishSkippedIds','fishUniversalLureOverrides','fishBaitOwned','fishBaitNotes'];
 let ff14Client=null,ff14User=null,ff14Saving=false,ff14Loading=false,ff14SyncTimer=null;
 
 function syncStatus(t){const el=document.getElementById('sync-status');if(el)el.textContent=t}
 function ensureClient(){if(!ff14Client)ff14Client=window.supabase.createClient(FF14_SUPABASE_URL,FF14_SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});return ff14Client}
 function cloudSnapshot(){const p={};for(const k of FF14_SYNC_KEYS){const raw=localStorage.getItem(k);if(raw!==null){try{p[k]=JSON.parse(raw)}catch{}}}return p}
-function rerenderCloudState(){if(typeof window.renderFF14All==='function')window.renderFF14All();if(typeof window.renderLevelScheduler==='function')window.renderLevelScheduler();if(typeof window.renderTonightPlanner==='function')window.renderTonightPlanner()}
+function rerenderCloudState(){if(typeof window.renderFF14All==='function')window.renderFF14All();if(typeof window.renderLevelScheduler==='function')window.renderLevelScheduler();if(typeof window.renderTonightPlanner==='function')window.renderTonightPlanner();if(typeof window.renderFishingGuide==='function')window.renderFishingGuide()}
 function applyCloudSnapshot(p){
   if(!p||typeof p!=='object')return false;let changed=false;
   for(const k of FF14_SYNC_KEYS){if(!Object.prototype.hasOwnProperty.call(p,k))continue;const next=JSON.stringify(p[k]),prev=localStorage.getItem(k);if(prev!==next){nativeSetItem(k,next);changed=true}}
