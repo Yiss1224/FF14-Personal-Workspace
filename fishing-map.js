@@ -11,7 +11,7 @@
   function readStore(key,def=[]){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
   function catalog(){return readStore('fishCatalog',[])}
   function val(id){return document.getElementById(id)?.value||''}
-  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
   function tc(v){try{return typeof ff14TcText==='function'?ff14TcText(v):String(v||'')}catch{return String(v||'')}}
   function relationName(v){return String(v?.fields?.Name??v?.Name??'').trim()}
 
@@ -71,12 +71,9 @@
     const id=String(row.id||'');
     if(row.place===zone)score+=100;
     if(row.sub===zone)score+=70;
-    // Open-world territory maps overwhelmingly use an *f* map code (e.g. a2f1/00).
-    // Prefer those over world/region/navigation maps that can share the same PlaceName.
     if(/^[a-z0-9]+f\d+\/\d{2}$/i.test(id))score+=80;
     else if(/[a-z0-9]f\d+\/\d{2}$/i.test(id))score+=60;
     if(/\/00$/i.test(id))score+=20;
-    // Common overview/navigation identifiers are poor choices for fishing coordinates.
     if(/^[a-z0-9]+(?:w|t|m)\d+\/\d{2}$/i.test(id))score-=35;
     return score;
   }
@@ -99,7 +96,9 @@
     return `${XIVAPI}/asset/map/${encodeURIComponent(m[1])}/${encodeURIComponent(m[2])}`;
   }
 
-  function coordPct(n){return Math.max(0,Math.min(100,(Number(n)/42)*100))}
+  // FishingSpot X/Z are pixel coordinates on the 2048x2048 map texture,
+  // not the 0–42 in-game coordinate display. Convert pixels directly to percent.
+  function coordPct(n){return Math.max(0,Math.min(100,(Number(n)/2048)*100))}
 
   function spotButtons(spots){
     return `<div class="fish-map-fallback">${spots.map(s=>`<button type="button" data-map-spot="${esc(s.name)}">${esc(tc(s.name))} <span>${s.fish}</span></button>`).join('')}</div>`;
@@ -138,10 +137,10 @@
     const plotted=spots.filter(s=>Number.isFinite(s.x)&&Number.isFinite(s.y)&&s.x>0&&s.y>0);
     const markers=plotted.map(s=>{
       const left=coordPct(s.x),top=coordPct(s.y),sel=s.name===selected?' selected':'';
-      return `<button type="button" class="ff14-map-marker${sel}" data-map-spot="${esc(s.name)}" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}%" title="${esc(tc(s.name))} · X ${s.x.toFixed(1)} Y ${s.y.toFixed(1)} · ${s.fish} 種"><span class="ff14-map-dot"></span><span class="ff14-map-label">${esc(tc(s.name))}</span></button>`;
+      return `<button type="button" class="ff14-map-marker${sel}" data-map-spot="${esc(s.name)}" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}%" title="${esc(tc(s.name))} · X ${s.x.toFixed(0)} Z ${s.y.toFixed(0)} · ${s.fish} 種"><span class="ff14-map-dot"></span><span class="ff14-map-label">${esc(tc(s.name))}</span></button>`;
     }).join('');
-    const noCoords=!plotted.length?`<div class="muted fish-map-warning">這批釣點目前沒有可用 X/Y，所以先顯示釣場按鈕。</div>${spotButtons(spots)}`:'';
-    body.innerHTML=`<div class="fish-map-title">${esc(tc(region))} / <strong>${esc(tc(zone))}</strong> · ${spots.length} 個釣點</div><div class="ff14-map-wrap"><img class="ff14-map-image" src="${esc(url)}" alt="${esc(tc(zone))} FF14 地圖"><div class="ff14-map-markers">${markers}</div></div><div class="muted fish-map-note">底圖：FF14 遊戲地圖素材（XIVAPI） · Map.Id: <code>${esc(mapId)}</code></div>${noCoords}`;
+    const noCoords=!plotted.length?`<div class="muted fish-map-warning">這批釣點目前沒有可用 X/Z，所以先顯示釣場按鈕。</div>${spotButtons(spots)}`:'';
+    body.innerHTML=`<div class="fish-map-title">${esc(tc(region))} / <strong>${esc(tc(zone))}</strong> · ${spots.length} 個釣點</div><div class="ff14-map-wrap"><img class="ff14-map-image" src="${esc(url)}" alt="${esc(tc(zone))} FF14 地圖"><div class="ff14-map-markers">${markers}</div></div><div class="muted fish-map-note">底圖：FF14 遊戲地圖素材（XIVAPI） · Map.Id: <code>${esc(mapId)}</code> · 釣點：${plotted.length}/${spots.length}</div>${noCoords}`;
     const img=body.querySelector('.ff14-map-image');if(img)img.addEventListener('error',()=>renderFallback(body,region,zone,spots,`Map.Id ${mapId} 圖片載入失敗。`),{once:true});
     bindSpotButtons(body);
   }
