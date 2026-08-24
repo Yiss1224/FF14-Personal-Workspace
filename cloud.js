@@ -30,7 +30,7 @@ async function cloudLoad(){
 }
 async function initCloud(){
   const c=ensureClient(),{data}=await c.auth.getSession();ff14User=data.session?.user||null;authUi();if(ff14User)await cloudLoad();
-  c.auth.onAuthStateChange(async(event,session)=>{ff14User=session?.user||null;authUi();if(event==='SIGNED_IN'&&ff14User)await cloudLoad()});
+  c.auth.onAuthStateChange((event,session)=>{ff14User=session?.user||null;authUi();if(event==='SIGNED_IN'&&ff14User)setTimeout(()=>cloudLoad(),0)});
 }
 window.addEventListener('DOMContentLoaded',()=>{
   const panel=document.getElementById('auth-panel'),email=document.getElementById('auth-email'),password=document.getElementById('auth-password'),msg=document.getElementById('auth-message');
