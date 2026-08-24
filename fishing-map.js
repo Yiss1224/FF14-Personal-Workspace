@@ -3,7 +3,7 @@
   'use strict';
 
   const XIVAPI='https://v2.xivapi.com/api';
-  const MAP_CACHE_KEY='ff14FishingMapIndexV1';
+  const MAP_CACHE_KEY='ff14FishingMapIndexV2';
   const MAP_CACHE_MS=30*24*60*60*1000;
   let mapIndex=null;
   let mapIndexPromise=null;
@@ -30,10 +30,10 @@
     const by=new Map();
     for(const x of rows){
       const key=`${x.spotId}|||${x.spotName}`;
-      if(!by.has(key))by.set(key,{spotId:Number(x.spotId)||0,name:x.spotName,x:Number(x.x),y:Number(x.y),fish:0});
+      if(!by.has(key))by.set(key,{spotId:Number(x.spotId)||0,name:x.spotName,x:Number.isFinite(Number(x.x))?Number(x.x):null,y:Number.isFinite(Number(x.y))?Number(x.y):null,fish:0});
       const s=by.get(key);s.fish++;
-      if(!Number.isFinite(s.x)&&Number.isFinite(Number(x.x)))s.x=Number(x.x);
-      if(!Number.isFinite(s.y)&&Number.isFinite(Number(x.y)))s.y=Number(x.y);
+      if(s.x===null&&Number.isFinite(Number(x.x)))s.x=Number(x.x);
+      if(s.y===null&&Number.isFinite(Number(x.y)))s.y=Number(x.y);
     }
     return [...by.values()];
   }
@@ -66,14 +66,32 @@
     return mapIndexPromise;
   }
 
+  function mapCandidateScore(row,zone){
+    let score=0;
+    const id=String(row.id||'');
+    if(row.place===zone)score+=100;
+    if(row.sub===zone)score+=70;
+    // Open-world territory maps overwhelmingly use an *f* map code (e.g. a2f1/00).
+    // Prefer those over world/region/navigation maps that can share the same PlaceName.
+    if(/^[a-z0-9]+f\d+\/\d{2}$/i.test(id))score+=80;
+    else if(/[a-z0-9]f\d+\/\d{2}$/i.test(id))score+=60;
+    if(/\/00$/i.test(id))score+=20;
+    // Common overview/navigation identifiers are poor choices for fishing coordinates.
+    if(/^[a-z0-9]+(?:w|t|m)\d+\/\d{2}$/i.test(id))score-=35;
+    return score;
+  }
+
   async function resolveMapId(zone){
     if(!zone)return '';
     const rows=await fetchMapIndex();
-    const exact=rows.find(x=>x.place===zone)||rows.find(x=>x.sub===zone);
-    if(exact)return exact.id;
-    const needle=zone.toLowerCase();
-    const loose=rows.find(x=>x.place.toLowerCase()===needle||x.sub.toLowerCase()===needle);
-    return loose?.id||'';
+    const needle=String(zone).toLowerCase();
+    const candidates=rows.filter(x=>
+      x.place===zone||x.sub===zone||
+      x.place.toLowerCase()===needle||x.sub.toLowerCase()===needle
+    );
+    if(!candidates.length)return '';
+    candidates.sort((a,b)=>mapCandidateScore(b,zone)-mapCandidateScore(a,zone)||a.rowId-b.rowId);
+    return candidates[0].id||'';
   }
 
   function mapAssetUrl(mapId){
@@ -81,14 +99,16 @@
     return `${XIVAPI}/asset/map/${encodeURIComponent(m[1])}/${encodeURIComponent(m[2])}`;
   }
 
-  // FFXIV field map coordinates normally occupy roughly 0–42 on both axes.
-  // Keep values clamped so bad/missing data cannot place markers outside the map.
   function coordPct(n){return Math.max(0,Math.min(100,(Number(n)/42)*100))}
 
-  function renderFallback(body,region,zone,spots){
+  function spotButtons(spots){
+    return `<div class="fish-map-fallback">${spots.map(s=>`<button type="button" data-map-spot="${esc(s.name)}">${esc(tc(s.name))} <span>${s.fish}</span></button>`).join('')}</div>`;
+  }
+
+  function renderFallback(body,region,zone,spots,note='找不到原版地圖素材，暫時使用座標示意圖。'){
     const plotted=spots.filter(s=>Number.isFinite(s.x)&&Number.isFinite(s.y));
     if(!plotted.length){
-      body.innerHTML=`<div class="muted">${esc(tc(zone))} 的釣點資料沒有座標；先用下方按鈕選擇。</div><div class="fish-map-fallback">${spots.map(s=>`<button type="button" data-map-spot="${esc(s.name)}">${esc(tc(s.name))} <span>${s.fish}</span></button>`).join('')}</div>`;
+      body.innerHTML=`<div class="muted">${esc(tc(zone))} 的釣點資料沒有可用座標；可直接用下面的釣場按鈕。</div>${spotButtons(spots)}`;
       bindSpotButtons(body);return;
     }
     const W=760,H=420,P=34;
@@ -97,7 +117,7 @@
     const padX=(maxX-minX)*.14,padY=(maxY-minY)*.14;minX-=padX;maxX+=padX;minY-=padY;maxY+=padY;
     const sx=x=>P+(x-minX)/(maxX-minX)*(W-P*2),sy=y=>H-P-(y-minY)/(maxY-minY)*(H-P*2);
     const circles=plotted.map(s=>`<g class="fish-map-point" data-map-spot="${esc(s.name)}" tabindex="0" role="button"><circle cx="${sx(s.x).toFixed(1)}" cy="${sy(s.y).toFixed(1)}" r="10"></circle><text x="${(sx(s.x)+14).toFixed(1)}" y="${(sy(s.y)+5).toFixed(1)}">${esc(tc(s.name))}</text></g>`).join('');
-    body.innerHTML=`<div class="fish-map-title">${esc(tc(region))} / <strong>${esc(tc(zone))}</strong> · ${spots.length} 個釣點</div><div class="fish-map-scroll"><svg class="fish-map-svg" viewBox="0 0 ${W} ${H}"><rect x="1" y="1" width="${W-2}" height="${H-2}" rx="12"></rect>${circles}</svg></div><div class="muted fish-map-note">找不到原版地圖素材，暫時使用座標示意圖。</div>`;
+    body.innerHTML=`<div class="fish-map-title">${esc(tc(region))} / <strong>${esc(tc(zone))}</strong> · ${spots.length} 個釣點</div><div class="fish-map-scroll"><svg class="fish-map-svg" viewBox="0 0 ${W} ${H}"><rect x="1" y="1" width="${W-2}" height="${H-2}" rx="12"></rect>${circles}</svg></div><div class="muted fish-map-note">${esc(note)}</div>${spotButtons(spots)}`;
     bindSpotButtons(body);
   }
 
@@ -115,13 +135,14 @@
     const url=mapAssetUrl(mapId);
     if(!url){renderFallback(body,region,zone,spots);return}
 
-    const plotted=spots.filter(s=>Number.isFinite(s.x)&&Number.isFinite(s.y));
+    const plotted=spots.filter(s=>Number.isFinite(s.x)&&Number.isFinite(s.y)&&s.x>0&&s.y>0);
     const markers=plotted.map(s=>{
       const left=coordPct(s.x),top=coordPct(s.y),sel=s.name===selected?' selected':'';
       return `<button type="button" class="ff14-map-marker${sel}" data-map-spot="${esc(s.name)}" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}%" title="${esc(tc(s.name))} · X ${s.x.toFixed(1)} Y ${s.y.toFixed(1)} · ${s.fish} 種"><span class="ff14-map-dot"></span><span class="ff14-map-label">${esc(tc(s.name))}</span></button>`;
     }).join('');
-    body.innerHTML=`<div class="fish-map-title">${esc(tc(region))} / <strong>${esc(tc(zone))}</strong> · ${spots.length} 個釣點</div><div class="ff14-map-wrap"><img class="ff14-map-image" src="${esc(url)}" alt="${esc(tc(zone))} FF14 地圖"><div class="ff14-map-markers">${markers}</div></div><div class="muted fish-map-note">底圖：FF14 遊戲地圖素材（由 XIVAPI 合成）；圓點為魚圖鑑釣點座標。</div>`;
-    const img=body.querySelector('.ff14-map-image');if(img)img.addEventListener('error',()=>renderFallback(body,region,zone,spots),{once:true});
+    const noCoords=!plotted.length?`<div class="muted fish-map-warning">這批釣點目前沒有可用 X/Y，所以先顯示釣場按鈕。</div>${spotButtons(spots)}`:'';
+    body.innerHTML=`<div class="fish-map-title">${esc(tc(region))} / <strong>${esc(tc(zone))}</strong> · ${spots.length} 個釣點</div><div class="ff14-map-wrap"><img class="ff14-map-image" src="${esc(url)}" alt="${esc(tc(zone))} FF14 地圖"><div class="ff14-map-markers">${markers}</div></div><div class="muted fish-map-note">底圖：FF14 遊戲地圖素材（XIVAPI） · Map.Id: <code>${esc(mapId)}</code></div>${noCoords}`;
+    const img=body.querySelector('.ff14-map-image');if(img)img.addEventListener('error',()=>renderFallback(body,region,zone,spots,`Map.Id ${mapId} 圖片載入失敗。`),{once:true});
     bindSpotButtons(body);
   }
 
@@ -150,7 +171,7 @@
       .ff14-map-dot{width:15px;height:15px;border-radius:50%;background:#fff;border:3px solid #222;box-shadow:0 1px 4px rgba(0,0,0,.65);flex:0 0 auto}
       .ff14-map-label{font-weight:700;font-size:12px;white-space:nowrap;color:#fff;text-shadow:-1px -1px 2px #000,1px -1px 2px #000,-1px 1px 2px #000,1px 1px 2px #000}
       .ff14-map-marker.selected .ff14-map-dot{width:20px;height:20px}.ff14-map-marker:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:4px}
-      .fish-map-scroll{overflow:auto;border:1px solid var(--border,#d8d8df);border-radius:12px;background:rgba(127,127,127,.04)}.fish-map-svg{display:block;width:100%;min-width:620px;height:auto}.fish-map-point{cursor:pointer}.fish-map-point circle{fill:currentColor;opacity:.65;stroke:Canvas;stroke-width:3}.fish-map-point text{font-size:13px;fill:currentColor;paint-order:stroke;stroke:Canvas;stroke-width:3px}.fish-map-note{margin-top:7px}.fish-map-fallback{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.fish-map-fallback button span{opacity:.6;margin-left:5px}
+      .fish-map-scroll{overflow:auto;border:1px solid var(--border,#d8d8df);border-radius:12px;background:rgba(127,127,127,.04)}.fish-map-svg{display:block;width:100%;min-width:620px;height:auto}.fish-map-point{cursor:pointer}.fish-map-point circle{fill:currentColor;opacity:.65;stroke:Canvas;stroke-width:3}.fish-map-point text{font-size:13px;fill:currentColor;paint-order:stroke;stroke:Canvas;stroke-width:3px}.fish-map-note{margin-top:7px}.fish-map-warning{margin-top:9px}.fish-map-fallback{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.fish-map-fallback button span{opacity:.6;margin-left:5px}
       @media(max-width:760px){.ff14-map-label{font-size:11px}.ff14-map-dot{width:13px;height:13px}.fish-map-svg{min-width:560px}}
     `;document.head.appendChild(s);
   }
