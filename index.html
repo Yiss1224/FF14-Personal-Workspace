@@ -50,7 +50,7 @@
           <label>目標等級 <input id="level-target" type="number" min="2" max="100" value="71"></label>
         </div>
         <label class="inline-check"><input id="level-use-remaining" type="checkbox" checked> 今天已經勾掉的 Daily 不再計入今天</label>
-        <p class="hint">每日隨機 EXP 並不是固定數字：獎勵會依目前職業等級與抽到的任務內容變動。這裡先用可調整的「EXP 條比例」做快速估算。</p>
+        <p class="hint">每日隨機 EXP 並不是固定數字：獎勵會依目前職業等級與抽到的任務內容變動，所以工具用比例做逐日／逐級模擬；之後可再加入你的個人實測校正。</p>
         <div id="roulette-config"></div>
         <button id="calc-level">計算</button>
         <div id="level-result" class="result"></div>
@@ -178,5 +178,6 @@
   <script src="fishing-map-groups.js"></script>
   <script src="fishing-map.js"></script>
   <script src="fishing-guide-renderer.js"></script>
+  <script src="fishing-progress-fix.js"></script>
 </body>
 </html>
