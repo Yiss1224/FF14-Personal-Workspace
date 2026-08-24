@@ -7,7 +7,9 @@
   <title>FF14 Personal Workspace</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="tonight.css">
+  <link rel="stylesheet" href="fishing-guide.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
 </head>
 <body>
   <header>
@@ -149,12 +151,26 @@
           <input id="fish-search" type="search" placeholder="搜尋魚／地區／釣點">
         </div>
         <div id="fish-map-summary" class="result"></div>
+
+        <div class="section-head">
+          <div><h3>魚餌／釣法／秒數</h3><p class="hint">把魚糕社群釣法疊到掃圖清單：推薦餌／泳餌路線、! / !! / !!!、提鉤、ET 時間與天氣。秒數先連到釣點社群統計，不拿不完整資料硬填。</p></div>
+          <button id="refresh-fish-methods">更新釣法資料</button>
+        </div>
+        <div id="fish-method-status" class="muted fish-method-status-note">尚未讀取釣法資料</div>
+        <div class="bait-toolbar">
+          <label class="inline-check"><input id="fish-bait-only-required" type="checkbox"> 購物清單只看「已確認萬能餌不可用」</label>
+        </div>
+        <div id="fish-bait-summary" class="result"></div>
+        <div id="fish-bait-list"></div>
+        <p class="fish-method-source">「推薦餌」不等於「萬能餌一定不能用」。每隻魚可自行標成萬能餌可用／不可用／未確認；不可用與未確認才會進準備清單。取得方式按鈕會解析餌的 Item ID 後開 Teamcraft 資料頁。</p>
+
         <div id="fish-catalog"></div>
       </article>
     </section>
   </main>
 
   <script src="app.js"></script>
+  <script src="fishing-guide.js"></script>
   <script src="leveling.js"></script>
   <script src="tonight.js"></script>
   <script src="cloud.js"></script>
