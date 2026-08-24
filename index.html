@@ -31,14 +31,14 @@
     <section id="dashboard" class="tab active">
       <div class="grid">
         <article><h2>今日 Daily</h2><div id="daily-list"></div></article>
-        <article><h2>練等 ETA</h2><div id="level-summary"></div></article>
+        <article><h2>練等 ETA</h2><div id="level-summary"></div><hr><div id="level-multi-summary"></div></article>
         <article><h2>釣魚 ETA</h2><div id="fish-summary"></div></article>
       </div>
     </section>
 
     <section id="leveling" class="tab">
       <article>
-        <h2>練等預估器</h2>
+        <h2>單職業快速估算</h2>
         <div class="row">
           <label>職業 <input id="job-name" value="武僧"></label>
           <label>目前等級 <input id="level-current" type="number" min="1" max="99" value="65"></label>
@@ -46,10 +46,45 @@
           <label>目標等級 <input id="level-target" type="number" min="2" max="100" value="71"></label>
         </div>
         <label class="inline-check"><input id="level-use-remaining" type="checkbox" checked> 今天已經勾掉的 Daily 不再計入今天</label>
-        <p class="hint">每日隨機 EXP 並不是固定數字：獎勵會依目前職業等級與抽到的任務內容變動。這裡用可調整的「EXP 條比例」做逐日、逐級模擬，適合回答「我只吃這些日隨，大約幾天到目標」。</p>
+        <p class="hint">每日隨機 EXP 並不是固定數字：獎勵會依目前職業等級與抽到的任務內容變動。這裡先用可調整的「EXP 條比例」做快速估算。</p>
         <div id="roulette-config"></div>
         <button id="calc-level">計算</button>
         <div id="level-result" class="result"></div>
+      </article>
+
+      <article class="scheduler-card">
+        <div class="section-head">
+          <div>
+            <h2>多職業練等排程</h2>
+            <p class="hint">每個 Daily 一天只能領一次，所以排程會真的把它分配給不同職業，而不是每個職業都各吃一套。上到下就是集中練模式的優先順序。</p>
+          </div>
+          <button id="add-level-job">＋ 新增職業</button>
+        </div>
+        <div id="level-jobs"></div>
+
+        <h3>排程設定</h3>
+        <div class="row">
+          <label>Daily 分配方式
+            <select id="multi-mode"><option value="focus">集中練：先把上面的職業練完</option><option value="round">輪替：日隨在未完成職業間輪流分配</option></select>
+          </label>
+          <label>每天額外刷幾本副本 <input id="multi-dungeon-runs" type="number" min="0" max="20" value="0"></label>
+        </div>
+        <div class="row">
+          <label class="inline-check"><input id="multi-use-remaining" type="checkbox" checked> 今天已完成的 Daily 不再計入</label>
+          <label class="inline-check"><input id="multi-use-dungeon-exp" type="checkbox" checked> 額外副本使用實際 Base EXP 模型</label>
+        </div>
+        <p class="hint">同一等級的普通戰鬥職需要的升級 EXP 相同；真正會影響規劃的是目前等級/EXP、兵裝加成、一天有限的 Daily 分配，以及你願意額外刷幾本。角色欄與平均排隊時間先記錄起來，後續會拿來做「今晚要花多久」的時間模型。</p>
+
+        <div class="section-head">
+          <div><h3>副本 EXP 資料</h3><p class="hint">從 FFXIV Wiki 的 Semantic MediaWiki 資料讀取每個 Dungeon 的 Base EXP。自動刷本會優先選目前等級可進的最高等級練等副本。</p></div>
+          <button id="refresh-dungeon-exp">更新副本 EXP</button>
+        </div>
+        <div id="dungeon-exp-status" class="muted">尚未讀取副本 EXP</div>
+        <div id="dungeon-exp-preview"></div>
+        <p class="muted">兵裝加成只套在副本本體 EXP：Lv1–89 +100%、Lv90–99 +50%（前提是該職業低於你最高戰鬥職）。Duty Roulette 的每日 Bonus 不吃兵裝加成。休息加成、食物與部隊效果目前先不算，ETA 會稍微保守。</p>
+
+        <button id="calc-multi-level">計算多職業排程</button>
+        <div id="multi-level-result" class="result"></div>
       </article>
     </section>
 
@@ -90,6 +125,7 @@
   </main>
 
   <script src="app.js"></script>
+  <script src="leveling.js"></script>
   <script src="cloud.js"></script>
 </body>
 </html>
