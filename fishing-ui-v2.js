@@ -13,7 +13,7 @@
   };
 
   function tc(v){try{return typeof ff14TcText==='function'?ff14TcText(v):String(v||'')}catch{return String(v||'')}}
-  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
+  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function readStore(key,def=[]){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
   function catalog(){return readStore('fishCatalog',[])}
   function value(el){return el?.value||''}
@@ -80,6 +80,23 @@
     const r=document.getElementById('fish-picker-region');if(r)r.value='';fillZones();fillSpots();const q=document.getElementById('fish-search');if(q){q.value='';q.dispatchEvent(new Event('input',{bubbles:true}))}updateCurrent();
   }
 
+  // app.js creates a spot-group key as "spotId|||spotName" but originally destructures
+  // the raw string instead of split('|||'), so the summary becomes the 2nd character
+  // of spotId (1/2/3...). The fish row itself still contains the correct spot name.
+  // Repair only the summary label from that known-good row text.
+  function fixSpotSummaryNames(){
+    document.querySelectorAll('#fish-catalog details.spot').forEach(details=>{
+      const summary=details.querySelector(':scope > summary');
+      const small=details.querySelector('.fish-row small');
+      if(!summary||!small)return;
+      const parts=small.textContent.split('/').map(x=>x.trim()).filter(Boolean);
+      const spotName=parts[parts.length-1];
+      if(!spotName||/^\d+$/.test(spotName))return;
+      const textNode=[...summary.childNodes].find(n=>n.nodeType===Node.TEXT_NODE);
+      if(textNode&&textNode.nodeValue.trim()!==spotName)textNode.nodeValue=spotName+' ';
+    });
+  }
+
   // Marking one fish should not rebuild the entire catalog. Keep the current scroll,
   // open region/spot details, and only update the affected row + counters.
   function updateCatalogSummary(){
@@ -114,9 +131,9 @@
         const done=document.createElement('span');done.className='done';done.textContent='✓ 已記錄';button.replaceWith(done);
       }
     }
-    // These depend on caught IDs but can update independently without rebuilding fish-catalog.
     try{if(typeof renderBaitShoppingList==='function')renderBaitShoppingList()}catch{}
     try{if(typeof renderRoutePlanner==='function')renderRoutePlanner()}catch{}
+    fixSpotSummaryNames();
   }
   window.markCaught=markCaughtInPlace;
 
@@ -124,7 +141,7 @@
   async function repairCatalogIfNeeded(){
     if(!hasBrokenSpotNames()||typeof refreshFishCatalog!=='function')return;
     const status=document.getElementById('fish-catalog-status');if(status)status.textContent='偵測到舊版數字釣點，正在重新建立釣點資料…';
-    try{await refreshFishCatalog(true);refreshPicker()}catch(e){console.warn('repair fish catalog failed',e)}
+    try{await refreshFishCatalog(true);refreshPicker();fixSpotSummaryNames()}catch(e){console.warn('repair fish catalog failed',e)}
   }
   function refreshTc(){try{if(typeof ff14TcRefresh==='function')ff14TcRefresh(true);else if(typeof refreshFF14TcTerms==='function')refreshFF14TcTerms()}catch(e){console.warn('TC refresh failed',e)}}
   function addStyles(){
@@ -132,12 +149,15 @@
   }
 
   window.addEventListener('DOMContentLoaded',()=>{
-    addStyles();ensurePicker();refreshPicker();
+    addStyles();ensurePicker();refreshPicker();fixSpotSummaryNames();
     setTimeout(repairCatalogIfNeeded,600);
-    setTimeout(refreshPicker,1500);
-    setTimeout(()=>{refreshTc();refreshPicker()},2500);
-    setTimeout(refreshPicker,7000);
+    setTimeout(()=>{refreshPicker();fixSpotSummaryNames()},1500);
+    setTimeout(()=>{refreshTc();refreshPicker();fixSpotSummaryNames()},2500);
+    setTimeout(()=>{refreshPicker();fixSpotSummaryNames()},7000);
   });
-  const observer=new MutationObserver(()=>{clearTimeout(window.__fishPickerTimer);window.__fishPickerTimer=setTimeout(refreshPicker,120)});
+  const observer=new MutationObserver(()=>{
+    clearTimeout(window.__fishPickerTimer);
+    window.__fishPickerTimer=setTimeout(()=>{refreshPicker();fixSpotSummaryNames()},120);
+  });
   window.addEventListener('DOMContentLoaded',()=>{const target=document.getElementById('fish-catalog');if(target)observer.observe(target,{childList:true,subtree:true})});
 })();
