@@ -32,6 +32,7 @@
       <div class="grid">
         <article><h2>今日 Daily</h2><div id="daily-list"></div></article>
         <article><h2>練等 ETA</h2><div id="level-summary"></div><hr><div id="level-multi-summary"></div></article>
+        <article><h2>今晚怎麼玩</h2><div id="tonight-summary"></div></article>
         <article><h2>釣魚 ETA</h2><div id="fish-summary"></div></article>
       </div>
     </section>
@@ -73,7 +74,7 @@
           <label class="inline-check"><input id="multi-use-remaining" type="checkbox" checked> 今天已完成的 Daily 不再計入</label>
           <label class="inline-check"><input id="multi-use-dungeon-exp" type="checkbox" checked> 額外副本使用實際 Base EXP 模型</label>
         </div>
-        <p class="hint">同一等級的普通戰鬥職需要的升級 EXP 相同；真正會影響規劃的是目前等級/EXP、兵裝加成、一天有限的 Daily 分配，以及你願意額外刷幾本。角色欄與平均排隊時間先記錄起來，後續會拿來做「今晚要花多久」的時間模型。</p>
+        <p class="hint">同一等級的普通戰鬥職需要的升級 EXP 相同；真正會影響規劃的是目前等級/EXP、兵裝加成、一天有限的 Daily 分配，以及你願意額外刷幾本。角色欄與平均排隊時間會直接拿去算今晚時間成本。</p>
 
         <div class="section-head">
           <div><h3>副本 EXP 資料</h3><p class="hint">從 FFXIV Wiki 的 Semantic MediaWiki 資料讀取每個 Dungeon 的 Base EXP。自動刷本會優先選目前等級可進的最高等級練等副本。</p></div>
@@ -85,6 +86,34 @@
 
         <button id="calc-multi-level">計算多職業排程</button>
         <div id="multi-level-result" class="result"></div>
+      </article>
+
+      <article class="scheduler-card">
+        <div class="section-head">
+          <div>
+            <h2>今晚排程器</h2>
+            <p class="hint">給一個今晚可玩的時間，它會把剩下的 Daily、排隊時間、額外刷本與排隊釣魚一起算進去，優先塞進比較值得的項目。</p>
+          </div>
+        </div>
+        <div class="row">
+          <label>今晚可玩幾分鐘 <input id="tonight-minutes" type="number" min="10" max="600" value="120"></label>
+          <label>模式
+            <select id="tonight-mode"><option value="chill">🛌 今天只想混</option><option value="balanced" selected>⚖️ 平衡</option><option value="grind">🔥 今天要肝</option></select>
+          </label>
+          <label>今晚主要練誰 <select id="tonight-focus-job"></select></label>
+          <label>排隊釣魚速度（種/小時） <input id="tonight-fish-rate" type="number" min="0" max="200" step="1" value="10"></label>
+        </div>
+        <div class="row">
+          <label>最多額外刷幾本副本 <input id="tonight-dungeon-limit" type="number" min="0" max="20" value="2"></label>
+          <label>一本文本體時間 min <input id="tonight-dungeon-minutes" type="number" min="5" max="90" value="20"></label>
+        </div>
+        <details class="tonight-settings">
+          <summary>調整各 Daily 的平均時間 / 想打程度</summary>
+          <p class="muted">本體時間不含排隊；排隊取職業列裡的「平均排隊 min」。想打程度 0–100 只影響平衡 / 混模式排序，不會改 EXP。</p>
+          <div id="tonight-activity-settings"></div>
+        </details>
+        <button id="calc-tonight">幫我排今晚</button>
+        <div id="tonight-result" class="result"></div>
       </article>
     </section>
 
@@ -126,6 +155,7 @@
 
   <script src="app.js"></script>
   <script src="leveling.js"></script>
+  <script src="tonight.js"></script>
   <script src="cloud.js"></script>
 </body>
 </html>
