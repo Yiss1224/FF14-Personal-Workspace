@@ -43,6 +43,10 @@ function makeDungeonCandidate(job,settings,index=0){
   const gain=dungeonGainForJob(job,d),active=Math.max(5,Number(settings.dungeonMinutes)||20),queue=Math.max(0,Number(job.queueMin)||0),barPct=pctOfCurrentLevel(job,gain);
   return {id:'dungeon:'+index,kind:'dungeon',name:d.name,job:job.name,jobId:job.id,gain,barPct,activeMin:active,queueMin:queue,totalMin:active+queue,willingness:85,repeatable:true,source:d}
 }
+function tonightCandidateDisplayName(c){
+  if(c?.kind==='dungeon'&&typeof dungeonDisplayName==='function')return dungeonDisplayName(c.name);
+  return c?.name||''
+}
 function candidateScore(c,mode){
   const efficiency=c.totalMin>0?c.barPct/c.totalMin:0;
   if(mode==='grind')return efficiency*1.15+c.barPct/100;
@@ -101,10 +105,10 @@ function syncTonightUi(){
 function renderTonightPlan(){
   syncTonightUi();const r=simulateTonight(),out=document.getElementById('tonight-result');if(!out)return;
   if(r.error){out.innerHTML=r.error;return}
-  const rows=r.picked.map((c,i)=>`<tr><td>${i+1}</td><td>${c.kind==='roulette'?'🎲':'🏰'} ${lvlEsc(c.name)}</td><td>${lvlEsc(c.job)}</td><td>${c.barPct.toFixed(1)}%</td><td>${c.activeMin}+${c.queueMin}</td><td>${(c.barPct/Math.max(1,c.totalMin)).toFixed(2)}%/min</td></tr>`).join('');
-  const skip=r.skipped.slice(0,4).map(c=>`${lvlEsc(c.name)}（還要 ${c.totalMin}m）`).join('、')||'—';
+  const rows=r.picked.map((c,i)=>`<tr><td>${i+1}</td><td>${c.kind==='roulette'?'🎲':'🏰'} ${lvlEsc(tonightCandidateDisplayName(c))}</td><td>${lvlEsc(c.job)}</td><td>${c.barPct.toFixed(1)}%</td><td>${c.activeMin}+${c.queueMin}</td><td>${(c.barPct/Math.max(1,c.totalMin)).toFixed(2)}%/min</td></tr>`).join('');
+  const skip=r.skipped.slice(0,4).map(c=>`${lvlEsc(tonightCandidateDisplayName(c))}（還要 ${c.totalMin}m）`).join('、')||'—';
   out.innerHTML=`<div class="scenario-callout"><strong>${modeLabel(r.settings.mode)} · ${r.job.name}</strong><br>預算 ${r.settings.minutes} 分鐘；排入 ${r.picked.length} 項，剩 ${r.remaining} 分鐘。<br>預估推進約 <strong>${r.totalBar.toFixed(1)}% 經驗條</strong>（以各項執行當下等級估算）。</div><table><tr><th>#</th><th>內容</th><th>職業</th><th>約進度</th><th>本體+排隊</th><th>效率</th></tr>${rows||'<tr><td colspan="6">時間內沒有排入項目。</td></tr>'}</table><div class="scenario-callout">預估排隊時間共 <strong>${r.queueFishing} 分</strong>。若排隊都拿去釣魚，照 ${r.settings.fishPerHour} 種/小時估算，可處理約 <strong>${r.fishEstimate.toFixed(1)} 種</strong>。<br><span class="muted">塞不下的前幾項：${skip}</span></div>`;
-  store.set('tonightPlan',{generatedAt:new Date().toISOString(),job:r.job.name,mode:r.settings.mode,minutes:r.settings.minutes,remaining:r.remaining,queueFishing:r.queueFishing,fishEstimate:r.fishEstimate,totalBar:r.totalBar,items:r.picked.map(c=>({kind:c.kind,name:c.name,job:c.job,totalMin:c.totalMin,barPct:c.barPct}))});renderTonightSummary()
+  store.set('tonightPlan',{generatedAt:new Date().toISOString(),job:r.job.name,mode:r.settings.mode,minutes:r.settings.minutes,remaining:r.remaining,queueFishing:r.queueFishing,fishEstimate:r.fishEstimate,totalBar:r.totalBar,items:r.picked.map(c=>({kind:c.kind,name:tonightCandidateDisplayName(c),job:c.job,totalMin:c.totalMin,barPct:c.barPct}))});renderTonightSummary()
 }
 function renderTonightSummary(){
   const box=document.getElementById('tonight-summary');if(!box)return;const p=store.get('tonightPlan',null);
