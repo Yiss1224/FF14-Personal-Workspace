@@ -2,7 +2,7 @@ const LEVEL_JOB_DEFAULTS=[{id:'mnk',name:'MNK',role:'dps',level:65,exp:0,target:
 const LEVEL_ROLE_LABELS={tank:'TANK',healer:'HEALER',dps:'DPS'};
 const DUNGEON_EXP_CACHE_MS=7*24*60*60*1000;
 const DUNGEON_EXP_API='https://ffxiv.consolegameswiki.com/mediawiki/api.php';
-const DUNGEON_TC_CACHE_KEY='ff14DungeonTcNamesV1';
+const DUNGEON_TC_CACHE_KEY='ff14DungeonTcNamesV2';
 const DUNGEON_TC_BASE='https://raw.githubusercontent.com/thewakingsands/ffxiv-datamining-tc/main';
 const DUNGEON_EN_BASE='https://raw.githubusercontent.com/xivapi/ffxiv-datamining/master/csv/en';
 
@@ -37,7 +37,7 @@ const LEVELING_DUNGEON_LADDER=[
 let dungeonExpCatalog=[];
 let dungeonTcNames={};
 
-function lvlEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function lvlEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
 function lvlUid(){return 'j'+Math.random().toString(36).slice(2,9)}
 function normalizeLevelJob(j={}){return{id:String(j.id||lvlUid()),name:String(j.name||'').trim(),role:['tank','healer','dps'].includes(j.role)?j.role:'dps',level:Math.max(1,Math.min(99,Number(j.level)||1)),exp:Math.max(0,Number(j.exp)||0),target:Math.max(2,Math.min(100,Number(j.target)||100)),armoury:j.armoury!==false,queueMin:Math.max(0,Number(j.queueMin)||0)}}
 function getLevelJobs(){const saved=store.get('levelJobs',null);let rows=Array.isArray(saved)?saved.filter(x=>x&&typeof x==='object').map(normalizeLevelJob):[];if(!rows.length)rows=LEVEL_JOB_DEFAULTS.map(x=>normalizeLevelJob({...x,id:lvlUid()}));return rows}
@@ -55,15 +55,20 @@ function csvLine(line){const out=[];let cur='',quoted=false;for(let i=0;i<line.l
 function dungeonNameKey(v){return String(v||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'')}
 function dungeonDisplayName(name){return dungeonTcNames[dungeonNameKey(name)]||name}
 function contentFinderNames(text){const lines=String(text||'').replace(/^\uFEFF/,'').split(/\r?\n/),heads=csvLine(lines[1]||''),idx=heads.indexOf('Name'),out={};for(let i=3;i<lines.length;i++){if(!lines[i])continue;const r=csvLine(lines[i]),id=Number(r[0]);if(Number.isFinite(id)&&idx>=0&&r[idx])out[id]=String(r[idx]).trim()}return out}
+function refreshRenderedScheduleNames(){
+  renderDungeonPreview();
+  const out=document.getElementById('multi-level-result');
+  if(out&&out.textContent.trim())safeLevelInitStep('translated multi schedule',renderMultiSchedule);
+}
 async function loadDungeonTcNames(){
   try{const cached=JSON.parse(localStorage.getItem(DUNGEON_TC_CACHE_KEY)||'null');if(cached?.names&&Date.now()-(cached.ts||0)<30*24*60*60*1000)dungeonTcNames=cached.names}catch{}
-  if(Object.keys(dungeonTcNames).length){renderDungeonPreview();return dungeonTcNames}
+  if(Object.keys(dungeonTcNames).length){refreshRenderedScheduleNames();return dungeonTcNames}
   try{
     const [enR,tcR]=await Promise.all([fetch(`${DUNGEON_EN_BASE}/ContentFinderCondition.csv`,{cache:'no-store'}),fetch(`${DUNGEON_TC_BASE}/ContentFinderCondition.csv`,{cache:'no-store'})]);
     if(!enR.ok||!tcR.ok)throw new Error('ContentFinderCondition.csv');
     const [enText,tcText]=await Promise.all([enR.text(),tcR.text()]),en=contentFinderNames(enText),tc=contentFinderNames(tcText),map={};
     for(const[id,enName]of Object.entries(en)){const tcName=tc[id];if(enName&&tcName)map[dungeonNameKey(enName)]=tcName}
-    dungeonTcNames=map;localStorage.setItem(DUNGEON_TC_CACHE_KEY,JSON.stringify({ts:Date.now(),names:map}));renderDungeonPreview();return map
+    dungeonTcNames=map;localStorage.setItem(DUNGEON_TC_CACHE_KEY,JSON.stringify({ts:Date.now(),names:map}));refreshRenderedScheduleNames();return map
   }catch(e){console.warn('dungeon TC names load failed',e);return dungeonTcNames}
 }
 
@@ -161,6 +166,6 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.querySelectorAll('#multi-mode,#multi-dungeon-runs,#multi-use-remaining,#multi-use-dungeon-exp').forEach(x=>x.addEventListener('change',syncSchedulerSettingsFromUi));
   document.getElementById('refresh-dungeon-exp')?.addEventListener('click',()=>loadDungeonExpCatalog(true));
   safeLevelInitStep('jobs',renderLevelJobs);safeLevelInitStep('settings',loadSchedulerSettingsToUi);safeLevelInitStep('summary',renderMultiSummary);
-  Promise.allSettled([loadDungeonTcNames(),loadDungeonExpCatalog(false)]).then(()=>renderDungeonPreview())
+  Promise.allSettled([loadDungeonTcNames(),loadDungeonExpCatalog(false)]).then(()=>refreshRenderedScheduleNames())
 });
 window.renderLevelScheduler=()=>{safeLevelInitStep('jobs',renderLevelJobs);safeLevelInitStep('settings',loadSchedulerSettingsToUi);safeLevelInitStep('summary',renderMultiSummary);safeLevelInitStep('dungeon preview',renderDungeonPreview)};
