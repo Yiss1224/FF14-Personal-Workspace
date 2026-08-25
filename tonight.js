@@ -7,7 +7,7 @@ const TONIGHT_DEFAULTS={
   dungeonMinutes:20,
   activities:{
     leveling:{minutes:20,willingness:100},
-    msq:{minutes:35,willingness:70},
+    msq:{minutes:20,willingness:70},
     alliance:{minutes:30,willingness:80},
     normal:{minutes:12,willingness:90},
     trial:{minutes:12,willingness:90},
