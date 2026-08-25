@@ -17,7 +17,9 @@ const TONIGHT_DEFAULTS={
 
 function tonightSettings(){
   const saved=store.get('tonightSettings',{})||{};
-  return {...TONIGHT_DEFAULTS,...saved,activities:{...TONIGHT_DEFAULTS.activities,...(saved.activities||{})}}
+  const activities={...TONIGHT_DEFAULTS.activities,...(saved.activities||{})};
+  if(Number(activities.msq?.minutes)===35)activities.msq={...activities.msq,minutes:20};
+  return {...TONIGHT_DEFAULTS,...saved,activities}
 }
 function saveTonightSettings(s){store.set('tonightSettings',s)}
 function tonightJobs(){return getLevelJobs().map(normalizeLevelJob).filter(j=>j.name&&j.level<j.target)}
