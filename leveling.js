@@ -50,6 +50,17 @@ function isJobDone(j){return j.level>=j.target}
 function addAbsoluteExp(job,amount){let gain=Math.max(0,Number(amount)||0),earned=0;while(gain>0&&job.level<job.target){const need=levelNeed(job.level);if(!need)break;job.exp=Math.max(0,Math.min(job.exp,need));const room=need-job.exp;if(gain>=room){gain-=room;earned+=room;job.level++;job.exp=0}else{job.exp+=gain;earned+=gain;gain=0}}return earned}
 function addPercentBar(job,pct){const need=levelNeed(job.level);if(!need||isJobDone(job))return 0;return addAbsoluteExp(job,need*Math.max(0,Number(pct)||0)/100)}
 function armouryMultiplier(job){if(!job.armoury)return 1;return job.level<=89?2:1.5}
+function roulettePctAtLevel(roulette,level){
+  if(roulette?.id!=='leveling')return Math.max(0,Number(roulette?.pct)||0);
+  const lv=Math.max(1,Number(level)||1);
+  if(lv<50)return Math.max(0,Number(roulette?.pct)||33);
+  if(lv<60)return 35;
+  if(lv<70)return 30;
+  if(lv<80)return 35;
+  if(lv<90)return 50;
+  return 50
+}
+window.roulettePctAtLevel=roulettePctAtLevel;
 
 function csvLine(line){const out=[];let cur='',quoted=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(quoted&&line[i+1]==='"'){cur+='"';i++}else quoted=!quoted}else if(c===','&&!quoted){out.push(cur);cur=''}else cur+=c}out.push(cur);return out}
 function dungeonNameKey(v){return String(v||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'')}
@@ -153,7 +164,7 @@ function simulateMultiJobs(inputJobs,roulettes,settings){
   const jobs=inputJobs.map(normalizeLevelJob).filter(j=>j.name).map(x=>({...x})),completed={},trace=[];let day=0,pointer=0,totalDungeonRuns=0;
   while(jobs.some(j=>!isJobDone(j))&&day<3650){
     const events=[],acts=schedulerDailyActivities(roulettes,day,settings.useRemainingToday);
-    for(const a of acts){let job;if(settings.mode==='round'){const p=chooseRoundJob(jobs,pointer);job=p.job;pointer=p.pointer}else job=chooseFocusJob(jobs);if(!job)break;const before=`Lv${job.level}`,earned=addPercentBar(job,Number(a.pct)||0);events.push({kind:'daily',name:a.name,job:job.name,before,after:`Lv${job.level}`,earned});if(isJobDone(job)&&completed[job.id]==null)completed[job.id]=day+1}
+    for(const a of acts){let job;if(settings.mode==='round'){const p=chooseRoundJob(jobs,pointer);job=p.job;pointer=p.pointer}else job=chooseFocusJob(jobs);if(!job)break;const before=`Lv${job.level}`,pct=roulettePctAtLevel(a,job.level),earned=addPercentBar(job,pct);events.push({kind:'daily',name:a.name,job:job.name,before,after:`Lv${job.level}`,earned,pct});if(isJobDone(job)&&completed[job.id]==null)completed[job.id]=day+1}
     for(let n=0;n<(Number(settings.dungeonRuns)||0);n++){let job;if(settings.mode==='round'){const p=chooseRoundJob(jobs,pointer);job=p.job;pointer=p.pointer}else job=chooseFocusJob(jobs);if(!job)break;const d=settings.includeDungeonExp?bestDungeonForLevel(job.level):null;if(!d)break;const before=`Lv${job.level}`,earned=addAbsoluteExp(job,dungeonGainForJob(job,d));totalDungeonRuns++;events.push({kind:'dungeon',name:d.name,estimated:d.estimated,job:job.name,before,after:`Lv${job.level}`,earned});if(isJobDone(job)&&completed[job.id]==null)completed[job.id]=day+1}
     day++;if(day<=14)trace.push({day,events,jobs:jobs.map(j=>({name:j.name,level:j.level,exp:j.exp,target:j.target}))})
   }
@@ -168,8 +179,8 @@ function renderMultiSchedule(){
   const jobRows=jobs.map(j=>{const d=baseline.completed[j.id];return`<tr><td>${lvlEsc(j.name)}</td><td>${LEVEL_ROLE_LABELS[j.role]}</td><td>Lv${j.level} → ${j.target}</td><td>${d??'—'} 天</td><td>${d?addDays(d):'—'}</td></tr>`}).join('');
   const diffRows=diffs.map(x=>`<tr><td>${lvlEsc(x.name)}</td><td>${x.currently?'目前有打':'目前沒打'}</td><td>${x.currently?'不打':'加入'}</td><td>${x.delta===0?'±0':x.delta>0?`+${x.delta}`:x.delta} 天</td></tr>`).join('');
   const dungeonLine=noDungeon?`<div class="scenario-callout">每天 ${settings.dungeonRuns} 本最高可用練等副本：總畢業約 <strong>${baseline.days} 天</strong>；若完全不刷副本約 <strong>${noDungeon.days} 天</strong>，差 ${Math.max(0,noDungeon.days-baseline.days)} 天。</div>`:'';
-  const trace=baseline.trace.slice(0,7).map(d=>`<details class="schedule-day"><summary>Day ${d.day} · ${d.events.length} 項</summary>${d.events.map(e=>`<div>${e.kind==='daily'?'🎲':'🏰'} ${lvlEsc(e.kind==='dungeon'?dungeonDisplayName(e.name):e.name)}${e.kind==='dungeon'&&e.estimated?'（EXP估算）':''} → <strong>${lvlEsc(e.job)}</strong> ${e.before}→${e.after}　+${Math.round(e.earned).toLocaleString('zh-TW')} EXP</div>`).join('')||'<div class="muted">今天沒有可用項目。</div>'}</details>`).join('');
-  out.innerHTML=`<div class="scenario-callout"><strong>全部目標：約 ${baseline.days} 天</strong>（${addDays(baseline.days)}）<br><span class="muted">模式：${settings.mode==='round'?'日隨輪替分配':'照上方順序集中練'}。副本推薦使用完整練等副本階梯；Wiki 缺少的 Base EXP 會標為估算。</span></div>${dungeonLine}<h3>各職業 ETA</h3><table><tr><th>職業</th><th>角色</th><th>目標</th><th>完成</th><th>日期</th></tr>${jobRows}</table><h3>打／不打差多少</h3><table><tr><th>項目</th><th>狀態</th><th>假設</th><th>全部目標差</th></tr>${diffRows}</table><h3>前 7 天排程預覽</h3>${trace}`;
+  const trace=baseline.trace.slice(0,7).map(d=>`<details class="schedule-day"><summary>Day ${d.day} · ${d.events.length} 項</summary>${d.events.map(e=>`<div>${e.kind==='daily'?'🎲':'🏰'} ${lvlEsc(e.kind==='dungeon'?dungeonDisplayName(e.name):e.name)}${e.kind==='dungeon'&&e.estimated?'（EXP估算）':''}${e.kind==='daily'&&e.name==='練等隨機'?`（動態估算 ${Number(e.pct||0).toFixed(0)}%）`:''} → <strong>${lvlEsc(e.job)}</strong> ${e.before}→${e.after}　+${Math.round(e.earned).toLocaleString('zh-TW')} EXP</div>`).join('')||'<div class="muted">今天沒有可用項目。</div>'}</details>`).join('');
+  out.innerHTML=`<div class="scenario-callout"><strong>全部目標：約 ${baseline.days} 天</strong>（${addDays(baseline.days)}）<br><span class="muted">模式：${settings.mode==='round'?'日隨輪替分配':'照上方順序集中練'}。練等隨機會依角色等級使用動態估值；副本推薦使用完整練等副本階梯，Wiki 缺少的 Base EXP 會標為估算。</span></div>${dungeonLine}<h3>各職業 ETA</h3><table><tr><th>職業</th><th>角色</th><th>目標</th><th>完成</th><th>日期</th></tr>${jobRows}</table><h3>打／不打差多少</h3><table><tr><th>項目</th><th>狀態</th><th>假設</th><th>全部目標差</th></tr>${diffRows}</table><h3>前 7 天排程預覽</h3>${trace}`;
   store.set('levelMultiPlan',{days:baseline.days,generatedAt:new Date().toISOString(),jobs:jobs.map(j=>({name:j.name,level:j.level,target:j.target,etaDays:baseline.completed[j.id]})),settings});renderMultiSummary()
 }
 function renderMultiSummary(){const box=document.getElementById('level-multi-summary');if(!box)return;const p=store.get('levelMultiPlan',null);box.innerHTML=p?`多職業：<strong>${p.days} 天</strong><br>${(p.jobs||[]).slice(0,4).map(j=>`${lvlEsc(j.name)} ${j.etaDays||'—'}d`).join(' · ')}`:'尚未建立多職業排程'}
