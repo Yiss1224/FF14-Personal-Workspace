@@ -2,7 +2,7 @@ const LEVEL_JOB_DEFAULTS=[{id:'mnk',name:'MNK',role:'dps',level:65,exp:0,target:
 const LEVEL_ROLE_LABELS={tank:'TANK',healer:'HEALER',dps:'DPS'};
 const DUNGEON_EXP_CACHE_MS=7*24*60*60*1000;
 const DUNGEON_EXP_API='https://ffxiv.consolegameswiki.com/mediawiki/api.php';
-const DUNGEON_TC_CACHE_KEY='ff14DungeonTcNamesV2';
+const DUNGEON_TC_CACHE_KEY='ff14DungeonTcNamesV3';
 const DUNGEON_TC_BASE='https://raw.githubusercontent.com/thewakingsands/ffxiv-datamining-tc/main';
 const DUNGEON_EN_BASE='https://raw.githubusercontent.com/xivapi/ffxiv-datamining/master/csv/en';
 
@@ -37,7 +37,7 @@ const LEVELING_DUNGEON_LADDER=[
 let dungeonExpCatalog=[];
 let dungeonTcNames={};
 
-function lvlEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
+function lvlEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function lvlUid(){return 'j'+Math.random().toString(36).slice(2,9)}
 function normalizeLevelJob(j={}){return{id:String(j.id||lvlUid()),name:String(j.name||'').trim(),role:['tank','healer','dps'].includes(j.role)?j.role:'dps',level:Math.max(1,Math.min(99,Number(j.level)||1)),exp:Math.max(0,Number(j.exp)||0),target:Math.max(2,Math.min(100,Number(j.target)||100)),armoury:j.armoury!==false,queueMin:Math.max(0,Number(j.queueMin)||0)}}
 function getLevelJobs(){const saved=store.get('levelJobs',null);let rows=Array.isArray(saved)?saved.filter(x=>x&&typeof x==='object').map(normalizeLevelJob):[];if(!rows.length)rows=LEVEL_JOB_DEFAULTS.map(x=>normalizeLevelJob({...x,id:lvlUid()}));return rows}
@@ -54,7 +54,21 @@ function armouryMultiplier(job){if(!job.armoury)return 1;return job.level<=89?2:
 function csvLine(line){const out=[];let cur='',quoted=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(quoted&&line[i+1]==='"'){cur+='"';i++}else quoted=!quoted}else if(c===','&&!quoted){out.push(cur);cur=''}else cur+=c}out.push(cur);return out}
 function dungeonNameKey(v){return String(v||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'')}
 function dungeonDisplayName(name){return dungeonTcNames[dungeonNameKey(name)]||name}
-function contentFinderNames(text){const lines=String(text||'').replace(/^\uFEFF/,'').split(/\r?\n/),heads=csvLine(lines[1]||''),idx=heads.indexOf('Name'),out={};for(let i=3;i<lines.length;i++){if(!lines[i])continue;const r=csvLine(lines[i]),id=Number(r[0]);if(Number.isFinite(id)&&idx>=0&&r[idx])out[id]=String(r[idx]).trim()}return out}
+function contentFinderNames(text){
+  const lines=String(text||'').replace(/^\uFEFF/,'').split(/\r?\n/),out={};
+  let headerRow=-1,nameIndex=-1;
+  for(let i=0;i<Math.min(lines.length,6);i++){
+    const row=csvLine(lines[i]||''),idx=row.indexOf('Name');
+    if(idx>=0){headerRow=i;nameIndex=idx;break}
+  }
+  if(nameIndex<0)return out;
+  for(let i=headerRow+1;i<lines.length;i++){
+    if(!lines[i])continue;
+    const r=csvLine(lines[i]),id=Number(r[0]);
+    if(Number.isInteger(id)&&r.length>nameIndex&&r[nameIndex])out[id]=String(r[nameIndex]).trim()
+  }
+  return out
+}
 function refreshRenderedScheduleNames(){
   renderDungeonPreview();
   const out=document.getElementById('multi-level-result');
@@ -68,6 +82,9 @@ async function loadDungeonTcNames(){
     if(!enR.ok||!tcR.ok)throw new Error('ContentFinderCondition.csv');
     const [enText,tcText]=await Promise.all([enR.text(),tcR.text()]),en=contentFinderNames(enText),tc=contentFinderNames(tcText),map={};
     for(const[id,enName]of Object.entries(en)){const tcName=tc[id];if(enName&&tcName)map[dungeonNameKey(enName)]=tcName}
+    const sanity=['Dohn Mheg','the Qitana Ravel','The Tower of Babil'];
+    const missing=sanity.filter(x=>!map[dungeonNameKey(x)]);
+    if(missing.length)throw new Error(`繁中副本對照失敗：${missing.join(', ')}`);
     dungeonTcNames=map;localStorage.setItem(DUNGEON_TC_CACHE_KEY,JSON.stringify({ts:Date.now(),names:map}));refreshRenderedScheduleNames();return map
   }catch(e){console.warn('dungeon TC names load failed',e);return dungeonTcNames}
 }
@@ -140,7 +157,7 @@ function simulateMultiJobs(inputJobs,roulettes,settings){
     for(let n=0;n<(Number(settings.dungeonRuns)||0);n++){let job;if(settings.mode==='round'){const p=chooseRoundJob(jobs,pointer);job=p.job;pointer=p.pointer}else job=chooseFocusJob(jobs);if(!job)break;const d=settings.includeDungeonExp?bestDungeonForLevel(job.level):null;if(!d)break;const before=`Lv${job.level}`,earned=addAbsoluteExp(job,dungeonGainForJob(job,d));totalDungeonRuns++;events.push({kind:'dungeon',name:d.name,estimated:d.estimated,job:job.name,before,after:`Lv${job.level}`,earned});if(isJobDone(job)&&completed[job.id]==null)completed[job.id]=day+1}
     day++;if(day<=14)trace.push({day,events,jobs:jobs.map(j=>({name:j.name,level:j.level,exp:j.exp,target:j.target}))})
   }
-  jobs.forEach(j=>{if(isJobDone(j)&&completed[j.id]==null)completed[j.id]=day});return{days:day,jobs,completed,trace,totalDungeonRuns}
+  jobs.forEach(j=>{if(isJobDone(j)&&completed[job.id]==null)completed[j.id]=day});return{days:day,jobs,completed,trace,totalDungeonRuns}
 }
 function scenarioRoulettes(base,id,enabled){return base.map(r=>r.id===id?{...r,enabled}:{...r})}
 function simulateScenarioDiffs(jobs,roulettes,settings,baseline){return roulettes.map(r=>{const v=simulateMultiJobs(jobs,scenarioRoulettes(roulettes,r.id,!r.enabled),settings);return{id:r.id,name:r.name,currently:r.enabled,days:v.days,delta:v.days-baseline.days,pct:r.pct}})}
