@@ -157,7 +157,7 @@ function simulateMultiJobs(inputJobs,roulettes,settings){
     for(let n=0;n<(Number(settings.dungeonRuns)||0);n++){let job;if(settings.mode==='round'){const p=chooseRoundJob(jobs,pointer);job=p.job;pointer=p.pointer}else job=chooseFocusJob(jobs);if(!job)break;const d=settings.includeDungeonExp?bestDungeonForLevel(job.level):null;if(!d)break;const before=`Lv${job.level}`,earned=addAbsoluteExp(job,dungeonGainForJob(job,d));totalDungeonRuns++;events.push({kind:'dungeon',name:d.name,estimated:d.estimated,job:job.name,before,after:`Lv${job.level}`,earned});if(isJobDone(job)&&completed[job.id]==null)completed[job.id]=day+1}
     day++;if(day<=14)trace.push({day,events,jobs:jobs.map(j=>({name:j.name,level:j.level,exp:j.exp,target:j.target}))})
   }
-  jobs.forEach(j=>{if(isJobDone(j)&&completed[job.id]==null)completed[j.id]=day});return{days:day,jobs,completed,trace,totalDungeonRuns}
+  jobs.forEach(j=>{if(isJobDone(j)&&completed[j.id]==null)completed[j.id]=day});return{days:day,jobs,completed,trace,totalDungeonRuns}
 }
 function scenarioRoulettes(base,id,enabled){return base.map(r=>r.id===id?{...r,enabled}:{...r})}
 function simulateScenarioDiffs(jobs,roulettes,settings,baseline){return roulettes.map(r=>{const v=simulateMultiJobs(jobs,scenarioRoulettes(roulettes,r.id,!r.enabled),settings);return{id:r.id,name:r.name,currently:r.enabled,days:v.days,delta:v.days-baseline.days,pct:r.pct}})}
