@@ -10,6 +10,7 @@
 
   function readStore(key,def=[]){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
   function catalog(){return readStore('fishCatalog',[])}
+  function catalogLocations(){const rows=catalog();if(typeof window.expandFishLocations==='function')return window.expandFishLocations(rows);const out=[];for(const fish of rows){const spots=Array.isArray(fish?.spots)&&fish.spots.length?fish.spots:[fish];spots.forEach(loc=>out.push({...fish,...loc}))}return out}
   function val(id){return document.getElementById(id)?.value||''}
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
   function tc(v){try{return typeof ff14TcText==='function'?ff14TcText(v):String(v||'')}catch{return String(v||'')}}
@@ -26,12 +27,12 @@
   }
 
   function groupedSpots(region,zone){
-    const rows=catalog().filter(x=>(!region||x.regionName===region)&&x.zoneName===zone);
+    const rows=catalogLocations().filter(x=>(!region||x.regionName===region)&&x.zoneName===zone);
     const by=new Map();
     for(const x of rows){
       const key=`${x.spotId}|||${x.spotName}`;
-      if(!by.has(key))by.set(key,{spotId:Number(x.spotId)||0,name:x.spotName,x:Number.isFinite(Number(x.x))?Number(x.x):null,y:Number.isFinite(Number(x.y))?Number(x.y):null,fish:0});
-      const s=by.get(key);s.fish++;
+      if(!by.has(key))by.set(key,{spotId:Number(x.spotId)||0,name:x.spotName,x:Number.isFinite(Number(x.x))?Number(x.x):null,y:Number.isFinite(Number(x.y))?Number(x.y):null,fish:0,fishIds:new Set()});
+      const s=by.get(key);s.fishIds.add(`${x.type||'fish'}:${Number(x.itemId)||0}`);s.fish=s.fishIds.size;
       if(s.x===null&&Number.isFinite(Number(x.x)))s.x=Number(x.x);
       if(s.y===null&&Number.isFinite(Number(x.y)))s.y=Number(x.y);
     }
