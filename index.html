@@ -130,10 +130,11 @@
         <div class="row">
           <button id="save-fish">記錄今天</button>
           <button id="import-fishcake">匯入魚糕 JSON</button>
+          <button id="export-fishcake">匯出魚糕 JSON</button>
           <input id="fishcake-file" type="file" accept="application/json,.json" hidden>
         </div>
         <div id="fish-result" class="result"></div>
-        <div id="fish-import-status" class="hint">支援魚糕常見輸出 <code>{"completed":[itemId,…]}</code>。匯入採聯集，只會增加已知魚種，不會因漏記把既有紀錄刪掉。</div>
+        <div id="fish-import-status" class="hint">支援魚糕常見格式 <code>{"completed":[itemId,…]}</code>。匯入採聯集；匯出會包含魚糕匯入與本工具手動標記的全部已知魚種。</div>
 
         <h3>歷史</h3>
         <div id="fish-history"></div>
@@ -169,7 +170,7 @@
     </section>
   </main>
 
-  <script src="app.js?v=20260826-1931"></script>
+  <script src="app.js?v=20260826-2138"></script>
   <script src="fishing-guide.js?v=20260826-1931"></script>
   <script src="leveling.js?v=20260825-1357"></script>
   <script src="tonight.js?v=20260825-1357"></script>
