@@ -63,6 +63,16 @@
     return enLoadPromise;
   }
 
+  function rowSpotName(row){
+    const small=row?.querySelector?.(':scope > div:first-child > small')?.textContent||'';
+    const parts=small.split('/').map(x=>x.trim()).filter(Boolean);
+    return parts[parts.length-1]||'';
+  }
+  function locationsFor(fish){
+    if(!fish)return [];
+    if(typeof window.fishLocations==='function')return window.fishLocations(fish);
+    return Array.isArray(fish.spots)&&fish.spots.length?fish.spots:[fish];
+  }
   function itemIdFromRow(row){
     const explicit=row?.dataset?.itemId;
     if(explicit&&Number(explicit))return Number(explicit);
@@ -76,18 +86,21 @@
 
     // Last-resort fallback: match the row's visible spot/fish text against catalog.
     const visible=row?.querySelector?.(':scope > div:first-child > strong')?.textContent?.trim()||'';
-    const small=row?.querySelector?.(':scope > div:first-child > small')?.textContent||'';
-    const parts=small.split('/').map(x=>x.trim()).filter(Boolean),spot=parts[parts.length-1]||'';
-    const rows=catalog();
-    let hit=rows.find(x=>String(x.spotName||'')===spot&&(String(x.name||'')===visible||tc(x.name)===visible));
+    const spot=rowSpotName(row),rows=catalog();
+    let hit=rows.find(fish=>locationsFor(fish).some(loc=>(String(loc.spotName||'')===spot||tc(loc.spotName)===spot)&&(String(fish.name||'')===visible||tc(fish.name)===visible)));
     if(!hit)hit=rows.find(x=>String(x.name||'')===visible||tc(x.name)===visible);
     return Number(hit?.itemId)||0;
   }
 
-  function catalogRow(itemId){return catalog().find(x=>Number(x.itemId)===Number(itemId))||null}
+  function catalogRow(itemId,row){
+    const fish=catalog().find(x=>Number(x.itemId)===Number(itemId))||null;
+    if(!fish)return null;
+    const spot=rowSpotName(row),locations=locationsFor(fish),loc=locations.find(x=>String(x.spotName||'')===spot||tc(x.spotName)===spot)||locations[0];
+    return loc?{...fish,...loc}:fish;
+  }
   function rowMeta(row){
     const visibleName=row?.querySelector?.(':scope > div:first-child > strong')?.textContent?.trim()||'';
-    const itemId=itemIdFromRow(row),cat=catalogRow(itemId);
+    const itemId=itemIdFromRow(row),cat=catalogRow(itemId,row);
     const english=String(enById[String(itemId)]||'').trim();
     const catalogName=String(cat?.name||'').trim();
     return {itemId,catalog:cat,englishName:english,catalogName,visibleName};
