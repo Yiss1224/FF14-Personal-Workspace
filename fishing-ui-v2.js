@@ -16,9 +16,11 @@
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function readStore(key,def=[]){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
   function catalog(){return readStore('fishCatalog',[])}
+  function catalogLocations(){const rows=catalog();if(typeof window.expandFishLocations==='function')return window.expandFishLocations(rows);const out=[];for(const fish of rows){const spots=Array.isArray(fish?.spots)&&fish.spots.length?fish.spots:[fish];spots.forEach(loc=>out.push({...fish,...loc}))}return out}
   function value(el){return el?.value||''}
   function validName(v){const s=String(v||'').trim();return s&&!/^\d+$/.test(s)?s:''}
   function relationName(v){return validName(v?.fields?.Name??v?.Name??'')}
+  function uniqueFishCount(rows){return new Set((rows||[]).map(x=>`${x.type||'fish'}:${Number(x.itemId)||0}`)).size}
 
   window.locationParts=function(spot){
     const sf=spot?.fields||{},territory=sf.TerritoryType,tf=territory?.fields||{};
@@ -54,16 +56,16 @@
   }
   function refreshPicker(){
     ensurePicker();const region=document.getElementById('fish-picker-region');if(!region)return;
-    fillSelect(region,distinct(catalog().map(x=>x.regionName)),'全部地區');fillZones();fillSpots();updateCurrent();
+    fillSelect(region,distinct(catalogLocations().map(x=>x.regionName)),'全部地區');fillZones();fillSpots();updateCurrent();
   }
   function fillZones(){
     const region=document.getElementById('fish-picker-region'),zone=document.getElementById('fish-picker-zone');if(!region||!zone)return;
-    const selected=value(region),rows=catalog().filter(x=>!selected||x.regionName===selected);
+    const selected=value(region),rows=catalogLocations().filter(x=>!selected||x.regionName===selected);
     fillSelect(zone,distinct(rows.map(x=>x.zoneName)),selected?'全部地圖':'先選地區');zone.disabled=!selected;if(!selected)zone.value='';
   }
   function fillSpots(){
     const region=value(document.getElementById('fish-picker-region')),zoneEl=document.getElementById('fish-picker-zone'),spot=document.getElementById('fish-picker-spot');if(!spot)return;
-    const zone=value(zoneEl),rows=catalog().filter(x=>(!region||x.regionName===region)&&(!zone||x.zoneName===zone));
+    const zone=value(zoneEl),rows=catalogLocations().filter(x=>(!region||x.regionName===region)&&(!zone||x.zoneName===zone));
     fillSelect(spot,distinct(rows.map(x=>x.spotName)),zone?'全部釣點':'先選地圖');spot.disabled=!zone;if(!zone)spot.value='';
   }
   function updateCurrent(){
@@ -78,8 +80,6 @@
     const r=document.getElementById('fish-picker-region');if(r)r.value='';fillZones();fillSpots();const q=document.getElementById('fish-search');if(q){q.value='';q.dispatchEvent(new Event('input',{bubbles:true}))}updateCurrent();
   }
 
-  // app.js makes key "spotId|||spotName" but destructures the raw string.
-  // Repair the outer summary from the known-good row text.
   function fixSpotSummaryNames(){
     document.querySelectorAll('#fish-catalog details.spot').forEach(details=>{
       const summary=details.querySelector(':scope > summary'),small=details.querySelector('.fish-row small');
@@ -94,8 +94,8 @@
   function updateCatalogSummary(){
     const summary=document.getElementById('fish-map-summary');if(!summary)return;
     const all=catalog(),caught=new Set(typeof getCaughtIds==='function'?getCaughtIds():readStore('fishCaughtIds',[])),skipped=new Set(typeof getSkippedIds==='function'?getSkippedIds():readStore('fishSkippedIds',[]));
-    const ordinaryRemaining=all.filter(x=>!caught.has(Number(x.itemId))&&!x.bigFish&&!skipped.has(Number(x.itemId))).length;
-    summary.innerHTML=`外部圖鑑：${all.length} 筆　｜　已知已釣 ID：${caught.size}　｜　<strong>未記錄普通魚：${ordinaryRemaining}</strong>　｜　先跳過：${skipped.size}<br><span class="muted">魚糕可能漏記，所以「未記錄」不等於一定沒釣過。預設把魚王隱藏，優先拿普通魚掃圖。</span>`;
+    const ordinaryRemaining=uniqueFishCount(all.filter(x=>!caught.has(Number(x.itemId))&&!x.bigFish&&!skipped.has(Number(x.itemId))));
+    summary.innerHTML=`外部圖鑑：${uniqueFishCount(all)} 種　｜　已知已釣 ID：${caught.size}　｜　<strong>未記錄普通魚：${ordinaryRemaining}</strong>　｜　先跳過：${skipped.size}<br><span class="muted">同一魚種可出現在多個釣場，但圖鑑總數只算一次。魚糕可能漏記，所以「未記錄」不等於一定沒釣過。</span>`;
   }
   function decrementBadge(details){
     if(!details)return;
@@ -112,14 +112,15 @@
     if(typeof renderFish==='function')renderFish();
     updateCatalogSummary();
 
-    const button=document.querySelector(`#fish-catalog [data-caught="${itemId}"]`),row=button?.closest('.fish-row');
-    if(row){
-      const spot=row.closest('details.spot'),zone=row.closest('details.zone'),onlyMissing=document.getElementById('fish-only-missing')?.checked??true;
+    const buttons=[...document.querySelectorAll(`#fish-catalog [data-caught="${itemId}"]`)],onlyMissing=document.getElementById('fish-only-missing')?.checked??true;
+    for(const button of buttons){
+      const row=button.closest('.fish-row');if(!row)continue;
+      const spot=row.closest('details.spot'),zone=row.closest('details.zone');
       if(onlyMissing){
         row.remove();decrementBadge(spot);decrementBadge(zone);
         const list=spot?.querySelector('.fish-list');if(list&&!list.querySelector('.fish-row'))spot.remove();
         if(zone&&!zone.querySelector('details.spot'))zone.remove();
-      }else if(button){
+      }else{
         const done=document.createElement('span');done.className='done';done.textContent='✓ 已記錄';button.replaceWith(done);
       }
     }
@@ -140,7 +141,7 @@
     markCaughtInPlace(Number(button.dataset.caught));
   }
 
-  function hasBrokenSpotNames(){return catalog().some(x=>/^\d+$/.test(String(x.spotName||'').trim()))}
+  function hasBrokenSpotNames(){return catalogLocations().some(x=>/^\d+$/.test(String(x.spotName||'').trim()))}
   async function repairCatalogIfNeeded(){
     if(!hasBrokenSpotNames()||typeof refreshFishCatalog!=='function')return;
     const status=document.getElementById('fish-catalog-status');if(status)status.textContent='偵測到舊版數字釣點，正在重新建立釣點資料…';
