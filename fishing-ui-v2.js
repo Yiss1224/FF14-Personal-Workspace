@@ -112,12 +112,12 @@
     if(typeof renderFish==='function')renderFish();
     updateCatalogSummary();
 
-    const buttons=[...document.querySelectorAll(`#fish-catalog [data-caught="${itemId}"]`)],onlyMissing=document.getElementById('fish-only-missing')?.checked??true;
+    const buttons=[...document.querySelectorAll(`#fish-catalog [data-caught="${itemId}"]`)],onlyMissing=document.getElementById('fish-only-missing')?.checked??true,seenZones=new Set();
     for(const button of buttons){
       const row=button.closest('.fish-row');if(!row)continue;
       const spot=row.closest('details.spot'),zone=row.closest('details.zone');
       if(onlyMissing){
-        row.remove();decrementBadge(spot);decrementBadge(zone);
+        row.remove();decrementBadge(spot);if(zone&&!seenZones.has(zone)){decrementBadge(zone);seenZones.add(zone)}
         const list=spot?.querySelector('.fish-list');if(list&&!list.querySelector('.fish-row'))spot.remove();
         if(zone&&!zone.querySelector('details.spot'))zone.remove();
       }else{
