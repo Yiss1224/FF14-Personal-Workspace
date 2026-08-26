@@ -74,11 +74,14 @@ function fgTimeText(m){const a=Number(m?.startHour),b=Number(m?.endHour);if(a===
 function fgWeatherText(m){const prev=Array.isArray(m?.previousWeatherSet)?m.previousWeatherSet.filter(Boolean):[],now=Array.isArray(m?.weatherSet)?m.weatherSet.filter(Boolean):[];if(!prev.length&&!now.length)return '無限制';if(prev.length&&now.length)return `${prev.join('/')} → ${now.join('/')}`;return (now.length?now:prev).join('/')}
 function fgLodinnUrl(spot){return `https://lodinn.github.io/biterates?spot=${encodeURIComponent(spot||'')}`}
 function fgMethodForName(name){return fishMethodByName.get(fgNorm(name))||null}
+function fgCatalogLocations(fish){if(!fish)return[];if(typeof window.fishLocations==='function')return window.fishLocations(fish);return Array.isArray(fish.spots)&&fish.spots.length?fish.spots:[fish]}
+function fgRowSpotName(row){const small=row?.querySelector?.(':scope > div:first-child > small')?.textContent||'',parts=small.split('/').map(x=>x.trim()).filter(Boolean);return parts[parts.length-1]||''}
+function fgCatalogAtRow(itemId,row){const fish=(store.get('fishCatalog',[])||[]).find(x=>Number(x.itemId)===Number(itemId));if(!fish)return null;const shown=fgRowSpotName(row),locations=fgCatalogLocations(fish),tc=v=>{try{return typeof window.ff14TcText==='function'?window.ff14TcText(v):String(v||'')}catch{return String(v||'')}};const loc=locations.find(x=>String(x.spotName||'')===shown||tc(x.spotName)===shown)||locations[0];return loc?{...fish,...loc}:fish}
 function fgFishMetaFromRow(row){
   const name=row.querySelector(':scope > div:first-child > strong')?.textContent?.trim()||'';
   const href=row.querySelector('a[href*="/fish/"]')?.getAttribute('href')||'';
   const match=href.match(/\/fish\/(\d+)/),itemId=match?Number(match[1]):0;
-  const catalog=(store.get('fishCatalog',[])||[]).find(x=>Number(x.itemId)===itemId);
+  const catalog=fgCatalogAtRow(itemId,row);
   return{name,itemId,catalog}
 }
 
@@ -141,7 +144,7 @@ function fgFilteredMissingFish(){
   const catalog=store.get('fishCatalog',[])||[],caught=new Set(getCaughtIds()),skipped=new Set(getSkippedIds()),fl=typeof fishFilters==='function'?fishFilters():{missing:true,hideBig:true,includeSpear:true,hideSkipped:true,q:''};
   let rows=catalog.filter(x=>x.type==='fishing').map(x=>({...x,caught:caught.has(x.itemId),skipped:skipped.has(x.itemId)}));
   if(fl.missing)rows=rows.filter(x=>!x.caught);if(fl.hideBig)rows=rows.filter(x=>!x.bigFish);if(fl.hideSkipped)rows=rows.filter(x=>!x.skipped);
-  if(fl.q)rows=rows.filter(x=>[x.name,x.spotName,x.zoneName,x.regionName].some(v=>fgNorm(v).includes(fl.q)));
+  if(fl.q)rows=rows.filter(x=>[x.name,...fgCatalogLocations(x).flatMap(loc=>[loc.spotName,loc.zoneName,loc.regionName])].some(v=>fgNorm(v).includes(fl.q)));
   return rows
 }
 function fgFishPrep(fish){
@@ -229,8 +232,8 @@ function renderVendorPlan(){
 }
 
 function fgBuildSpotPlan(){
-  const owned=fgOwnedMap(),spots=new Map();
-  for(const fish of fgFilteredMissingFish()){
+  const owned=fgOwnedMap(),spots=new Map(),base=fgFilteredMissingFish(),rows=typeof window.expandFishLocations==='function'?window.expandFishLocations(base):base.flatMap(fish=>fgCatalogLocations(fish).map(loc=>({...fish,...loc})));
+  for(const fish of rows){
     const prep=fgFishPrep(fish),key=`${fish.spotId}|||${fish.spotName}|||${fish.zoneName}`;if(!spots.has(key))spots.set(key,{spotId:fish.spotId,spotName:fish.spotName,zoneName:fish.zoneName,regionName:fish.regionName,fish:[],ready:0,blocked:0,unknown:0,missingBaits:new Set()});const s=spots.get(key);s.fish.push({...fish,prep});if(prep.universal==='unknown')s.unknown++;if(prep.ready)s.ready++;else{s.blocked++;if(prep.bait&&!owned[prep.bait])s.missingBaits.add(prep.bait)}
   }
   return [...spots.values()].sort((a,b)=>b.ready-a.ready||a.blocked-b.blocked||b.fish.length-a.fish.length||a.spotName.localeCompare(b.spotName))
