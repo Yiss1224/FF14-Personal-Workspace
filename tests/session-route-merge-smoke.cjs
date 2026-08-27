@@ -8,4 +8,10 @@ if(!src.includes('window.__fishingSessionRouteModel='))throw new Error('publishe
 if(!src.includes('STAY_FOR_WINDOW_MIN=20'))throw new Error('same-spot short-window stay threshold missing');
 if(!src.includes('next.spot.key===currentSpot&&gap<=STAY_FOR_WINDOW_MIN*60000'))throw new Error('same-spot short-window stay rule missing');
 if(!src.includes('真的換點才算'))throw new Error('movement model text missing');
-console.log('session route merge guards ok');
+if(!src.includes('window.__fishingSessionRouteSnapshot='))throw new Error('persistent route snapshot missing');
+if(!src.includes('window.preserveSessionFishingRoute=restoreSnapshot'))throw new Error('route restore API missing');
+if(!src.includes("restoreObserver.observe(result,{childList:true})"))throw new Error('immediate route restore observer missing');
+if(src.includes("document.getElementById('fish-picker-spot')?.addEventListener('change',markStale)"))throw new Error('spot-only picker change must not invalidate map session route');
+if(!src.includes('session-route-window-time'))throw new Error('window time UI missing');
+if(!src.includes('fmtClock(w.start)')||!src.includes('fmtClock(w.end)'))throw new Error('window start/end clock missing');
+console.log('session route persistence/window guards ok');
