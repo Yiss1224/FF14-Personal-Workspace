@@ -24,7 +24,7 @@
   function routeMinutes(){const own=Number(document.getElementById('fish-route-session')?.value),today=Number(document.getElementById('fish-today-session')?.value);return Number.isFinite(own)&&own>0?own:(Number.isFinite(today)&&today>0?today:DEFAULT_SESSION_MIN)}
   function spotKey(loc){const id=Number(loc?.spotId)||0;return id?`id:${id}`:`name:${loc?.regionName||''}|${loc?.zoneName||''}|${loc?.spotName||''}`}
   function matchesPicker(loc,p){if(p.region&&String(loc?.regionName||'')!==p.region)return false;if(p.zone&&String(loc?.zoneName||'')!==p.zone)return false;if(p.spot&&String(loc?.spotName||'')!==p.spot)return false;return true}
-  function locationsFor(fish,info,p){const spots=fishLocations(fish).filter(loc=>matchesPicker(loc,p));if(!info?.restricted||!Number(info.locationId))return spots;const exact=spots.filter(x=>Number(x?.spotId)===Number(info.locationId));return exact.length?exact:spots}
+  function locationsFor(fish,info,p){const spots=fishLocations(fish).filter(loc=>matchesPicker(loc,p));if(!info?.restricted||!Number(info.locationId))return spots;return spots.filter(x=>Number(x?.spotId)===Number(info.locationId))}
   function fishName(f){return itemText(f?.name||`Item ${f?.itemId||''}`)}
 
   function ensureUi(){
