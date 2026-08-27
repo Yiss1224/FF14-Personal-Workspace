@@ -1,4 +1,4 @@
-// Fishing guide scope controller: keep bait/method recommendations off until a map or spot is selected.
+// Fishing guide scope controller: scope fish methods to a selected map/spot and keep shopping optional.
 (function(){
   'use strict';
 
@@ -36,21 +36,48 @@
     }
   }
 
+  function setShoppingOpen(open){
+    const root=document.getElementById('fishing'),btn=document.getElementById('fish-shopping-toggle');
+    root?.classList.toggle('fish-shopping-open',!!open);
+    if(btn){btn.setAttribute('aria-expanded',open?'true':'false');btn.textContent=open?'收起採買清單':'展開採買清單'}
+    if(open&&isActive()&&typeof window.renderFishingGuide==='function')window.renderFishingGuide();
+  }
+
+  function ensureShoppingToggle(){
+    const required=document.getElementById('fish-bait-only-required'),toolbar=required?.closest('.bait-toolbar');
+    if(!toolbar)return;
+    toolbar.classList.add('fish-shopping-toolbar');
+    let btn=document.getElementById('fish-shopping-toggle');
+    if(!btn){
+      btn=document.createElement('button');btn.type='button';btn.id='fish-shopping-toggle';btn.className='fish-shopping-toggle';btn.setAttribute('aria-controls','fish-bait-summary fish-bait-list fish-vendor-plan');
+      toolbar.prepend(btn);btn.addEventListener('click',()=>setShoppingOpen(!document.getElementById('fishing')?.classList.contains('fish-shopping-open')));
+    }
+    setShoppingOpen(false);
+  }
+
   function addEarlyStyle(){
     if(document.getElementById('fish-guide-scope-style'))return;
     const style=document.createElement('style');
     style.id='fish-guide-scope-style';
-    style.textContent='#fishing:not(.fish-guide-scope-active) #fish-catalog .fish-method{display:none!important}';
+    style.textContent=`
+      #fishing:not(.fish-guide-scope-active) #fish-catalog .fish-method{display:none!important}
+      #fishing:not(.fish-shopping-open) #fish-bait-summary,
+      #fishing:not(.fish-shopping-open) #fish-bait-list,
+      #fishing:not(.fish-shopping-open) #fish-vendor-plan,
+      #fishing:not(.fish-shopping-open) .fish-method-source{display:none!important}
+      #fishing:not(.fish-shopping-open) .fish-shopping-toolbar>:not(#fish-shopping-toggle){display:none!important}
+      .fish-shopping-toolbar{align-items:center}.fish-shopping-toggle{min-height:36px}
+    `;
     document.head.appendChild(style);
   }
 
   function init(){
     const root=document.getElementById('fishing');if(!root)return;
-    bindPicker();
-    schedule(0);
+    bindPicker();ensureShoppingToggle();schedule(0);
   }
 
   addEarlyStyle();
   window.refreshFishingGuideScope=renderScoped;
+  window.toggleFishingShopping=open=>setShoppingOpen(open===undefined?!document.getElementById('fishing')?.classList.contains('fish-shopping-open'):!!open);
   window.addEventListener('DOMContentLoaded',init);
 })();
