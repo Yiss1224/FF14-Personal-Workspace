@@ -70,9 +70,9 @@
     return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
   function npcMapButton(v,name,title=''){
-    const rawZone=String(v?.zone||''),coords=String(v?.coords||'');
+    const rawZone=String(v?.zone||''),rawArea=String(v?.area||''),coords=String(v?.coords||'');
     if(!rawZone||!coords)return `${esc(name)}${title?` &lt;${esc(title)}&gt;`:''}`;
-    return `<button type="button" class="npc-map-link" data-npc-map-zone="${esc(rawZone)}" data-npc-map-coords="${esc(coords)}" data-npc-map-name="${esc(name)}" title="在地圖上查看 ${esc(name)}">${esc(name)}${title?` &lt;${esc(title)}&gt;`:''}</button>`;
+    return `<button type="button" class="npc-map-link" data-npc-map-zone="${esc(rawZone)}" data-npc-map-area="${esc(rawArea)}" data-npc-map-coords="${esc(coords)}" data-npc-map-name="${esc(name)}" title="在地圖上查看 ${esc(name)}">${esc(name)}${title?` &lt;${esc(title)}&gt;`:''}</button>`;
   }
 
   function installRenderer(){
@@ -133,7 +133,7 @@
     addStyles();readCache();installRenderer();
     document.addEventListener('click',e=>{
       const el=e.target?.closest?.('.npc-map-link');if(!el)return;
-      if(typeof window.openFF14MapAt==='function')window.openFF14MapAt(el.dataset.npcMapZone,el.dataset.npcMapCoords,el.dataset.npcMapName||'NPC');
+      if(typeof window.openFF14MapAt==='function')window.openFF14MapAt(el.dataset.npcMapZone,el.dataset.npcMapCoords,el.dataset.npcMapName||'NPC',el.dataset.npcMapArea||'');
     });
     load(false).then(rerender);
   });
