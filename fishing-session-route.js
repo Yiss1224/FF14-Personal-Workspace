@@ -1,4 +1,4 @@
-// Window-aware fishing session route planner.
+// Window-aware fishing session route planner. Heavy window analysis is manual-only.
 (function(){
   'use strict';
 
@@ -6,6 +6,7 @@
   const ORDINARY_FISH_MIN=5;
   const MOVE_MIN=3;
   const MAX_STOPS=10;
+  const YIELD_EVERY=4;
   let renderToken=0;
 
   function read(key,def){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
@@ -16,6 +17,7 @@
   function placeText(v){const s=String(v||'');try{return typeof window.ff14TcPlaceText==='function'?window.ff14TcPlaceText(s):s}catch{return s}}
   function fmtClock(ms){return new Date(ms).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}
   function fmtMin(ms){if(!Number.isFinite(ms))return'—';return`${Math.max(0,Math.round(ms/60000))} 分`}
+  function yieldUi(){return new Promise(resolve=>setTimeout(resolve,0))}
   function caught(){try{if(typeof window.getCaughtIds==='function')return intSet(window.getCaughtIds())}catch{}return intSet([...(read('fishcakeCaughtIds',[])||[]),...(read('fishCaughtIds',[])||[])])}
   function skipped(){try{if(typeof window.getSkippedIds==='function')return intSet(window.getSkippedIds())}catch{}return intSet(read('fishSkippedIds',[])||[])}
   function catalog(){return read('fishCatalog',[])||[]}
@@ -32,16 +34,16 @@
     const section=result.closest('.fishing-route-section');
     const head=section?.querySelector('.section-head');
     const title=head?.querySelector('h3');if(title)title.textContent='Session 路線';
-    const hint=head?.querySelector('.hint');if(hint)hint.textContent='窗口急迫度決定先後；普通未釣魚拿來填窗口之間的空檔。時間是規劃估算，不代表一定能在該時間內釣到。';
-    const button=document.getElementById('refresh-route-plan');if(button)button.textContent='依窗口重算路線';
+    const hint=head?.querySelector('.hint');if(hint)hint.textContent='先選地圖，再按按鈕才分析魚窗；窗口急迫度決定先後，普通魚填窗口空檔。';
+    const button=document.getElementById('refresh-route-plan');if(button)button.textContent='依窗口規劃路線';
     const toolbar=section?.querySelector('.bait-toolbar');
     if(toolbar&&!document.getElementById('fish-route-session')){
       const label=document.createElement('label');label.className='fish-route-session-label';label.innerHTML='<span>可釣時間</span><select id="fish-route-session"><option value="60">60 分</option><option value="90">90 分</option><option value="120">120 分</option></select>';
       toolbar.prepend(label);
       const sel=label.querySelector('select'),today=document.getElementById('fish-today-session');
       if(sel)sel.value=String(Number(today?.value)||DEFAULT_SESSION_MIN);
-      sel?.addEventListener('change',()=>{if(today)today.value=sel.value;render()});
-      today?.addEventListener('change',()=>{if(sel)sel.value=today.value;render()});
+      sel?.addEventListener('change',()=>{if(today)today.value=sel.value;showReady()});
+      today?.addEventListener('change',()=>{if(sel)sel.value=today.value;showReady()});
     }
     if(!document.getElementById('fish-session-route-style')){
       const style=document.createElement('style');style.id='fish-session-route-style';style.textContent=`
@@ -52,55 +54,62 @@
     return result;
   }
 
-  function readyAllowedKeys(){
-    if(!document.getElementById('fish-route-ready-only')?.checked||typeof window.fgBuildSpotPlan!=='function')return null;
-    try{return new Set((window.fgBuildSpotPlan()||[]).map(x=>spotKey(x)).filter(Boolean))}catch{return null}
+  function showReady(){
+    const box=ensureUi();if(!box)return;
+    renderToken++;
+    const p=picker();
+    box.innerHTML=p.zone
+      ?`<span class="muted">已選 <strong>${esc(placeText(p.zone))}</strong>。按「依窗口規劃路線」才開始計算，不會背景自動分析。</span>`
+      :'<span class="muted">先選一張地圖（或直接選釣點），再按「依窗口規劃路線」。</span>';
   }
 
-  async function buildModel(now,end,p,includeBig,token){
-    const done=caught(),skip=skipped(),rows=catalog(),byId=new Map(rows.map(f=>[Number(f?.itemId),f]).filter(([id])=>id>0)),groups=new Map(),tasks=[],taskKeys=new Set(),infoCache=new Map(),allowed=readyAllowedKeys();
-    const getInfo=async(id,t=now)=>{const k=`${id}@${t}`;if(infoCache.has(k))return infoCache.get(k);const v=await window.ff14FishingWindowInfo(id,t);infoCache.set(k,v);return v};
-    const groupFor=loc=>{const key=spotKey(loc);if(allowed&&!allowed.has(key))return null;if(!groups.has(key))groups.set(key,{key,loc,ordinary:new Map()});return groups.get(key)};
+  async function buildModel(now,end,p,includeBig,token,box){
+    const done=caught(),skip=skipped(),rows=catalog(),byId=new Map(rows.map(f=>[Number(f?.itemId),f]).filter(([id])=>id>0)),groups=new Map(),tasks=[],taskKeys=new Set(),infoCache=new Map();
+    const getInfo=async(id)=>{if(infoCache.has(id))return infoCache.get(id);const v=await window.ff14FishingWindowInfo(id,now);infoCache.set(id,v);return v};
+    const groupFor=loc=>{const key=spotKey(loc);if(!groups.has(key))groups.set(key,{key,loc,ordinary:new Map()});return groups.get(key)};
     const base=rows.filter(f=>Number(f?.itemId)>0&&f?.type!=='spearfishing'&&!done.has(Number(f.itemId))&&!skip.has(Number(f.itemId))&&(includeBig||!f.bigFish)&&fishLocations(f).some(loc=>matchesPicker(loc,p)));
 
-    const checked=await Promise.all(base.map(async fish=>({fish,info:await getInfo(Number(fish.itemId)),reqs:typeof window.ff14FishingPrerequisites==='function'?await window.ff14FishingPrerequisites(Number(fish.itemId)):[]})));
-    if(token!==renderToken)return null;
-
-    for(const row of checked){
-      const fish=row.fish,id=Number(fish.itemId),info=row.info;if(!info)continue;
-      const locs=locationsFor(fish,info,p);
-      if(!info.restricted){for(const loc of locs){const g=groupFor(loc);if(g)g.ordinary.set(id,fish)}}
-      else{
-        const win=info.current||((info.next&&info.next[0]<end)?info.next:null);
-        if(win){for(const loc of locs){const g=groupFor(loc);if(!g)continue;const k=`target:${id}:${win[0]}:${g.key}`;if(taskKeys.has(k))continue;taskKeys.add(k);tasks.push({key:k,kind:'target',fish,spot:g,start:Number(win[0]),end:Number(win[1]),served:false})}}
-      }
-      for(const req of row.reqs||[]){
-        const predId=Number(req?.itemId);if(!predId||!done.has(predId)||skip.has(predId))continue;
-        const pred=byId.get(predId);if(!pred)continue;
-        const predInfo=await getInfo(predId);if(token!==renderToken)return null;if(!predInfo?.restricted)continue;
-        const win=predInfo.current||((predInfo.next&&predInfo.next[0]<end)?predInfo.next:null);if(!win)continue;
-        for(const loc of locationsFor(pred,predInfo,p)){
-          const g=groupFor(loc);if(!g)continue;const k=`prep:${predId}:${win[0]}:${g.key}`;let task=tasks.find(x=>x.key===k);if(!task){task={key:k,kind:'prep',fish:pred,spot:g,start:Number(win[0]),end:Number(win[1]),served:false,targets:new Map()};tasks.push(task)}task.targets.set(id,{fish,count:Math.max(1,Number(req?.count)||1)});
+    for(let i=0;i<base.length;i++){
+      if(token!==renderToken)return null;
+      const fish=base[i],id=Number(fish.itemId),info=await getInfo(id);
+      if(token!==renderToken)return null;
+      if(info){
+        const locs=locationsFor(fish,info,p);
+        if(!info.restricted){for(const loc of locs)groupFor(loc).ordinary.set(id,fish)}
+        else{
+          const win=info.current||((info.next&&info.next[0]<end)?info.next:null);
+          if(win){for(const loc of locs){const g=groupFor(loc),k=`target:${id}:${win[0]}:${g.key}`;if(taskKeys.has(k))continue;taskKeys.add(k);tasks.push({key:k,kind:'target',fish,spot:g,start:Number(win[0]),end:Number(win[1]),served:false})}}
         }
       }
+
+      if(typeof window.ff14FishingPrerequisites==='function'){
+        const reqs=await window.ff14FishingPrerequisites(id);
+        if(token!==renderToken)return null;
+        for(const req of reqs||[]){
+          const predId=Number(req?.itemId);if(!predId||!done.has(predId)||skip.has(predId))continue;
+          const pred=byId.get(predId);if(!pred)continue;
+          const predInfo=await getInfo(predId);if(token!==renderToken)return null;if(!predInfo?.restricted)continue;
+          const win=predInfo.current||((predInfo.next&&predInfo.next[0]<end)?predInfo.next:null);if(!win)continue;
+          for(const loc of locationsFor(pred,predInfo,p)){
+            const g=groupFor(loc),k=`prep:${predId}:${win[0]}:${g.key}`;let task=tasks.find(x=>x.key===k);
+            if(!task){task={key:k,kind:'prep',fish:pred,spot:g,start:Number(win[0]),end:Number(win[1]),served:false,targets:new Map()};tasks.push(task)}
+            task.targets.set(id,{fish,count:Math.max(1,Number(req?.count)||1)});
+          }
+        }
+      }
+
+      if((i+1)%YIELD_EVERY===0||i===base.length-1){
+        if(box)box.innerHTML=`<span class="muted">正在分析魚窗 ${i+1} / ${base.length}…</span>`;
+        await yieldUi();
+      }
     }
-    return{groups,tasks,done,skip};
+    return{groups,tasks,done,skip,checked:base.length};
   }
 
   function activeTasks(tasks,cursor){return tasks.filter(t=>!t.served&&t.start<=cursor&&cursor<t.end).sort((a,b)=>a.end-b.end||(a.kind==='target'?0:1)-(b.kind==='target'?0:1))}
   function futureTasks(tasks,cursor,end){return tasks.filter(t=>!t.served&&t.start>cursor&&t.start<end).sort((a,b)=>a.start-b.start||a.end-b.end)}
   function remainingOrdinaryCount(group,remaining){let n=0;for(const id of group.ordinary.keys())if(remaining.has(id))n++;return n}
-  function bestFiller(groups,remaining,nextTask,currentSpot){
-    let best=null,bestScore=-1;
-    for(const g of groups.values()){
-      const n=remainingOrdinaryCount(g,remaining);if(!n)continue;
-      let score=n;
-      if(nextTask&&g.key===nextTask.spot.key)score+=1.5;
-      if(currentSpot&&g.key===currentSpot)score+=.25;
-      if(score>bestScore){bestScore=score;best=g}
-    }
-    return best;
-  }
+  function bestFiller(groups,remaining,nextTask,currentSpot){let best=null,bestScore=-1;for(const g of groups.values()){const n=remainingOrdinaryCount(g,remaining);if(!n)continue;let score=n;if(nextTask&&g.key===nextTask.spot.key)score+=1.5;if(currentSpot&&g.key===currentSpot)score+=.25;if(score>bestScore){bestScore=score;best=g}}return best}
   function takeOrdinary(group,remaining,count){const out=[];for(const[id,fish]of group.ordinary){if(!remaining.has(id))continue;remaining.delete(id);out.push(fish);if(out.length>=count)break}return out}
   function mergeStop(route,stop){const last=route[route.length-1];if(last&&last.spot.key===stop.spot.key&&last.kind===stop.kind&&Math.abs(stop.start-last.end)<=MOVE_MIN*60000){last.end=stop.end;last.fish.push(...stop.fish);last.reason+='；'+stop.reason;return}route.push(stop)}
 
@@ -115,18 +124,17 @@
         same.forEach(t=>t.served=true);
         const names=[...new Map(same.map(t=>[Number(t.fish.itemId),t.fish])).values()];
         const reason=target.length?`先救正在開的窗口；最早 ${fmtMin(minEnd-cursor)}後關`:`先處理直感前置窗口；最早 ${fmtMin(minEnd-cursor)}後關`;
-        mergeStop(route,{spot:first.spot,start:cursor,end:Math.min(end,cursor+dwell*60000),kind:target.length?'urgent':'prep',reason,fish:names,targetCount:target.length,prepCount:prep.length});
+        mergeStop(route,{spot:first.spot,start:cursor,end:Math.min(end,cursor+dwell*60000),kind:target.length?'urgent':'prep',reason,fish:names});
         cursor=Math.min(end,cursor+dwell*60000);currentSpot=first.spot.key;if(cursor<end)cursor+=MOVE_MIN*60000;continue;
       }
-
       const future=futureTasks(tasks,cursor,end),next=future[0]||null,gap=next?Math.max(0,next.start-cursor):Math.max(0,end-cursor),filler=bestFiller(groups,remaining,next,currentSpot);
       if(filler&&gap>=(ORDINARY_FISH_MIN+MOVE_MIN)*60000){
         const n=remainingOrdinaryCount(filler,remaining),maxByGap=Math.max(1,Math.floor((gap-MOVE_MIN*60000)/(ORDINARY_FISH_MIN*60000))),count=Math.max(1,Math.min(n,maxByGap,4)),dwell=Math.min(count*ORDINARY_FISH_MIN,20,Math.max(ORDINARY_FISH_MIN,Math.floor(gap/60000)-MOVE_MIN)),fish=takeOrdinary(filler,remaining,count);
-        mergeStop(route,{spot:filler,start:cursor,end:Math.min(end,cursor+dwell*60000),kind:'filler',reason:next?`用窗口前的空檔清普通魚；下一個窗口約 ${fmtClock(next.start)} 開`:'目前沒有更急的窗口，先清這裡的普通魚',fish,ordinaryCount:fish.length});
+        mergeStop(route,{spot:filler,start:cursor,end:Math.min(end,cursor+dwell*60000),kind:'filler',reason:next?`用窗口前空檔清普通魚；下一窗約 ${fmtClock(next.start)} 開`:'目前沒有更急窗口，先清普通魚',fish});
         cursor=Math.min(end,cursor+dwell*60000);currentSpot=filler.key;if(cursor<end)cursor+=MOVE_MIN*60000;continue;
       }
       if(next){cursor=Math.max(cursor,next.start);continue}
-      if(filler){const n=remainingOrdinaryCount(filler,remaining),count=Math.max(1,Math.min(n,4)),dwell=Math.min(count*ORDINARY_FISH_MIN,20,Math.max(2,Math.floor((end-cursor)/60000))),fish=takeOrdinary(filler,remaining,count);mergeStop(route,{spot:filler,start:cursor,end:Math.min(end,cursor+dwell*60000),kind:'filler',reason:'剩餘時間用來清普通魚',fish,ordinaryCount:fish.length});cursor=Math.min(end,cursor+dwell*60000);currentSpot=filler.key;if(cursor<end)cursor+=MOVE_MIN*60000;continue}
+      if(filler){const n=remainingOrdinaryCount(filler,remaining),count=Math.max(1,Math.min(n,4)),dwell=Math.min(count*ORDINARY_FISH_MIN,20,Math.max(2,Math.floor((end-cursor)/60000))),fish=takeOrdinary(filler,remaining,count);mergeStop(route,{spot:filler,start:cursor,end:Math.min(end,cursor+dwell*60000),kind:'filler',reason:'剩餘時間清普通魚',fish});cursor=Math.min(end,cursor+dwell*60000);currentSpot=filler.key;if(cursor<end)cursor+=MOVE_MIN*60000;continue}
       break;
     }
     return route;
@@ -134,7 +142,7 @@
 
   function stopHtml(stop,index){
     const loc=stop.spot.loc||{},region=placeText(loc.regionName||''),zone=placeText(loc.zoneName||''),spot=placeText(loc.spotName||'未知釣點'),minutes=Math.max(1,Math.round((stop.end-stop.start)/60000));
-    const badge=stop.kind==='urgent'?`<span class="session-route-badge">🟢 窗口優先</span>`:stop.kind==='prep'?`<span class="session-route-badge">🧩 前置窗口</span>`:`<span class="session-route-badge">🧹 填時間</span>`;
+    const badge=stop.kind==='urgent'?'<span class="session-route-badge">🟢 窗口優先</span>':stop.kind==='prep'?'<span class="session-route-badge">🧩 前置窗口</span>':'<span class="session-route-badge">🧹 填時間</span>';
     const names=stop.fish.slice(0,5).map(f=>esc(fishName(f))).join('、')+(stop.fish.length>5?'…':'');
     return `<div class="session-route-stop ${stop.kind}"><div class="session-route-top"><div><div class="session-route-name">${index+1}. ${esc(spot)}</div><div class="session-route-place muted">${[region,zone].filter(Boolean).map(esc).join(' / ')}</div></div><div class="session-route-time">約 ${esc(fmtClock(stop.start))}</div></div><div class="session-route-reason">${badge}${esc(stop.reason)}</div>${names?`<div class="session-route-fish">目標：${names}</div>`:''}<div class="session-route-actions"><span class="muted">建議停留約 ${minutes} 分${stop.kind==='filler'?'（普通魚每條先估 5 分）':''}</span><button type="button" data-session-route-spot="1" data-region="${esc(loc.regionName||'')}" data-zone="${esc(loc.zoneName||'')}" data-spot="${esc(loc.spotName||'')}">前往釣點</button></div></div>`;
   }
@@ -144,26 +152,31 @@
   async function render(){
     const box=ensureUi();if(!box)return;
     const p=picker(),minutes=routeMinutes();
-    if(!p.zone){box.innerHTML='<span class="muted">先選一張地圖（或直接選釣點），再幫你排窗口優先的 Session 路線。</span>';return}
-    if(typeof window.ff14FishingWindowInfo!=='function'){box.innerHTML='<span class="muted">魚窗資料尚未準備好，請稍後再重算。</span>';return}
+    if(!p.zone){showReady();return}
+    if(typeof window.ff14FishingWindowInfo!=='function'){box.innerHTML='<span class="muted">魚窗資料尚未準備好，請稍後再按一次。</span>';return}
     const token=++renderToken,now=Date.now(),end=now+minutes*60000,includeBig=!(document.getElementById('fish-hide-big')?.checked??true);
-    box.innerHTML='<span class="muted">正在把窗口塞進這次 Session…</span>';
-    const model=await buildModel(now,end,p,includeBig,token);if(!model||token!==renderToken)return;
-    const route=plan(model,now,end);if(token!==renderToken)return;
-    if(!route.length){box.innerHTML=`<span class="muted">${esc(placeText(p.zone))} 在接下來 ${minutes} 分鐘沒有找到可安排的未釣魚／前置窗口。</span>`;return}
-    const currentTasks=model.tasks.filter(t=>t.start<=now&&now<t.end).length,futureTasksCount=model.tasks.filter(t=>t.start>now&&t.start<end).length;
-    box.innerHTML=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 目前窗口事件 ${currentTasks} · Session 內將開 ${futureTasksCount}<br>規劃假設：普通魚約 ${ORDINARY_FISH_MIN} 分／條、換釣點預留 ${MOVE_MIN} 分；實際釣況不同時請直接按「依窗口重算路線」。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">路線原則：快關窗口 ＞ 前置窗口 ＞ 用普通魚填空檔 ＞ Session 尾段清普通魚。窗口急迫度與清圖收益分開處理。</div>`;
-    bindRouteButtons(box);
+    box.innerHTML='<span class="muted">正在準備 Session 路線…</span>';
+    try{
+      const model=await buildModel(now,end,p,includeBig,token,box);if(!model||token!==renderToken)return;
+      const route=plan(model,now,end);if(token!==renderToken)return;
+      if(!route.length){box.innerHTML=`<span class="muted">${esc(placeText(p.zone))} 在接下來 ${minutes} 分鐘沒有找到可安排的未釣魚／前置窗口。</span>`;return}
+      const currentTasks=model.tasks.filter(t=>t.start<=now&&now<t.end).length,futureCount=model.tasks.filter(t=>t.start>now&&t.start<end).length;
+      box.innerHTML=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>估算：普通魚 ${ORDINARY_FISH_MIN} 分／條、換點 ${MOVE_MIN} 分；卡魚時直接再按一次重算。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">原則：快關窗口 ＞ 前置窗口 ＞ 普通魚填空檔 ＞ Session 尾段普通魚。</div>`;
+      bindRouteButtons(box);
+    }catch(e){if(token!==renderToken)return;console.warn('session route failed',e);box.innerHTML=`<span class="muted">路線計算失敗：${esc(e?.message||e)}。頁面仍可繼續使用。</span>`}
   }
 
   function init(){
     ensureUi();
+    // Capture the existing route button so the old synchronous planner does not also run.
     document.addEventListener('click',e=>{const btn=e.target?.closest?.('#refresh-route-plan');if(!btn)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();render()},true);
-    for(const id of ['fish-picker-region','fish-picker-zone','fish-picker-spot','fish-hide-big','fish-route-ready-only'])document.getElementById(id)?.addEventListener('change',()=>setTimeout(render,20));
-    setTimeout(render,80);
+    for(const id of ['fish-picker-region','fish-picker-zone','fish-picker-spot','fish-hide-big']){
+      document.getElementById(id)?.addEventListener('change',()=>setTimeout(showReady,30));
+    }
+    showReady();
   }
 
   window.renderSessionFishingRoute=render;
-  window.renderRoutePlanner=render;
+  window.resetSessionFishingRoute=showReady;
   window.addEventListener('DOMContentLoaded',init);
 })();
