@@ -10,7 +10,7 @@
   let renderToken=0;
 
   function read(key,def){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
-  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
   function idOf(v){return Number(v&&typeof v==='object'?(v.id??v.itemId??v.fishId):v)}
   function intSet(values){return new Set((values||[]).map(idOf).filter(Number.isFinite))}
   function itemText(v){const s=String(v||'');try{return typeof window.ff14TcItemText==='function'?window.ff14TcItemText(s):s}catch{return s}}
@@ -62,7 +62,8 @@
   }
   function showReady(){const box=ensureUi();if(box)box.innerHTML=`<span class="muted">${readyText()}</span>`}
   function cancelCurrent(){renderToken++}
-  function markStale(){cancelCurrent();showReady()}
+  function clearRouteModel(){window.__fishingSessionRouteModel=null;try{window.refreshFishingSessionRouteMap?.()}catch{}}
+  function markStale(){cancelCurrent();clearRouteModel();showReady()}
 
   async function buildModel(now,end,p,includeBig,token,box){
     const done=caught(),skip=skipped(),rows=catalog(),byId=new Map(rows.map(f=>[Number(f?.itemId),f]).filter(([id])=>id>0)),groups=new Map(),tasks=[],taskKeys=new Set(),infoCache=new Map();
@@ -126,7 +127,9 @@
   function mergeStop(route,stop){
     stop.modes=[...new Set(stop.modes||[stop.kind])];
     const last=route[route.length-1];
-    if(last&&last.spot.key===stop.spot.key&&Math.abs(stop.start-last.end)<=MOVE_MIN*60000){
+    // A stop is a physical fishing spot, not a task type. If we never leave the spot,
+    // ordinary fish / waiting / window work all belong to the same stop even with a time gap.
+    if(last&&last.spot.key===stop.spot.key){
       last.end=Math.max(last.end,stop.end);
       last.modes=[...new Set([...(last.modes||[last.kind]),...stop.modes])];
       last.kind=last.modes.includes('urgent')?'urgent':last.modes.includes('prep')?'prep':'filler';
@@ -173,22 +176,26 @@
   }
 
   function bindRouteButtons(root){root.querySelectorAll('[data-session-route-spot]').forEach(btn=>btn.addEventListener('click',()=>{if(typeof window.selectFishingSpot==='function')window.selectFishingSpot(btn.dataset.region||'',btn.dataset.zone||'',btn.dataset.spot||'')}))}
+  function publishRouteModel(route,p){
+    window.__fishingSessionRouteModel={region:p.region||'',zone:p.zone||'',stops:route.map((stop,index)=>{const loc=stop.spot?.loc||{};return{order:index+1,region:loc.regionName||p.region||'',zone:loc.zoneName||p.zone||'',spot:loc.spotName||'',spotKey:stop.spot?.key||''}})};
+    try{window.refreshFishingSessionRouteMap?.()}catch{}
+  }
 
   async function render(){
     const box=ensureUi();if(!box)return;
     const p=pickerMap(),minutes=routeMinutes();
-    if(!p.zone){showReady();return}
+    if(!p.zone){clearRouteModel();showReady();return}
     if(typeof window.ff14FishingWindowInfo!=='function'){box.innerHTML='<span class="muted">魚窗資料尚未準備好，請稍後再按一次。</span>';return}
     const token=++renderToken,now=Date.now(),end=now+minutes*60000,includeBig=!(document.getElementById('fish-hide-big')?.checked??true);
     box.innerHTML=`<span class="muted">正在分析 ${esc(placeText(p.zone))} 的 Session 路線…</span>`;
     try{
       const model=await buildModel(now,end,p,includeBig,token,box);if(!model||token!==renderToken)return;
       const route=plan(model,now,end);if(token!==renderToken)return;
-      if(!route.length){box.innerHTML=`<span class="muted">${esc(placeText(p.zone))} 在接下來 ${minutes} 分鐘沒有找到可安排的未釣魚／前置窗口。</span>`;return}
+      if(!route.length){clearRouteModel();box.innerHTML=`<span class="muted">${esc(placeText(p.zone))} 在接下來 ${minutes} 分鐘沒有找到可安排的未釣魚／前置窗口。</span>`;return}
       const currentTasks=model.tasks.filter(t=>t.start<=now&&now<t.end).length,futureCount=model.tasks.filter(t=>t.start>now&&t.start<end).length;
-      box.innerHTML=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、換點 ${MOVE_MIN} 分。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">原則：快關窗口 ＞ 前置窗口 ＞ 普通魚填空檔 ＞ Session 尾段普通魚。同一釣點的普通魚與窗口會合併成同一站。</div>`;
-      bindRouteButtons(box);
-    }catch(e){if(token!==renderToken)return;console.warn('session route failed',e);box.innerHTML=`<span class="muted">路線計算失敗：${esc(e?.message||e)}。頁面仍可繼續使用。</span>`}
+      box.innerHTML=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、換點 ${MOVE_MIN} 分。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">原則：快關窗口 ＞ 前置窗口 ＞ 普通魚填空檔 ＞ Session 尾段普通魚。同一釣點只算一站；留在原地等窗口不會再拆站。</div>`;
+      bindRouteButtons(box);publishRouteModel(route,p);
+    }catch(e){if(token!==renderToken)return;clearRouteModel();console.warn('session route failed',e);box.innerHTML=`<span class="muted">路線計算失敗：${esc(e?.message||e)}。頁面仍可繼續使用。</span>`}
   }
 
   function init(){
