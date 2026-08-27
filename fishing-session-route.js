@@ -159,7 +159,7 @@
     const moveOut=next&&currentSpot!==next.spot.key?MOVE_MIN:0;
     return Number.isFinite(until)?Math.max(0,until-moveOut):Infinity;
   }
-  function clearCurrentSpotOrdinary(route,groups,remaining,currentSpot,cursor,end,next){
+  function clearCurrentSpotOrdinary(route,groups,remaining,currentSpot,cursor,end,next,reasonPrefix='窗口後先清本釣點普通魚'){
     if(!currentSpot)return null;
     const here=groups.get(currentSpot);if(!here)return null;
     const n=remainingOrdinaryCount(here,remaining);if(!n)return null;
@@ -169,19 +169,33 @@
     const count=Math.max(1,Math.min(n,Math.floor(available/ORDINARY_FISH_MIN),4));
     const dwell=Math.min(count*ORDINARY_FISH_MIN,20,available),fish=takeOrdinary(here,remaining,count);
     if(!fish.length)return null;
-    const reason=next?`窗口後先清本釣點普通魚；預留 ${currentSpot===next.spot.key?0:MOVE_MIN} 分前往下一窗（${fmtClock(next.start)}）`:'窗口後先把本釣點普通魚清掉';
+    const reason=next?`${reasonPrefix}；預留 ${currentSpot===next.spot.key?0:MOVE_MIN} 分前往下一窗（${fmtClock(next.start)}）`:reasonPrefix;
     mergeStop(route,{spot:here,start:cursor,end:Math.min(end,cursor+dwell*60000),kind:'filler',reason,fish});
     return Math.min(end,cursor+dwell*60000);
+  }
+  function clearPreferredSpotOrdinary(route,groups,remaining,preferredSpot,currentSpot,cursor,end,next,reasonPrefix){
+    if(!preferredSpot)return null;
+    const here=groups.get(preferredSpot);if(!here||!remainingOrdinaryCount(here,remaining))return null;
+    const travelIn=currentSpot&&currentSpot!==preferredSpot?MOVE_MIN:0;
+    const arrive=Math.min(end,cursor+travelIn*60000);if(arrive>=end)return null;
+    const nextCursor=clearCurrentSpotOrdinary(route,groups,remaining,preferredSpot,arrive,end,next,reasonPrefix);
+    if(nextCursor==null)return null;
+    return{cursor:nextCursor,currentSpot:preferredSpot};
   }
 
   function plan(model,now,end){
     const groups=model.groups,tasks=model.tasks,remaining=new Set();for(const g of groups.values())for(const id of g.ordinary.keys())remaining.add(id);
-    const route=[];let cursor=now,currentSpot=null,guard=0,justHandledWindow=false;
+    const route=[];let cursor=now,currentSpot=null,guard=0,justHandledWindow=false,committedSpot=null,resumeSpot=null;
+    const hasOrdinary=key=>!!(key&&groups.get(key)&&remainingOrdinaryCount(groups.get(key),remaining)>0);
+    const clearCommitIfDone=()=>{if(committedSpot&&!hasOrdinary(committedSpot)){if(resumeSpot===committedSpot)resumeSpot=null;committedSpot=null}}
     while(cursor<end&&route.length<MAX_STOPS&&guard++<80){
+      clearCommitIfDone();
       for(const t of tasks)if(!t.served&&t.end<=cursor)t.served=true;
       const active=activeTasks(tasks,cursor);
       if(active.length){
-        const first=active[0];if(currentSpot&&currentSpot!==first.spot.key)cursor=Math.min(end,cursor+MOVE_MIN*60000);if(cursor>=end)break;
+        const first=active[0];
+        if(committedSpot&&committedSpot!==first.spot.key&&hasOrdinary(committedSpot))resumeSpot=committedSpot;
+        if(currentSpot&&currentSpot!==first.spot.key)cursor=Math.min(end,cursor+MOVE_MIN*60000);if(cursor>=end)break;
         const same=activeTasks(tasks,cursor).filter(t=>t.spot.key===first.spot.key);if(!same.length)continue;
         const minEnd=Math.min(...same.map(t=>t.end)),available=Math.max(2,Math.floor((minEnd-cursor)/60000)),dwell=Math.max(2,Math.min(15,available,5+Math.max(0,same.length-1)*3)),target=same.filter(t=>t.kind==='target');
         same.forEach(t=>t.served=true);
@@ -194,8 +208,15 @@
       const future=futureTasks(tasks,cursor,end),next=future[0]||null;
 
       if(justHandledWindow){
-        const nextCursor=clearCurrentSpotOrdinary(route,groups,remaining,currentSpot,cursor,end,next);
-        if(nextCursor!=null){cursor=nextCursor;continue}
+        if(resumeSpot&&hasOrdinary(resumeSpot)){
+          const resumed=clearPreferredSpotOrdinary(route,groups,remaining,resumeSpot,currentSpot,cursor,end,next,'窗口結束後先回原本固定釣點清普通魚');
+          if(resumed){cursor=resumed.cursor;currentSpot=resumed.currentSpot;committedSpot=resumeSpot;clearCommitIfDone();if(!committedSpot)resumeSpot=null;justHandledWindow=false;continue}
+        }else{
+          resumeSpot=null;
+          if(!committedSpot&&hasOrdinary(currentSpot))committedSpot=currentSpot;
+          const nextCursor=clearCurrentSpotOrdinary(route,groups,remaining,currentSpot,cursor,end,next);
+          if(nextCursor!=null){cursor=nextCursor;clearCommitIfDone();justHandledWindow=false;continue}
+        }
         justHandledWindow=false;
       }
 
@@ -206,13 +227,20 @@
         cursor=Math.min(end,next.start);continue;
       }
 
-      const filler=bestFiller(groups,remaining,next,currentSpot);
+      clearCommitIfDone();
+      let filler=committedSpot&&hasOrdinary(committedSpot)?groups.get(committedSpot):null;
+      if(!filler)filler=bestFiller(groups,remaining,next,currentSpot);
       if(filler){
         const travelIn=currentSpot&&currentSpot!==filler.key?MOVE_MIN:0,travelOut=next&&filler.key!==next.spot.key?MOVE_MIN:0,availableMin=Math.floor(gap/60000)-travelIn-travelOut,n=remainingOrdinaryCount(filler,remaining);
         if(availableMin>=ORDINARY_FISH_MIN&&n){
           if(travelIn)cursor=Math.min(end,cursor+travelIn*60000);
           const count=Math.max(1,Math.min(n,Math.floor(availableMin/ORDINARY_FISH_MIN),4)),dwell=Math.min(count*ORDINARY_FISH_MIN,20,availableMin),fish=takeOrdinary(filler,remaining,count);
-          if(fish.length){mergeStop(route,{spot:filler,start:cursor,end:Math.min(end,cursor+dwell*60000),kind:'filler',reason:next?`用窗口前空檔清普通魚；下一窗約 ${fmtClock(next.start)} 開`:'目前沒有更急窗口，先清普通魚',fish});cursor=Math.min(end,cursor+dwell*60000);currentSpot=filler.key;continue}
+          if(fish.length){
+            if(!committedSpot)committedSpot=filler.key;
+            const returning=resumeSpot&&filler.key===resumeSpot;
+            mergeStop(route,{spot:filler,start:cursor,end:Math.min(end,cursor+dwell*60000),kind:'filler',reason:returning?'回到原本固定釣點繼續清普通魚':next?`用窗口前空檔清普通魚；下一窗約 ${fmtClock(next.start)} 開`:'目前沒有更急窗口，先把這個固定釣點清完',fish});
+            cursor=Math.min(end,cursor+dwell*60000);currentSpot=filler.key;clearCommitIfDone();if(!committedSpot&&resumeSpot===filler.key)resumeSpot=null;continue;
+          }
         }
       }
       if(next){if(currentSpot&&currentSpot!==next.spot.key)cursor=Math.max(cursor,next.start-MOVE_MIN*60000);cursor=Math.min(end,next.start);currentSpot=next.spot.key;continue}
@@ -243,7 +271,7 @@
       const model=await buildModel(now,end,p,includeBig,token,box);if(!model||token!==renderToken)return;const route=plan(model,now,end);if(token!==renderToken)return;
       if(!route.length){box.innerHTML=`<span class="muted">${esc(placeText(p.zone))} 在接下來 ${minutes} 分鐘沒有找到可安排的未釣魚／前置窗口。</span>`;return}
       const currentTasks=model.tasks.filter(t=>t.start<=now&&now<t.end).length,futureCount=model.tasks.filter(t=>t.start>now&&t.start<end).length;
-      const html=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、真的換點才算 ${MOVE_MIN} 分。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">窗口站會顯示實際開窗／關窗時間。窗口處理完會先清目前釣點剩餘普通魚，再依下一窗時間決定是否換點。標記釣到或切換釣點不會自動洗掉這份路線；要依最新進度更新時再按一次「規劃這張圖路線」。</div>`;
+      const html=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、真的換點才算 ${MOVE_MIN} 分。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">Planner 會盡量先把已開始的固定釣點清完；遇到魚窗可以暫時插隊，窗口處理完會優先回原本固定釣點續清，再考慮新的固定釣點。標記釣到或切換釣點不會自動洗掉這份路線；要依最新進度更新時再按一次「規劃這張圖路線」。</div>`;
       box.innerHTML=html;bindRouteButtons(box);publishRouteSnapshot(route,p,html);
     }catch(e){if(token!==renderToken)return;clearRouteState();console.warn('session route failed',e);box.innerHTML=`<span class="muted">路線計算失敗：${esc(e?.message||e)}。頁面仍可繼續使用。</span>`}
   }
