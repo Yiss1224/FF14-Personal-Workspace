@@ -2,7 +2,7 @@
 (function(){
   'use strict';
 
-  const APP_VERSION='v2026.08.27.31';
+  const APP_VERSION='v2026.08.27.32';
   const DEFAULT_SESSION_MIN=90;
   const ORDINARY_FISH_MIN=5;
   const MOVE_MIN=3;
@@ -228,8 +228,14 @@
       const future=futureTasks(tasks,cursor,end),next=future[0]||null;
 
       if(justHandledWindow){
+        // Window is only the interruption. If this same fishing spot still has unrecorded ordinary fish,
+        // stay here and clear them before leaving; then resume the previously committed spot if needed.
+        if(hasOrdinary(currentSpot)){
+          const nextCursor=clearCurrentSpotOrdinary(route,groups,remaining,currentSpot,cursor,end,next,'窗口魚處理完，先把本釣點剩下的普通魚清掉');
+          if(nextCursor!=null){cursor=nextCursor;clearCommitIfDone();justHandledWindow=false;continue}
+        }
         if(resumeSpot&&hasOrdinary(resumeSpot)){
-          const resumed=clearPreferredSpotOrdinary(route,groups,remaining,resumeSpot,currentSpot,cursor,end,next,'窗口結束後先回原本固定釣點清普通魚');
+          const resumed=clearPreferredSpotOrdinary(route,groups,remaining,resumeSpot,currentSpot,cursor,end,next,'窗口結束後回原本固定釣點清普通魚');
           if(resumed){cursor=resumed.cursor;currentSpot=resumed.currentSpot;committedSpot=resumeSpot;clearCommitIfDone();if(!committedSpot)resumeSpot=null;justHandledWindow=false;continue}
         }else{
           resumeSpot=null;
@@ -291,7 +297,7 @@
       const model=await buildModel(now,end,p,includeBig,token,box);if(!model||token!==renderToken)return;const route=plan(model,now,end);if(token!==renderToken)return;
       if(!route.length){box.innerHTML=`<span class="muted">${esc(placeText(p.zone))} 在接下來 ${minutes} 分鐘沒有找到可安排的未釣魚／前置窗口。</span>`;return}
       const currentTasks=model.tasks.filter(t=>t.start<=now&&now<t.end).length,futureCount=model.tasks.filter(t=>t.start>now&&t.start<end).length;
-      const html=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、真的換點才算 ${MOVE_MIN} 分。除窗口外，新的白魚釣點以地圖距離與順路程度優先，剩餘魚數只在距離接近時當參考。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">Planner 會盡量先把已開始的固定釣點清完；遇到魚窗可以暫時插隊，窗口處理完會優先回原本固定釣點續清。不同釣點只要目前仍有同一條未釣魚，都可以各自列入路線；實際標記釣到後，下次重算才會從其他釣點清單消失。沒有窗口強制插隊時，白魚路線會以少繞路、少折返為第一優先。</div>`;
+      const html=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、真的換點才算 ${MOVE_MIN} 分。除窗口外，新的白魚釣點以地圖距離與順路程度優先，剩餘魚數只在距離接近時當參考。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">Planner 會盡量先把已開始的固定釣點清完；遇到魚窗可以暫時插隊。窗口魚處理完後，如果該窗口釣點本身還有未釣普通魚，會先留在原地清掉，再回先前被中斷的固定釣點。不同釣點只要目前仍有同一條未釣魚，都可以各自列入路線；實際標記釣到後，下次重算才會從其他釣點清單消失。</div>`;
       box.innerHTML=html;bindRouteButtons(box);publishRouteSnapshot(route,p,html);
     }catch(e){if(token!==renderToken)return;clearRouteState();console.warn('session route failed',e);box.innerHTML=`<span class="muted">路線計算失敗：${esc(e?.message||e)}。頁面仍可繼續使用。</span>`}
   }
