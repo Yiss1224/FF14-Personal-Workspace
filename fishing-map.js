@@ -16,6 +16,7 @@
   function tc(v){try{return typeof ff14TcText==='function'?ff14TcText(v):String(v||'')}catch{return String(v||'')}}
   function relationName(v){return String(v?.fields?.Name??v?.Name??'').trim()}
   function norm(v){return String(v||'').trim().toLowerCase()}
+  function refreshSessionOverlay(){try{if(typeof window.refreshFishingSessionRouteMap==='function')queueMicrotask(()=>window.refreshFishingSessionRouteMap())}catch(e){console.warn('session route map refresh failed',e)}}
 
   function ensureMap(){
     const picker=document.getElementById('fish-location-picker');
@@ -87,45 +88,25 @@
     if(!zone)return null;
     const rows=await fetchMapIndex();
     const needle=norm(zone);
-    const candidates=rows.filter(x=>
-      x.place===zone||x.sub===zone||
-      norm(x.place)===needle||norm(x.sub)===needle
-    );
+    const candidates=rows.filter(x=>x.place===zone||x.sub===zone||norm(x.place)===needle||norm(x.sub)===needle);
     if(!candidates.length)return null;
     candidates.sort((a,b)=>mapCandidateScore(b,zone,hints)-mapCandidateScore(a,zone,hints)||a.rowId-b.rowId);
     return candidates[0]||null;
   }
-
-  async function resolveMapId(zone,hints=[]){return (await resolveMapRecord(zone,hints))?.id||''}
 
   function mapAssetUrl(mapId){
     const m=String(mapId||'').match(/^([^/]+)\/(\d{2})$/);if(!m)return '';
     return `${XIVAPI}/asset/map/${encodeURIComponent(m[1])}/${encodeURIComponent(m[2])}`;
   }
 
-  // FishingSpot X/Z are already pixel coordinates on the 2048x2048 map texture.
-  // OffsetX/OffsetY are only needed when converting world coordinates to map pixels,
-  // so do not apply map offsets to FishingSpot points here.
   function coordPct(n){return Math.max(0,Math.min(100,(Number(n)/2048)*100))}
+  function gameCoordPct(n,sizeFactor){const coord=Number(n),factor=Number(sizeFactor)||100;if(!Number.isFinite(coord))return null;return coordPct((coord-1)*factor/2)}
 
-  // NPC/vendor coordinates are visible in-game 0–42 map coordinates. Inverting
-  // gameCoord = pixel / SizeFactor * 2 + 1 also does not use OffsetX/OffsetY.
-  function gameCoordPct(n,sizeFactor){
-    const coord=Number(n),factor=Number(sizeFactor)||100;
-    if(!Number.isFinite(coord))return null;
-    return coordPct((coord-1)*factor/2);
-  }
-
-  function spotButtons(spots){
-    return `<div class="fish-map-fallback">${spots.map(s=>`<button type="button" data-map-spot="${esc(s.name)}">${esc(tc(s.name))} <span>${s.fish}</span></button>`).join('')}</div>`;
-  }
+  function spotButtons(spots){return `<div class="fish-map-fallback">${spots.map(s=>`<button type="button" data-map-spot="${esc(s.name)}">${esc(tc(s.name))} <span>${s.fish}</span></button>`).join('')}</div>`}
 
   function renderFallback(body,region,zone,spots,note='找不到原版地圖素材，暫時使用座標示意圖。'){
     const plotted=spots.filter(s=>Number.isFinite(s.x)&&Number.isFinite(s.y));
-    if(!plotted.length){
-      body.innerHTML=`<div class="muted">${esc(tc(zone))} 的釣點資料沒有可用座標；可直接用下面的釣場按鈕。</div>${spotButtons(spots)}`;
-      bindSpotButtons(body);return;
-    }
+    if(!plotted.length){body.innerHTML=`<div class="muted">${esc(tc(zone))} 的釣點資料沒有可用座標；可直接用下面的釣場按鈕。</div>${spotButtons(spots)}`;bindSpotButtons(body);refreshSessionOverlay();return}
     const W=760,H=420,P=34;
     let minX=Math.min(...plotted.map(s=>s.x)),maxX=Math.max(...plotted.map(s=>s.x)),minY=Math.min(...plotted.map(s=>s.y)),maxY=Math.max(...plotted.map(s=>s.y));
     if(minX===maxX){minX-=1;maxX+=1}if(minY===maxY){minY-=1;maxY+=1}
@@ -133,16 +114,16 @@
     const sx=x=>P+(x-minX)/(maxX-minX)*(W-P*2),sy=y=>H-P-(y-minY)/(maxY-minY)*(H-P*2);
     const circles=plotted.map(s=>`<g class="fish-map-point" data-map-spot="${esc(s.name)}" tabindex="0" role="button"><circle cx="${sx(s.x).toFixed(1)}" cy="${sy(s.y).toFixed(1)}" r="10"></circle><text x="${(sx(s.x)+14).toFixed(1)}" y="${(sy(s.y)+5).toFixed(1)}">${esc(tc(s.name))}</text></g>`).join('');
     body.innerHTML=`<div class="fish-map-title">${esc(tc(region))} / <strong>${esc(tc(zone))}</strong> · ${spots.length} 個釣點</div><div class="fish-map-scroll"><svg class="fish-map-svg" viewBox="0 0 ${W} ${H}"><rect x="1" y="1" width="${W-2}" height="${H-2}" rx="12"></rect>${circles}</svg></div><div class="muted fish-map-note">${esc(note)}</div>${spotButtons(spots)}`;
-    bindSpotButtons(body);
+    bindSpotButtons(body);refreshSessionOverlay();
   }
 
   async function renderMap(){
     ensureMap();
     const body=document.getElementById('fish-zone-map-body');if(!body)return;
     const region=val('fish-picker-region'),zone=val('fish-picker-zone'),selected=val('fish-picker-spot');
-    if(!zone){body.innerHTML='<div class="muted">先選地區與地圖。</div>';return}
+    if(!zone){body.innerHTML='<div class="muted">先選地區與地圖。</div>';refreshSessionOverlay();return}
     const spots=groupedSpots(region,zone);
-    if(!spots.length){body.innerHTML='<div class="muted">這張地圖沒有可顯示的釣點。</div>';return}
+    if(!spots.length){body.innerHTML='<div class="muted">這張地圖沒有可顯示的釣點。</div>';refreshSessionOverlay();return}
     const token=`${region}|||${zone}`;body.dataset.renderToken=token;
     body.innerHTML=`<div class="muted">正在載入 ${esc(tc(zone))} 原版地圖…</div>`;
     let map=null;try{map=await resolveMapRecord(zone,spots.map(s=>s.name))}catch(e){console.warn('map id lookup failed',e)}
@@ -151,67 +132,35 @@
     if(!url){renderFallback(body,region,zone,spots);return}
 
     const plotted=spots.filter(s=>Number.isFinite(s.x)&&Number.isFinite(s.y)&&s.x>0&&s.y>0);
-    const markers=plotted.map(s=>{
-      const left=coordPct(s.x),top=coordPct(s.y),sel=s.name===selected?' selected':'';
-      return `<button type="button" class="ff14-map-marker${sel}" data-map-spot="${esc(s.name)}" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}%" title="${esc(tc(s.name))} · X ${s.x.toFixed(0)} Z ${s.y.toFixed(0)} · ${s.fish} 種"><span class="ff14-map-dot"></span><span class="ff14-map-label">${esc(tc(s.name))}</span></button>`;
-    }).join('');
+    const markers=plotted.map(s=>{const left=coordPct(s.x),top=coordPct(s.y),sel=s.name===selected?' selected':'';return `<button type="button" class="ff14-map-marker${sel}" data-map-spot="${esc(s.name)}" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}%" title="${esc(tc(s.name))} · X ${s.x.toFixed(0)} Z ${s.y.toFixed(0)} · ${s.fish} 種"><span class="ff14-map-dot"></span><span class="ff14-map-label">${esc(tc(s.name))}</span></button>`}).join('');
     const noCoords=!plotted.length?`<div class="muted fish-map-warning">這批釣點目前沒有可用 X/Z，所以先顯示釣場按鈕。</div>${spotButtons(spots)}`:'';
     body.innerHTML=`<div class="fish-map-title">${esc(tc(region))} / <strong>${esc(tc(zone))}</strong> · ${spots.length} 個釣點</div><div class="ff14-map-wrap"><img class="ff14-map-image" src="${esc(url)}" alt="${esc(tc(zone))} FF14 地圖"><div class="ff14-map-markers">${markers}</div></div><div class="muted fish-map-note">底圖：FF14 遊戲地圖素材（XIVAPI） · Map.Id: <code>${esc(mapId)}</code> · 釣點：${plotted.length}/${spots.length}</div>${noCoords}`;
     const img=body.querySelector('.ff14-map-image');if(img)img.addEventListener('error',()=>renderFallback(body,region,zone,spots,`Map.Id ${mapId} 圖片載入失敗。`),{once:true});
-    bindSpotButtons(body);
+    bindSpotButtons(body);refreshSessionOverlay();
   }
 
   function ensureNpcMapDialog(){
-    let dialog=document.getElementById('ff14-npc-map-dialog');
-    if(dialog)return dialog;
-    dialog=document.createElement('dialog');
-    dialog.id='ff14-npc-map-dialog';
-    dialog.className='ff14-npc-map-dialog';
-    dialog.innerHTML='<div class="ff14-npc-map-head"><strong id="ff14-npc-map-title">NPC 地圖</strong><button type="button" data-npc-map-close aria-label="關閉">×</button></div><div id="ff14-npc-map-body" class="ff14-npc-map-body"></div>';
-    document.body.appendChild(dialog);
-    dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close()});
-    dialog.querySelector('[data-npc-map-close]').addEventListener('click',()=>dialog.close());
-    return dialog;
+    let dialog=document.getElementById('ff14-npc-map-dialog');if(dialog)return dialog;
+    dialog=document.createElement('dialog');dialog.id='ff14-npc-map-dialog';dialog.className='ff14-npc-map-dialog';dialog.innerHTML='<div class="ff14-npc-map-head"><strong id="ff14-npc-map-title">NPC 地圖</strong><button type="button" data-npc-map-close aria-label="關閉">×</button></div><div id="ff14-npc-map-body" class="ff14-npc-map-body"></div>';document.body.appendChild(dialog);
+    dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close()});dialog.querySelector('[data-npc-map-close]').addEventListener('click',()=>dialog.close());return dialog;
   }
 
-  function parseVisibleCoords(coords){
-    if(Array.isArray(coords)&&coords.length>=2)return [Number(coords[0]),Number(coords[1])];
-    if(coords&&typeof coords==='object')return [Number(coords.x??coords.X),Number(coords.y??coords.Y)];
-    const nums=String(coords||'').match(/-?\d+(?:\.\d+)?/g)||[];
-    return [Number(nums[0]),Number(nums[1])];
-  }
+  function parseVisibleCoords(coords){if(Array.isArray(coords)&&coords.length>=2)return [Number(coords[0]),Number(coords[1])];if(coords&&typeof coords==='object')return [Number(coords.x??coords.X),Number(coords.y??coords.Y)];const nums=String(coords||'').match(/-?\d+(?:\.\d+)?/g)||[];return [Number(nums[0]),Number(nums[1])]}
 
   async function openNpcMap(zone,coords,label='NPC',area=''){
-    const dialog=ensureNpcMapDialog(),body=document.getElementById('ff14-npc-map-body'),title=document.getElementById('ff14-npc-map-title');
-    const [x,y]=parseVisibleCoords(coords),zoneLabel=tc(zone)||zone;
-    title.textContent=`${label} · ${zoneLabel}`;
-    body.innerHTML=`<div class="muted">正在載入 ${esc(zoneLabel)} 地圖…</div>`;
-    if(typeof dialog.showModal==='function'&&!dialog.open)dialog.showModal();else dialog.setAttribute('open','');
-    if(!zone||!Number.isFinite(x)||!Number.isFinite(y)){
-      body.innerHTML='<div class="muted">這個 NPC 沒有足夠的地圖座標資料。</div>';return;
-    }
+    const dialog=ensureNpcMapDialog(),body=document.getElementById('ff14-npc-map-body'),title=document.getElementById('ff14-npc-map-title'),[x,y]=parseVisibleCoords(coords),zoneLabel=tc(zone)||zone;
+    title.textContent=`${label} · ${zoneLabel}`;body.innerHTML=`<div class="muted">正在載入 ${esc(zoneLabel)} 地圖…</div>`;if(typeof dialog.showModal==='function'&&!dialog.open)dialog.showModal();else dialog.setAttribute('open','');
+    if(!zone||!Number.isFinite(x)||!Number.isFinite(y)){body.innerHTML='<div class="muted">這個 NPC 沒有足夠的地圖座標資料。</div>';return}
     let map=null;try{map=await resolveMapRecord(zone,[area])}catch(e){console.warn('NPC map lookup failed',e)}
     if(!map){body.innerHTML=`<div class="muted">找不到 ${esc(zoneLabel)} 對應的 FF14 地圖。</div>`;return}
     const url=mapAssetUrl(map.id);if(!url){body.innerHTML='<div class="muted">這張地圖沒有可用的底圖素材。</div>';return}
-    const left=gameCoordPct(x,map.sizeFactor),top=gameCoordPct(y,map.sizeFactor);
-    if(left===null||top===null){body.innerHTML='<div class="muted">NPC 座標格式無法辨識。</div>';return}
+    const left=gameCoordPct(x,map.sizeFactor),top=gameCoordPct(y,map.sizeFactor);if(left===null||top===null){body.innerHTML='<div class="muted">NPC 座標格式無法辨識。</div>';return}
     body.innerHTML=`<div class="fish-map-title"><strong>${esc(zoneLabel)}</strong> · ${esc(label)} · X/Y ${esc(x.toFixed(1))}, ${esc(y.toFixed(1))}</div><div class="ff14-map-wrap ff14-npc-map-wrap"><img class="ff14-map-image" src="${esc(url)}" alt="${esc(zoneLabel)} FF14 地圖"><div class="ff14-map-markers"><div class="ff14-map-marker ff14-npc-map-marker" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}%"><span class="ff14-map-dot"></span><span class="ff14-map-label">${esc(label)}</span></div></div></div><div class="muted fish-map-note">Map.Id: <code>${esc(map.id)}</code> · X/Y ${esc(x.toFixed(1))}, ${esc(y.toFixed(1))}</div><div class="muted fish-map-note">地圖僅供區域參考，請在標點周圍尋找一下。</div>`;
     const img=body.querySelector('.ff14-map-image');if(img)img.addEventListener('error',()=>{body.innerHTML='<div class="muted">FF14 地圖圖片載入失敗。</div>'},{once:true});
   }
 
-  function chooseSpot(name){
-    const spot=document.getElementById('fish-picker-spot');
-    if(spot&&[...spot.options].some(o=>o.value===name)){spot.value=name;spot.dispatchEvent(new Event('change',{bubbles:true}))}
-    else{const q=document.getElementById('fish-search');if(q){q.value=name;q.dispatchEvent(new Event('input',{bubbles:true}))}}
-    renderMap();
-  }
-  function bindSpotButtons(root){
-    root.querySelectorAll('[data-map-spot]').forEach(el=>{
-      const go=()=>chooseSpot(el.dataset.mapSpot);
-      el.addEventListener('click',go);
-      el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}});
-    });
-  }
+  function chooseSpot(name){const spot=document.getElementById('fish-picker-spot');if(spot&&[...spot.options].some(o=>o.value===name)){spot.value=name;spot.dispatchEvent(new Event('change',{bubbles:true}))}else{const q=document.getElementById('fish-search');if(q){q.value=name;q.dispatchEvent(new Event('input',{bubbles:true}))}}renderMap()}
+  function bindSpotButtons(root){root.querySelectorAll('[data-map-spot]').forEach(el=>{const go=()=>chooseSpot(el.dataset.mapSpot);el.addEventListener('click',go);el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}})})}
 
   function addStyles(){
     if(document.getElementById('fish-zone-map-style'))return;
@@ -236,6 +185,6 @@
   window.addEventListener('DOMContentLoaded',()=>{
     addStyles();setTimeout(()=>{ensureMap();renderMap()},300);
     document.addEventListener('change',e=>{if(['fish-picker-region','fish-picker-zone','fish-picker-spot'].includes(e.target?.id))setTimeout(renderMap,0)});
-    const target=document.getElementById('fish-catalog');if(target)new MutationObserver(()=>{clearTimeout(window.__fishMapTimer);window.__fishMapTimer=setTimeout(renderMap,100)}).observe(target,{childList:true,subtree:true});
+    const target=document.getElementById('fish-catalog');if(target)new MutationObserver(()=>{clearTimeout(window.__fishMapTimer);window.__fishMapTimer=setTimeout(renderMap,100)}).observe(target,{childList:true});
   });
 })();
