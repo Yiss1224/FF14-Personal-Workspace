@@ -1,9 +1,9 @@
-// Today fishing recommendations: recommend productive fishing spots, with nearby windows as a bonus.
+// Today fishing recommendations: recommend productive fishing spots for the current play session.
 (function(){
   'use strict';
 
   const LIMIT=5;
-  const SOON_MS=90*60*1000;
+  const DEFAULT_SESSION_MIN=90;
   const CURRENT_WINDOW_WEIGHT=3;
   const SOON_WINDOW_WEIGHT=2;
   let renderToken=0;
@@ -14,10 +14,10 @@
   function placeText(v){const s=String(v||'');try{return typeof window.ff14TcPlaceText==='function'?window.ff14TcPlaceText(s):s}catch{return s}}
   function fmtDuration(ms){if(!Number.isFinite(ms)||ms<0)return'—';const min=Math.max(0,Math.round(ms/60000));if(min<60)return`${min} 分`;const h=Math.floor(min/60),m=min%60;return m?`${h} 小時 ${m} 分`:`${h} 小時`}
   function fmtClock(ms){return new Date(ms).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}
-  function dayEnd(now){const d=new Date(now);d.setHours(24,0,0,0);return d.getTime()}
   function uniqueInts(values){return new Set((values||[]).map(Number).filter(Number.isFinite))}
   function caught(){return uniqueInts([...(read('fishcakeCaughtIds',[])||[]),...(read('fishCaughtIds',[])||[])])}
   function skipped(){return uniqueInts(read('fishSkippedIds',[])||[])}
+  function sessionMinutes(){const n=Number(document.getElementById('fish-today-session')?.value);return Number.isFinite(n)&&n>0?n:DEFAULT_SESSION_MIN}
 
   function fishLocations(fish){
     if(typeof window.fishLocations==='function')return window.fishLocations(fish);
@@ -47,12 +47,18 @@
     return ordinaryNow+currentWindow*CURRENT_WINDOW_WEIGHT+soonWindow*SOON_WINDOW_WEIGHT;
   }
 
+  function earliestCurrentClose(g){
+    let out=Infinity;
+    for(const x of g.nowFish.values())if(x.info?.restricted&&x.info?.currentLeftMs!=null)out=Math.min(out,Number(x.info.currentLeftMs));
+    return out;
+  }
+
   function ensureBox(){
     let box=document.getElementById('fish-today-result');
     if(box)return box;
     const summary=document.getElementById('fish-map-summary');if(!summary)return null;
     const section=document.createElement('div');section.className='fish-today-card';
-    section.innerHTML=`<div class="fish-today-head"><div><strong>今天釣什麼</strong><div class="muted">推薦現在最值得清的漁場；正在窗口 ×${CURRENT_WINDOW_WEIGHT}，90 分內快開窗 ×${SOON_WINDOW_WEIGHT}，普通魚 ×1。</div></div><div class="fish-today-actions"><label class="inline-check"><input id="fish-today-big" type="checkbox"> 包含魚王</label><button id="fish-today-refresh" type="button">今天釣什麼</button></div></div><div id="fish-today-result" class="fish-today-result"><span class="muted">要開始釣時再按「今天釣什麼」計算。</span></div>`;
+    section.innerHTML=`<div class="fish-today-head"><div><strong>今天釣什麼</strong><div class="muted">用你這次能玩的時間，直接判斷現在先去哪個漁場；正在窗口 ×${CURRENT_WINDOW_WEIGHT}、時段內會開窗 ×${SOON_WINDOW_WEIGHT}、普通魚 ×1。</div></div><div class="fish-today-actions"><label class="fish-today-session-label">可釣時間<select id="fish-today-session"><option value="60">60 分</option><option value="90" selected>90 分</option><option value="120">120 分</option></select></label><label class="inline-check"><input id="fish-today-big" type="checkbox"> 包含魚王</label><button id="fish-today-refresh" type="button">現在去哪釣</button></div></div><div id="fish-today-result" class="fish-today-result"><span class="muted">要開始釣時再按「現在去哪釣」計算。</span></div>`;
     summary.insertAdjacentElement('afterend',section);
     section.querySelector('#fish-today-refresh').addEventListener('click',render);
     return section.querySelector('#fish-today-result');
@@ -61,9 +67,9 @@
   function addStyles(){
     if(document.getElementById('fish-today-style'))return;
     const s=document.createElement('style');s.id='fish-today-style';s.textContent=`
-      .fish-today-card{margin:14px 0;padding:14px;border:1px solid var(--border,#d8d8df);border-radius:12px}.fish-today-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}.fish-today-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.fish-today-result{margin-top:12px;display:grid;gap:9px}.today-spot-row{padding:11px 12px;border-radius:10px;background:rgba(127,127,127,.07)}.today-spot-top{display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}.today-spot-name{font-weight:800}.today-spot-place{font-size:13px}.today-spot-count{font-weight:800;text-align:right}.today-spot-score{font-size:12px;font-weight:600}.today-spot-fish{margin-top:5px;font-size:13px}.today-spot-current{margin-top:8px;padding:7px 9px;border-radius:8px;background:rgba(52,168,83,.10);font-size:13px;line-height:1.5}.today-spot-current-label{font-weight:800}.today-spot-soon{margin-top:5px;font-size:13px}.today-spot-window{font-weight:700}.today-fish-king{font-size:11px;padding:2px 6px;border:1px solid currentColor;border-radius:999px;margin-left:4px}.today-fish-empty{padding:8px 0}.today-fish-summary{font-size:13px}.today-spot-tags{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px}.today-spot-tag{appearance:none;border:1px solid currentColor;background:transparent;color:inherit;border-radius:999px;padding:3px 8px;font:inherit;font-size:12px;cursor:pointer}.today-spot-tag:hover{text-decoration:underline}.today-spot-tag.has-window{font-weight:800}.today-spot-tag.no-window{opacity:.68}
+      .fish-today-card{margin:14px 0;padding:14px;border:1px solid var(--border,#d8d8df);border-radius:12px}.fish-today-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}.fish-today-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.fish-today-session-label{display:flex;flex-direction:row;align-items:center;gap:6px;font-size:13px}.fish-today-session-label select{padding:7px 8px}.fish-today-result{margin-top:12px;display:grid;gap:9px}.today-spot-row{padding:11px 12px;border-radius:10px;background:rgba(127,127,127,.07)}.today-spot-row.top-pick{outline:2px solid rgba(52,168,83,.35);background:rgba(52,168,83,.06)}.today-pick-label{display:inline-block;margin-bottom:7px;padding:3px 8px;border-radius:999px;background:rgba(52,168,83,.14);font-size:12px;font-weight:800}.today-spot-top{display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}.today-spot-name{font-weight:800}.today-spot-place{font-size:13px}.today-spot-count{font-weight:800;text-align:right}.today-spot-score{font-size:12px;font-weight:600}.today-spot-fish{margin-top:5px;font-size:13px}.today-spot-current{margin-top:8px;padding:7px 9px;border-radius:8px;background:rgba(52,168,83,.10);font-size:13px;line-height:1.5}.today-spot-current-label{font-weight:800}.today-spot-soon{margin-top:5px;font-size:13px}.today-spot-window{font-weight:700}.today-fish-king{font-size:11px;padding:2px 6px;border:1px solid currentColor;border-radius:999px;margin-left:4px}.today-fish-empty{padding:8px 0}.today-fish-summary{font-size:13px}.today-spot-tags{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px}.today-spot-tag{appearance:none;border:1px solid currentColor;background:transparent;color:inherit;border-radius:999px;padding:3px 8px;font:inherit;font-size:12px;cursor:pointer}.today-spot-tag:hover{text-decoration:underline}.today-spot-tag.has-window{font-weight:800}.today-spot-tag.no-window{opacity:.68}
       @media(max-width:980px){.fish-today-card{padding:12px}.fish-today-head{gap:10px}.fish-today-actions{width:100%;justify-content:space-between}.today-spot-top{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start}.today-spot-fish{line-height:1.55}.today-spot-current,.today-spot-soon{line-height:1.55}}
-      @media(max-width:650px){.fish-today-card{margin-inline:-2px;padding:11px}.fish-today-actions{align-items:stretch}.fish-today-actions button{flex:1;min-height:42px}.today-spot-row{padding:12px}.today-spot-top{grid-template-columns:1fr}.today-spot-count{text-align:left;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.today-spot-score{display:inline}.today-spot-tag{min-height:34px;padding:6px 10px}.today-spot-fish{margin-top:8px}.today-spot-current,.today-spot-soon{margin-top:8px}.today-spot-soon{padding-top:7px;border-top:1px solid rgba(127,127,127,.18)}}
+      @media(max-width:650px){.fish-today-card{margin-inline:-2px;padding:11px}.fish-today-actions{align-items:stretch;display:grid;grid-template-columns:1fr 1fr}.fish-today-session-label{grid-column:1/-1;justify-content:space-between}.fish-today-session-label select{min-height:40px}.fish-today-actions button{min-height:42px}.today-spot-row{padding:12px}.today-spot-top{grid-template-columns:1fr}.today-spot-count{text-align:left;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.today-spot-score{display:inline}.today-spot-tag{min-height:34px;padding:6px 10px}.today-spot-fish{margin-top:8px}.today-spot-current,.today-spot-soon{margin-top:8px}.today-spot-soon{padding-top:7px;border-top:1px solid rgba(127,127,127,.18)}}
     `;document.head.appendChild(s);
   }
 
@@ -76,11 +82,11 @@
 
   async function render(){
     const box=ensureBox();if(!box)return;
-    const my=++renderToken,includeBig=!!document.getElementById('fish-today-big')?.checked,now=Date.now(),end=dayEnd(now),catalog=read('fishCatalog',[])||[],done=caught(),skip=skipped();
+    const my=++renderToken,includeBig=!!document.getElementById('fish-today-big')?.checked,minutes=sessionMinutes(),now=Date.now(),sessionEnd=now+minutes*60000,catalog=read('fishCatalog',[])||[],done=caught(),skip=skipped();
     if(typeof window.ff14FishingWindowInfo!=='function'){
       box.innerHTML='<span class="muted">魚窗資料尚未準備好，請稍後再按一次。</span>';return;
     }
-    box.innerHTML='<span class="muted">正在找現在最值得去的漁場…</span>';
+    box.innerHTML='<span class="muted">正在判斷現在去哪裡最划算…</span>';
 
     const base=catalog.filter(f=>Number(f?.itemId)>0&&f?.type!=='spearfishing'&&!done.has(Number(f.itemId))&&!skip.has(Number(f.itemId))&&(includeBig||!f.bigFish));
     const groups=new Map();
@@ -89,7 +95,7 @@
       const info=await window.ff14FishingWindowInfo(Number(fish.itemId),now);if(my!==renderToken)return;
       if(!info)continue;
       const availableNow=!info.restricted||!!info.current;
-      const soon=!!(info.restricted&&!info.current&&info.next&&info.next[0]<end&&info.waitMs<=SOON_MS);
+      const soon=!!(info.restricted&&!info.current&&info.next&&info.next[0]<sessionEnd&&info.waitMs<=minutes*60000);
       for(const loc of locationsFor(fish,info)){
         const key=spotKey(loc);
         if(!groups.has(key))groups.set(key,{loc,nowFish:new Map(),soonFish:new Map(),windowFish:new Map(),earliestSoon:Infinity});
@@ -101,27 +107,32 @@
     }
 
     const spots=[...groups.values()].filter(g=>g.nowFish.size>0).sort((a,b)=>
-      spotScore(b)-spotScore(a)||b.nowFish.size-a.nowFish.size||b.soonFish.size-a.soonFish.size||a.earliestSoon-b.earliestSoon||String(a.loc?.spotName||'').localeCompare(String(b.loc?.spotName||''))
+      spotScore(b)-spotScore(a)||
+      earliestCurrentClose(a)-earliestCurrentClose(b)||
+      b.nowFish.size-a.nowFish.size||
+      b.soonFish.size-a.soonFish.size||
+      a.earliestSoon-b.earliestSoon||
+      String(a.loc?.spotName||'').localeCompare(String(b.loc?.spotName||''))
     );
 
     if(my!==renderToken)return;
     if(!spots.length){
-      box.innerHTML=`<div class="today-fish-empty">現在沒有找到可清的${includeBig?'漁場':'白魚漁場'}。<br><span class="muted">${includeBig?'目前連魚王一起算也沒有合適的點 QAQ':'想把魚王也算進去，可以勾「包含魚王」後再按一次。'}</span></div>`;return;
+      box.innerHTML=`<div class="today-fish-empty">接下來 ${minutes} 分鐘沒有找到可清的${includeBig?'漁場':'白魚漁場'}。<br><span class="muted">${includeBig?'目前連魚王一起算也沒有合適的點 QAQ':'想把魚王也算進去，可以勾「包含魚王」後再按一次。'}</span></div>`;return;
     }
 
     const shown=spots.slice(0,LIMIT);
-    box.innerHTML=`<div class="today-fish-summary muted">以 ${esc(fmtClock(now))} 為基準 · 普通魚 1 分、正在窗口 ${CURRENT_WINDOW_WEIGHT} 分、90 分內快開窗 ${SOON_WINDOW_WEIGHT} 分。</div>${shown.map(g=>{
+    box.innerHTML=`<div class="today-fish-summary muted">以 ${esc(fmtClock(now))} 起算接下來 ${minutes} 分鐘 · 普通魚 1 分、正在窗口 ${CURRENT_WINDOW_WEIGHT} 分、時段內會開窗 ${SOON_WINDOW_WEIGHT} 分；同分時先救快關的窗口。</div>${shown.map((g,index)=>{
       const loc=g.loc||{},regionRaw=String(loc.regionName||''),zoneRaw=String(loc.zoneName||''),spotRaw=String(loc.spotName||'未知釣點'),region=placeText(regionRaw),zone=placeText(zoneRaw),spot=placeText(spotRaw);
       const nowFish=[...g.nowFish.values()].sort((a,b)=>Number(a.fish.bigFish)-Number(b.fish.bigFish)||String(a.fish.name||'').localeCompare(String(b.fish.name||'')));
-      const currentWindowFish=nowFish.filter(x=>x.info?.restricted&&x.info?.current);
+      const currentWindowFish=nowFish.filter(x=>x.info?.restricted&&x.info?.current).sort((a,b)=>(a.info.currentLeftMs??Infinity)-(b.info.currentLeftMs??Infinity));
       const ordinaryNowFish=nowFish.filter(x=>!(x.info?.restricted&&x.info?.current));
       const soonFish=[...g.soonFish.values()].filter(x=>!g.nowFish.has(Number(x.fish.itemId))).sort((a,b)=>(a.info.next?.[0]??Infinity)-(b.info.next?.[0]??Infinity));
       const ordinaryNames=ordinaryNowFish.slice(0,8).map(x=>fishLabel(x.fish)).join('、')+(ordinaryNowFish.length>8?`、…共 ${ordinaryNowFish.length} 條`:'');
-      const currentHtml=currentWindowFish.length?`<div class="today-spot-current"><span class="today-spot-current-label">🟢 正在窗口：</span>${currentWindowFish.map(x=>fishLabel(x.fish)).join('、')}</div>`:'';
+      const currentHtml=currentWindowFish.length?`<div class="today-spot-current"><span class="today-spot-current-label">🟢 正在窗口：</span>${currentWindowFish.map(x=>`${fishLabel(x.fish)}（剩 ${esc(fmtDuration(x.info.currentLeftMs))}）`).join('、')}</div>`:'';
       const ordinaryHtml=ordinaryNames?`<div class="today-spot-fish">${ordinaryNames}</div>`:'';
-      const soonHtml=soonFish.length?`<div class="today-spot-soon">⏳ 快開窗：${soonFish.slice(0,3).map(x=>`<span class="today-spot-window">${fishLabel(x.fish)} ${esc(fmtDuration(x.info.waitMs))}後（${esc(fmtClock(x.info.next[0]))}）</span>`).join('、')}</div>`:'';
-      const hasWindow=g.windowFish.size>0,tagText=hasWindow?`有窗口魚 ${g.windowFish.size}`:'無窗口魚',score=spotScore(g);
-      return `<div class="today-spot-row"><div class="today-spot-top"><div><span class="today-spot-name">${esc(spot)}</span><div class="today-spot-place">${[region,zone].filter(Boolean).map(esc).join(' / ')}</div><div class="today-spot-tags"><button type="button" class="today-spot-tag ${hasWindow?'has-window':'no-window'}" data-today-spot="1" data-region="${esc(regionRaw)}" data-zone="${esc(zoneRaw)}" data-spot="${esc(spotRaw)}" title="跳到這個釣場">${esc(tagText)}</button></div></div><div class="today-spot-count">現在可釣 ${g.nowFish.size} 條<div class="today-spot-score muted">推薦分數 ${score}</div></div></div>${currentHtml}${ordinaryHtml}${soonHtml}</div>`;
+      const soonHtml=soonFish.length?`<div class="today-spot-soon">⏳ 這次會開窗：${soonFish.slice(0,3).map(x=>`<span class="today-spot-window">${fishLabel(x.fish)} ${esc(fmtDuration(x.info.waitMs))}後（${esc(fmtClock(x.info.next[0]))}）</span>`).join('、')}</div>`:'';
+      const hasWindow=g.windowFish.size>0,tagText=hasWindow?`有窗口魚 ${g.windowFish.size}`:'無窗口魚',score=spotScore(g),pick=index===0?'<div class="today-pick-label">★ 現在最推薦</div>':'';
+      return `<div class="today-spot-row${index===0?' top-pick':''}">${pick}<div class="today-spot-top"><div><span class="today-spot-name">${esc(spot)}</span><div class="today-spot-place">${[region,zone].filter(Boolean).map(esc).join(' / ')}</div><div class="today-spot-tags"><button type="button" class="today-spot-tag ${hasWindow?'has-window':'no-window'}" data-today-spot="1" data-region="${esc(regionRaw)}" data-zone="${esc(zoneRaw)}" data-spot="${esc(spotRaw)}" title="跳到這個釣場">${esc(tagText)}</button></div></div><div class="today-spot-count">現在可釣 ${g.nowFish.size} 條<div class="today-spot-score muted">推薦分數 ${score}</div></div></div>${currentHtml}${ordinaryHtml}${soonHtml}</div>`;
     }).join('')}`;
     bindSpotTags(box);
   }
