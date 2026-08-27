@@ -15,7 +15,6 @@
     setHtmlIfChanged(document.getElementById('fish-bait-summary'),hint);
     setHtmlIfChanged(document.getElementById('fish-bait-list'),'');
     setHtmlIfChanged(document.getElementById('fish-vendor-plan'),'');
-    setHtmlIfChanged(document.getElementById('fish-route-result'),hint);
   }
 
   function renderScoped(){
@@ -37,20 +36,21 @@
     }
   }
 
+  function addEarlyStyle(){
+    if(document.getElementById('fish-guide-scope-style'))return;
+    const style=document.createElement('style');
+    style.id='fish-guide-scope-style';
+    style.textContent='#fishing:not(.fish-guide-scope-active) #fish-catalog .fish-method{display:none!important}';
+    document.head.appendChild(style);
+  }
+
   function init(){
     const root=document.getElementById('fishing');if(!root)return;
-    if(!document.getElementById('fish-guide-scope-style')){
-      const style=document.createElement('style');style.id='fish-guide-scope-style';style.textContent=`
-        #fishing:not(.fish-guide-scope-active) #fish-catalog .fish-method{display:none!important}
-      `;document.head.appendChild(style);
-    }
-    // Picker is created by fishing-ui-v2 before this DOMContentLoaded listener runs.
-    // Do not observe the whole fishing subtree: clearGuide() changes that subtree itself
-    // and would recursively wake a MutationObserver until the page becomes unresponsive.
     bindPicker();
     schedule(0);
   }
 
+  addEarlyStyle();
   window.refreshFishingGuideScope=renderScoped;
   window.addEventListener('DOMContentLoaded',init);
 })();
