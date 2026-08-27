@@ -79,6 +79,21 @@
   function resetPicker(){
     const r=document.getElementById('fish-picker-region');if(r)r.value='';fillZones();fillSpots();const q=document.getElementById('fish-search');if(q){q.value='';q.dispatchEvent(new Event('input',{bubbles:true}))}updateCurrent();
   }
+  function selectFishingSpot(regionName,zoneName,spotName){
+    const tab=document.querySelector('nav button[data-tab="fishing"]');if(tab&&!tab.classList.contains('active'))tab.click();
+    ensurePicker();refreshPicker();
+    const region=document.getElementById('fish-picker-region'),zone=document.getElementById('fish-picker-zone'),spot=document.getElementById('fish-picker-spot');
+    if(!region||!zone||!spot)return false;
+    if([...region.options].some(o=>o.value===regionName))region.value=regionName;else return false;
+    fillZones();
+    if([...zone.options].some(o=>o.value===zoneName))zone.value=zoneName;else return false;
+    fillSpots();
+    if([...spot.options].some(o=>o.value===spotName))spot.value=spotName;else return false;
+    spot.dispatchEvent(new Event('change',{bubbles:true}));
+    setTimeout(()=>document.getElementById('fish-location-picker')?.scrollIntoView({behavior:'smooth',block:'start'}),30);
+    return true;
+  }
+  window.selectFishingSpot=selectFishingSpot;
 
   function fixSpotSummaryNames(){
     document.querySelectorAll('#fish-catalog details.spot').forEach(details=>{
