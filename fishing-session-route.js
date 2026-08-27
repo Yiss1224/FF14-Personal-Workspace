@@ -110,9 +110,33 @@
   function activeTasks(tasks,cursor){return tasks.filter(t=>!t.served&&t.start<=cursor&&cursor<t.end).sort((a,b)=>a.end-b.end||(a.kind==='target'?0:1)-(b.kind==='target'?0:1))}
   function futureTasks(tasks,cursor,end){return tasks.filter(t=>!t.served&&t.start>cursor&&t.start<end).sort((a,b)=>a.start-b.start||a.end-b.end)}
   function remainingOrdinaryCount(group,remaining){let n=0;for(const id of group.ordinary.keys())if(remaining.has(id))n++;return n}
-  function bestFiller(groups,remaining,nextTask,currentSpot){let best=null,bestScore=-1;for(const g of groups.values()){const n=remainingOrdinaryCount(g,remaining);if(!n)continue;let score=n;if(nextTask&&g.key===nextTask.spot.key)score+=1.5;if(currentSpot&&g.key===currentSpot)score+=.25;if(score>bestScore){bestScore=score;best=g}}return best}
+  function bestFiller(groups,remaining,nextTask,currentSpot){
+    const stayForNext=!!(nextTask&&currentSpot&&nextTask.spot.key===currentSpot);
+    let best=null,bestScore=-1;
+    for(const g of groups.values()){
+      const n=remainingOrdinaryCount(g,remaining);if(!n)continue;
+      let score=n;
+      if(nextTask&&g.key===nextTask.spot.key)score+=stayForNext?8:1.5;
+      if(currentSpot&&g.key===currentSpot)score+=stayForNext?8:2.5;
+      if(score>bestScore){bestScore=score;best=g}
+    }
+    return best;
+  }
   function takeOrdinary(group,remaining,count){const out=[];for(const[id,fish]of group.ordinary){if(!remaining.has(id))continue;remaining.delete(id);out.push(fish);if(out.length>=count)break}return out}
-  function mergeStop(route,stop){const last=route[route.length-1];if(last&&last.spot.key===stop.spot.key&&last.kind===stop.kind&&Math.abs(stop.start-last.end)<=MOVE_MIN*60000){last.end=stop.end;last.fish.push(...stop.fish);last.reason+='；'+stop.reason;return}route.push(stop)}
+  function mergeStop(route,stop){
+    stop.modes=[...new Set(stop.modes||[stop.kind])];
+    const last=route[route.length-1];
+    if(last&&last.spot.key===stop.spot.key&&Math.abs(stop.start-last.end)<=MOVE_MIN*60000){
+      last.end=Math.max(last.end,stop.end);
+      last.modes=[...new Set([...(last.modes||[last.kind]),...stop.modes])];
+      last.kind=last.modes.includes('urgent')?'urgent':last.modes.includes('prep')?'prep':'filler';
+      const fishById=new Map([...(last.fish||[]),...(stop.fish||[])].map(f=>[Number(f?.itemId)||String(f?.name||''),f]));
+      last.fish=[...fishById.values()];
+      if(stop.reason&&!String(last.reason||'').includes(stop.reason))last.reason=`${last.reason||''}${last.reason?'；':''}${stop.reason}`;
+      return last;
+    }
+    route.push(stop);return stop;
+  }
 
   function plan(model,now,end){
     const groups=model.groups,tasks=model.tasks,remaining=new Set();for(const g of groups.values())for(const id of g.ordinary.keys())remaining.add(id);
@@ -142,10 +166,10 @@
   }
 
   function stopHtml(stop,index){
-    const loc=stop.spot.loc||{},region=placeText(loc.regionName||''),zone=placeText(loc.zoneName||''),spot=placeText(loc.spotName||'未知釣點'),minutes=Math.max(1,Math.round((stop.end-stop.start)/60000));
-    const badge=stop.kind==='urgent'?'<span class="session-route-badge">🟢 窗口優先</span>':stop.kind==='prep'?'<span class="session-route-badge">🧩 前置窗口</span>':'<span class="session-route-badge">🧹 填時間</span>';
+    const loc=stop.spot.loc||{},region=placeText(loc.regionName||''),zone=placeText(loc.zoneName||''),spot=placeText(loc.spotName||'未知釣點'),minutes=Math.max(1,Math.round((stop.end-stop.start)/60000)),modes=stop.modes||[stop.kind];
+    const badges=[modes.includes('filler')?'<span class="session-route-badge">🧹 普通魚</span>':'',modes.includes('urgent')?'<span class="session-route-badge">🟢 窗口</span>':'',modes.includes('prep')?'<span class="session-route-badge">🧩 前置</span>':''].filter(Boolean).join('');
     const names=stop.fish.slice(0,5).map(f=>esc(fishName(f))).join('、')+(stop.fish.length>5?'…':'');
-    return `<div class="session-route-stop ${stop.kind}"><div class="session-route-top"><div><div class="session-route-name">${index+1}. ${esc(spot)}</div><div class="session-route-place muted">${[region,zone].filter(Boolean).map(esc).join(' / ')}</div></div><div class="session-route-time">約 ${esc(fmtClock(stop.start))}</div></div><div class="session-route-reason">${badge}${esc(stop.reason)}</div>${names?`<div class="session-route-fish">目標：${names}</div>`:''}<div class="session-route-actions"><span class="muted">建議停留約 ${minutes} 分${stop.kind==='filler'?'（普通魚每條先估 5 分）':''}</span><button type="button" data-session-route-spot="1" data-region="${esc(loc.regionName||'')}" data-zone="${esc(loc.zoneName||'')}" data-spot="${esc(loc.spotName||'')}">前往釣點</button></div></div>`;
+    return `<div class="session-route-stop ${stop.kind}"><div class="session-route-top"><div><div class="session-route-name">${index+1}. ${esc(spot)}</div><div class="session-route-place muted">${[region,zone].filter(Boolean).map(esc).join(' / ')}</div></div><div class="session-route-time">約 ${esc(fmtClock(stop.start))}</div></div><div class="session-route-reason">${badges}${esc(stop.reason)}</div>${names?`<div class="session-route-fish">目標：${names}</div>`:''}<div class="session-route-actions"><span class="muted">建議停留約 ${minutes} 分${modes.includes('filler')?'（普通魚每條先估 5 分）':''}</span><button type="button" data-session-route-spot="1" data-region="${esc(loc.regionName||'')}" data-zone="${esc(loc.zoneName||'')}" data-spot="${esc(loc.spotName||'')}">前往釣點</button></div></div>`;
   }
 
   function bindRouteButtons(root){root.querySelectorAll('[data-session-route-spot]').forEach(btn=>btn.addEventListener('click',()=>{if(typeof window.selectFishingSpot==='function')window.selectFishingSpot(btn.dataset.region||'',btn.dataset.zone||'',btn.dataset.spot||'')}))}
@@ -162,16 +186,14 @@
       const route=plan(model,now,end);if(token!==renderToken)return;
       if(!route.length){box.innerHTML=`<span class="muted">${esc(placeText(p.zone))} 在接下來 ${minutes} 分鐘沒有找到可安排的未釣魚／前置窗口。</span>`;return}
       const currentTasks=model.tasks.filter(t=>t.start<=now&&now<t.end).length,futureCount=model.tasks.filter(t=>t.start>now&&t.start<end).length;
-      box.innerHTML=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、換點 ${MOVE_MIN} 分。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">原則：快關窗口 ＞ 前置窗口 ＞ 普通魚填空檔 ＞ Session 尾段普通魚。</div>`;
+      box.innerHTML=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、換點 ${MOVE_MIN} 分。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">原則：快關窗口 ＞ 前置窗口 ＞ 普通魚填空檔 ＞ Session 尾段普通魚。同一釣點的普通魚與窗口會合併成同一站。</div>`;
       bindRouteButtons(box);
     }catch(e){if(token!==renderToken)return;console.warn('session route failed',e);box.innerHTML=`<span class="muted">路線計算失敗：${esc(e?.message||e)}。頁面仍可繼續使用。</span>`}
   }
 
   function init(){
     ensureUi();
-    // The existing app also listens to this button; capture it so only this planner runs.
     document.addEventListener('click',e=>{const btn=e.target?.closest?.('#refresh-route-plan');if(!btn)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();render()},true);
-    // Map/filter changes only invalidate the previous result. They never start heavy analysis.
     document.getElementById('fish-picker-region')?.addEventListener('change',markStale);
     document.getElementById('fish-picker-zone')?.addEventListener('change',markStale);
     document.getElementById('fish-hide-big')?.addEventListener('change',markStale);
@@ -179,7 +201,6 @@
   }
 
   window.renderSessionFishingRoute=render;
-  // Existing code calls renderRoutePlanner during boot/picker changes. Keep this deliberately cheap.
   window.renderRoutePlanner=showReady;
   window.resetSessionFishingRoute=showReady;
   window.addEventListener('DOMContentLoaded',init);
