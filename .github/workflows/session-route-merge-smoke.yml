@@ -1,0 +1,17 @@
+name: Session Route Merge Smoke
+on:
+  push:
+    branches:
+      - test/fishing-route-map-v1
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check fishing-session-route.js
+      - run: node --check fishing-map.js
+      - run: node --check fishing-session-route-map.js
+      - run: node tests/session-route-merge-smoke.cjs
