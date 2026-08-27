@@ -5,6 +5,7 @@ on:
       - test/fishing-route-map-v1
       - test/fishing-route-ui-v25
       - test/fishing-route-v26
+      - test/fishing-route-v27
 jobs:
   test:
     runs-on: ubuntu-latest
