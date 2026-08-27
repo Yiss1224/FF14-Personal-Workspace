@@ -2,6 +2,7 @@
 (function(){
   'use strict';
 
+  const APP_VERSION='v2026.08.27.28';
   const DEFAULT_SESSION_MIN=90;
   const ORDINARY_FISH_MIN=5;
   const MOVE_MIN=3;
@@ -33,6 +34,7 @@
   function fishName(f){return itemText(f?.name||`Item ${f?.itemId||''}`)}
 
   function ensureUi(){
+    const version=document.querySelector('header p');if(version)version.textContent=version.textContent.replace(/v\d{4}\.\d{2}\.\d{2}\.\d+$/,APP_VERSION);
     const result=document.getElementById('fish-route-result');if(!result)return null;
     const section=result.closest('.fishing-route-section'),head=section?.querySelector('.section-head');
     const title=head?.querySelector('h3');if(title)title.textContent='Session 路線';
@@ -128,8 +130,9 @@
 
   function activeTasks(tasks,cursor){return tasks.filter(t=>!t.served&&t.start<=cursor&&cursor<t.end).sort((a,b)=>a.end-b.end||(a.kind==='target'?0:1)-(b.kind==='target'?0:1))}
   function futureTasks(tasks,cursor,end){return tasks.filter(t=>!t.served&&t.start>cursor&&t.start<end).sort((a,b)=>a.start-b.start||a.end-b.end)}
-  function remainingOrdinaryCount(group,remaining){let n=0;for(const id of group.ordinary.keys())if(remaining.has(id))n++;return n}
-  function takeOrdinary(group,remaining,count){const out=[];for(const[id,fish]of group.ordinary){if(!remaining.has(id))continue;remaining.delete(id);out.push(fish);if(out.length>=count)break}return out}
+  function ordinaryPlanKey(group,id){return`${group.key}|${id}`}
+  function remainingOrdinaryCount(group,remaining){let n=0;for(const id of group.ordinary.keys())if(remaining.has(ordinaryPlanKey(group,id)))n++;return n}
+  function takeOrdinary(group,remaining,count){const out=[];for(const[id,fish]of group.ordinary){const key=ordinaryPlanKey(group,id);if(!remaining.has(key))continue;remaining.delete(key);out.push(fish);if(out.length>=count)break}return out}
   function bestFiller(groups,remaining,nextTask,currentSpot){
     let best=null,bestScore=-Infinity;
     for(const g of groups.values()){
@@ -184,7 +187,7 @@
   }
 
   function plan(model,now,end){
-    const groups=model.groups,tasks=model.tasks,remaining=new Set();for(const g of groups.values())for(const id of g.ordinary.keys())remaining.add(id);
+    const groups=model.groups,tasks=model.tasks,remaining=new Set();for(const g of groups.values())for(const id of g.ordinary.keys())remaining.add(ordinaryPlanKey(g,id));
     const route=[];let cursor=now,currentSpot=null,guard=0,justHandledWindow=false,committedSpot=null,resumeSpot=null;
     const hasOrdinary=key=>!!(key&&groups.get(key)&&remainingOrdinaryCount(groups.get(key),remaining)>0);
     const clearCommitIfDone=()=>{if(committedSpot&&!hasOrdinary(committedSpot)){if(resumeSpot===committedSpot)resumeSpot=null;committedSpot=null}}
@@ -271,7 +274,7 @@
       const model=await buildModel(now,end,p,includeBig,token,box);if(!model||token!==renderToken)return;const route=plan(model,now,end);if(token!==renderToken)return;
       if(!route.length){box.innerHTML=`<span class="muted">${esc(placeText(p.zone))} 在接下來 ${minutes} 分鐘沒有找到可安排的未釣魚／前置窗口。</span>`;return}
       const currentTasks=model.tasks.filter(t=>t.start<=now&&now<t.end).length,futureCount=model.tasks.filter(t=>t.start>now&&t.start<end).length;
-      const html=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、真的換點才算 ${MOVE_MIN} 分。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">Planner 會盡量先把已開始的固定釣點清完；遇到魚窗可以暫時插隊，窗口處理完會優先回原本固定釣點續清，再考慮新的固定釣點。標記釣到或切換釣點不會自動洗掉這份路線；要依最新進度更新時再按一次「規劃這張圖路線」。</div>`;
+      const html=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、真的換點才算 ${MOVE_MIN} 分。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">Planner 會盡量先把已開始的固定釣點清完；遇到魚窗可以暫時插隊，窗口處理完會優先回原本固定釣點續清。不同釣點只要目前仍有同一條未釣魚，都可以各自列入路線；實際標記釣到後，下次重算才會從其他釣點清單消失。</div>`;
       box.innerHTML=html;bindRouteButtons(box);publishRouteSnapshot(route,p,html);
     }catch(e){if(token!==renderToken)return;clearRouteState();console.warn('session route failed',e);box.innerHTML=`<span class="muted">路線計算失敗：${esc(e?.message||e)}。頁面仍可繼續使用。</span>`}
   }
