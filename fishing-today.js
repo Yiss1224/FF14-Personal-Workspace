@@ -4,7 +4,8 @@
 
   const LIMIT=5;
   const SOON_MS=90*60*1000;
-  const WINDOW_WEIGHT=3;
+  const CURRENT_WINDOW_WEIGHT=3;
+  const SOON_WINDOW_WEIGHT=2;
   let renderToken=0;
 
   function read(key,def){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
@@ -43,7 +44,7 @@
     }
     let soonWindow=0;
     for(const id of g.soonFish.keys())if(!g.nowFish.has(id))soonWindow++;
-    return ordinaryNow+(currentWindow+soonWindow)*WINDOW_WEIGHT;
+    return ordinaryNow+currentWindow*CURRENT_WINDOW_WEIGHT+soonWindow*SOON_WINDOW_WEIGHT;
   }
 
   function ensureBox(){
@@ -51,7 +52,7 @@
     if(box)return box;
     const summary=document.getElementById('fish-map-summary');if(!summary)return null;
     const section=document.createElement('div');section.className='fish-today-card';
-    section.innerHTML=`<div class="fish-today-head"><div><strong>今天釣什麼</strong><div class="muted">推薦現在最值得清的漁場；正在窗口或 90 分內開窗的魚，每條以 3 條普通魚計權重。</div></div><div class="fish-today-actions"><label class="inline-check"><input id="fish-today-big" type="checkbox"> 包含魚王</label><button id="fish-today-refresh" type="button">今天釣什麼</button></div></div><div id="fish-today-result" class="fish-today-result"><span class="muted">要開始釣時再按「今天釣什麼」計算。</span></div>`;
+    section.innerHTML=`<div class="fish-today-head"><div><strong>今天釣什麼</strong><div class="muted">推薦現在最值得清的漁場；正在窗口 ×${CURRENT_WINDOW_WEIGHT}，90 分內快開窗 ×${SOON_WINDOW_WEIGHT}，普通魚 ×1。</div></div><div class="fish-today-actions"><label class="inline-check"><input id="fish-today-big" type="checkbox"> 包含魚王</label><button id="fish-today-refresh" type="button">今天釣什麼</button></div></div><div id="fish-today-result" class="fish-today-result"><span class="muted">要開始釣時再按「今天釣什麼」計算。</span></div>`;
     summary.insertAdjacentElement('afterend',section);
     section.querySelector('#fish-today-refresh').addEventListener('click',render);
     return section.querySelector('#fish-today-result');
@@ -61,6 +62,8 @@
     if(document.getElementById('fish-today-style'))return;
     const s=document.createElement('style');s.id='fish-today-style';s.textContent=`
       .fish-today-card{margin:14px 0;padding:14px;border:1px solid var(--border,#d8d8df);border-radius:12px}.fish-today-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}.fish-today-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.fish-today-result{margin-top:12px;display:grid;gap:9px}.today-spot-row{padding:11px 12px;border-radius:10px;background:rgba(127,127,127,.07)}.today-spot-top{display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}.today-spot-name{font-weight:800}.today-spot-place{font-size:13px}.today-spot-count{font-weight:800;text-align:right}.today-spot-score{font-size:12px;font-weight:600}.today-spot-fish{margin-top:5px;font-size:13px}.today-spot-soon{margin-top:5px;font-size:13px}.today-spot-window{font-weight:700}.today-fish-king{font-size:11px;padding:2px 6px;border:1px solid currentColor;border-radius:999px;margin-left:4px}.today-fish-empty{padding:8px 0}.today-fish-summary{font-size:13px}.today-spot-tags{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px}.today-spot-tag{appearance:none;border:1px solid currentColor;background:transparent;color:inherit;border-radius:999px;padding:3px 8px;font:inherit;font-size:12px;cursor:pointer}.today-spot-tag:hover{text-decoration:underline}.today-spot-tag.has-window{font-weight:800}.today-spot-tag.no-window{opacity:.68}
+      @media(max-width:980px){.fish-today-card{padding:12px}.fish-today-head{gap:10px}.fish-today-actions{width:100%;justify-content:space-between}.today-spot-top{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start}.today-spot-fish{line-height:1.55}.today-spot-soon{line-height:1.55}}
+      @media(max-width:650px){.fish-today-card{margin-inline:-2px;padding:11px}.fish-today-actions{align-items:stretch}.fish-today-actions button{flex:1;min-height:42px}.today-spot-row{padding:12px}.today-spot-top{grid-template-columns:1fr}.today-spot-count{text-align:left;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.today-spot-score{display:inline}.today-spot-tag{min-height:34px;padding:6px 10px}.today-spot-fish{margin-top:8px}.today-spot-soon{margin-top:8px;padding-top:7px;border-top:1px solid rgba(127,127,127,.18)}}
     `;document.head.appendChild(s);
   }
 
@@ -107,7 +110,7 @@
     }
 
     const shown=spots.slice(0,LIMIT);
-    box.innerHTML=`<div class="today-fish-summary muted">以 ${esc(fmtClock(now))} 為基準 · 依推薦分數排序；普通魚 1 分，正在窗口或 90 分內開窗的魚每條 ${WINDOW_WEIGHT} 分。</div>${shown.map(g=>{
+    box.innerHTML=`<div class="today-fish-summary muted">以 ${esc(fmtClock(now))} 為基準 · 普通魚 1 分、正在窗口 ${CURRENT_WINDOW_WEIGHT} 分、90 分內快開窗 ${SOON_WINDOW_WEIGHT} 分。</div>${shown.map(g=>{
       const loc=g.loc||{},regionRaw=String(loc.regionName||''),zoneRaw=String(loc.zoneName||''),spotRaw=String(loc.spotName||'未知釣點'),region=placeText(regionRaw),zone=placeText(zoneRaw),spot=placeText(spotRaw);
       const nowFish=[...g.nowFish.values()].sort((a,b)=>Number(a.fish.bigFish)-Number(b.fish.bigFish)||String(a.fish.name||'').localeCompare(String(b.fish.name||'')));
       const soonFish=[...g.soonFish.values()].filter(x=>!g.nowFish.has(Number(x.fish.itemId))).sort((a,b)=>(a.info.next?.[0]??Infinity)-(b.info.next?.[0]??Infinity));
