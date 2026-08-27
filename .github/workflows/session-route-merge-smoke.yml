@@ -15,3 +15,4 @@ jobs:
       - run: node --check fishing-map.js
       - run: node --check fishing-session-route-map.js
       - run: node tests/session-route-merge-smoke.cjs
+      - run: node tests/session-route-map-lifecycle-smoke.cjs
