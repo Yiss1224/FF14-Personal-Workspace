@@ -35,7 +35,6 @@
     if(countInput)countInput.value=current;
     if(targetInput)targetInput.value=target;
 
-    // Preserve the highest known live count even when the latest history row is older.
     try{store.set('fishCurrentCount',current)}catch{}
 
     if(result)result.innerHTML=`<strong>${current} / ${target}</strong>　${pct.toFixed(1)}%<div class="progress"><div style="width:${pct}%"></div></div><br>魚種 ID 已知：${known}<br>3日平均：${s.r3==null?'—':s.r3.toFixed(1)+' 種/天'}<br>7日平均：${s.r7==null?'—':s.r7.toFixed(1)+' 種/天'}<br>剩餘：${remaining} 種<br><span class="good">預估：${eta}</span><br><span class="muted">魚糕可能漏記；而且越到後期通常越難，線性 ETA 可能偏樂觀。</span>`;
@@ -47,8 +46,6 @@
     }
   };
 
-  // Ocean Fishing is not an overworld "run from spot to spot" activity, so keep it
-  // in the catalog/method panels but remove it from the normal route planner.
   const oceanNames=new Set([
     'the high seas','high seas','the endeavor','endeavor',
     'galadion bay','the southern strait of merlthor','southern strait of merlthor',
@@ -63,8 +60,6 @@
   };
   const oceanStop=stop=>!!stop&&(oceanText(stop.regionName)||oceanText(stop.zoneName)||oceanText(stop.spotName));
 
-  // The location picker is authoritative. Search text is useful for free search, but
-  // when a region/map/spot is selected the route planner must never leak in another map.
   function pickerSelection(){
     return {
       region:document.getElementById('fish-picker-region')?.value||'',
@@ -90,9 +85,6 @@
   }
   window.isOceanFishingRouteStop=oceanStop;
 
-  // cloud.js used substring replacement, so "Thavnair" could turn
-  // "The Thavnairian Coast" into "The 薩維奈島ian Coast". Keep replacement only
-  // when the English term is not embedded inside another ASCII word.
   function regexEsc(v){return String(v).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
   if(typeof ff14TcReplaceTextNode==='function'&&typeof ff14TcCache!=='undefined'){
     ff14TcReplaceTextNode=function(node){
@@ -111,9 +103,16 @@
     };
   }
 
+  function hasCurrentSessionRoute(){
+    const model=window.__fishingSessionRouteModel,p=pickerSelection();
+    return !!(model?.stops?.length&&(!p.region||!model.region||model.region===p.region)&&(!p.zone||!model.zone||model.zone===p.zone));
+  }
+
   function rerenderRoute(){
-    try{if(typeof window.renderRoutePlanner==='function')window.renderRoutePlanner()}catch(e){console.warn('route planner refresh failed',e)}
-    // Re-apply TC after route HTML is freshly rebuilt.
+    try{
+      if(hasCurrentSessionRoute())window.refreshFishingSessionRouteMap?.();
+      else if(typeof window.renderRoutePlanner==='function')window.renderRoutePlanner();
+    }catch(e){console.warn('route planner refresh failed',e)}
     setTimeout(()=>{try{if(typeof ff14TcApply==='function')ff14TcApply()}catch{}},0);
   }
 
