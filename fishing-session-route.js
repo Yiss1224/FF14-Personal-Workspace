@@ -10,6 +10,7 @@
   const YIELD_EVERY=4;
   let renderToken=0;
   let restoreTimer=null;
+  let restoreObserver=null;
 
   function read(key,def){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -277,6 +278,11 @@
     document.getElementById('fish-picker-region')?.addEventListener('change',markStale);
     document.getElementById('fish-picker-zone')?.addEventListener('change',markStale);
     document.getElementById('fish-hide-big')?.addEventListener('change',markStale);
+    const result=document.getElementById('fish-route-result');
+    if(result){
+      restoreObserver=new MutationObserver(()=>{if(snapshotMatchesCurrent()&&!result.querySelector('.session-route-list'))queueMicrotask(restoreSnapshot)});
+      restoreObserver.observe(result,{childList:true});
+    }
     restoreTimer=setInterval(()=>{if(snapshotMatchesCurrent()){const box=document.getElementById('fish-route-result');if(box&&!box.querySelector('.session-route-list'))restoreSnapshot()}},1000);
     preserveOrReady();
   }
@@ -286,5 +292,5 @@
   window.resetSessionFishingRoute=preserveOrReady;
   window.preserveSessionFishingRoute=restoreSnapshot;
   window.addEventListener('DOMContentLoaded',init);
-  window.addEventListener('pagehide',()=>{if(restoreTimer)clearInterval(restoreTimer)},{once:true});
+  window.addEventListener('pagehide',()=>{if(restoreTimer)clearInterval(restoreTimer);restoreObserver?.disconnect()},{once:true});
 })();
