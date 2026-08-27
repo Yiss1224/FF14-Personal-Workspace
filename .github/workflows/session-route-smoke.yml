@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - test/fishing-session-route-v2
+      - test/fishing-route-map-v1
   pull_request:
     branches:
       - main
@@ -15,6 +16,20 @@ jobs:
         with:
           node-version: '22'
       - name: Syntax check
-        run: node --check fishing-session-route.js
-      - name: Smoke test
+        run: |
+          node --check fishing-session-route.js
+          node --check fishing-guide-scope.js
+          node --check fishing-session-route-map.js
+      - name: Session route smoke test
         run: node tests/session-route-smoke.cjs
+      - name: Scope and map safety guards
+        run: |
+          node <<'NODE'
+          const fs=require('fs');
+          const scope=fs.readFileSync('fishing-guide-scope.js','utf8');
+          const map=fs.readFileSync('fishing-session-route-map.js','utf8');
+          if(scope.includes('fish-route-result'))throw new Error('guide scope must not write or clear Session route result');
+          if(!map.includes("observe(result,{childList:true,subtree:true})"))throw new Error('route map observer must stay scoped to Session result');
+          if(/observe\([^\n]*(?:fish-zone-map-body|#fishing|root)/.test(map))throw new Error('route map must not observe the fishing/map subtree');
+          console.log('scope/map safety guards passed');
+          NODE
