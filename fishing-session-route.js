@@ -2,7 +2,7 @@
 (function(){
   'use strict';
 
-  const APP_VERSION='v2026.08.27.30';
+  const APP_VERSION='v2026.08.27.31';
   const DEFAULT_SESSION_MIN=90;
   const ORDINARY_FISH_MIN=5;
   const MOVE_MIN=3;
