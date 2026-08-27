@@ -3,7 +3,7 @@
   'use strict';
 
   const XIVAPI='https://v2.xivapi.com/api';
-  const MAP_CACHE_KEY='ff14FishingMapIndexV2';
+  const MAP_CACHE_KEY='ff14FishingMapIndexV3';
   const MAP_CACHE_MS=30*24*60*60*1000;
   let mapIndex=null;
   let mapIndexPromise=null;
@@ -12,7 +12,7 @@
   function catalog(){return readStore('fishCatalog',[])}
   function catalogLocations(){const rows=catalog();if(typeof window.expandFishLocations==='function')return window.expandFishLocations(rows);const out=[];for(const fish of rows){const spots=Array.isArray(fish?.spots)&&fish.spots.length?fish.spots:[fish];spots.forEach(loc=>out.push({...fish,...loc}))}return out}
   function val(id){return document.getElementById(id)?.value||''}
-  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
+  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function tc(v){try{return typeof ff14TcText==='function'?ff14TcText(v):String(v||'')}catch{return String(v||'')}}
   function relationName(v){return String(v?.fields?.Name??v?.Name??'').trim()}
 
@@ -47,13 +47,14 @@
       if(cached?.ts&&cached?.rows&&Date.now()-cached.ts<MAP_CACHE_MS){mapIndex=cached.rows;return mapIndex}
       let after=null,guard=0,rows=[];
       while(guard++<10){
-        const p=new URLSearchParams({fields:'Id,PlaceName.Name,PlaceNameRegion.Name,PlaceNameSub.Name',language:'en',limit:'500'});
+        const p=new URLSearchParams({fields:'Id,SizeFactor,PlaceName.Name,PlaceNameRegion.Name,PlaceNameSub.Name',language:'en',limit:'500'});
         if(after!==null)p.set('after',String(after));
         const r=await fetch(`${XIVAPI}/sheet/Map?${p}`);if(!r.ok)throw new Error(`Map API ${r.status}`);
         const j=await r.json(),batch=Array.isArray(j.rows)?j.rows:[];if(!batch.length)break;
         rows.push(...batch.map(row=>({
           rowId:Number(row.row_id)||0,
           id:String(row.fields?.Id||''),
+          sizeFactor:Number(row.fields?.SizeFactor)||100,
           place:relationName(row.fields?.PlaceName),
           region:relationName(row.fields?.PlaceNameRegion),
           sub:relationName(row.fields?.PlaceNameSub)
@@ -79,18 +80,20 @@
     return score;
   }
 
-  async function resolveMapId(zone){
-    if(!zone)return '';
+  async function resolveMapRecord(zone){
+    if(!zone)return null;
     const rows=await fetchMapIndex();
     const needle=String(zone).toLowerCase();
     const candidates=rows.filter(x=>
       x.place===zone||x.sub===zone||
       x.place.toLowerCase()===needle||x.sub.toLowerCase()===needle
     );
-    if(!candidates.length)return '';
+    if(!candidates.length)return null;
     candidates.sort((a,b)=>mapCandidateScore(b,zone)-mapCandidateScore(a,zone)||a.rowId-b.rowId);
-    return candidates[0].id||'';
+    return candidates[0]||null;
   }
+
+  async function resolveMapId(zone){return (await resolveMapRecord(zone))?.id||''}
 
   function mapAssetUrl(mapId){
     const m=String(mapId||'').match(/^([^/]+)\/(\d{2})$/);if(!m)return '';
@@ -100,6 +103,14 @@
   // FishingSpot X/Z are pixel coordinates on the 2048x2048 map texture,
   // not the 0–42 in-game coordinate display. Convert pixels directly to percent.
   function coordPct(n){return Math.max(0,Math.min(100,(Number(n)/2048)*100))}
+
+  // NPC/vendor coordinates are the visible in-game 0–42 coordinates. XIV's map formula is
+  // gameCoord = pixel / SizeFactor * 2 + 1, so invert it to place a marker on the same 2048 map texture.
+  function gameCoordPct(n,sizeFactor){
+    const coord=Number(n),factor=Number(sizeFactor)||100;
+    if(!Number.isFinite(coord))return null;
+    return coordPct((coord-1)*factor/2);
+  }
 
   function spotButtons(spots){
     return `<div class="fish-map-fallback">${spots.map(s=>`<button type="button" data-map-spot="${esc(s.name)}">${esc(tc(s.name))} <span>${s.fish}</span></button>`).join('')}</div>`;
@@ -146,6 +157,44 @@
     bindSpotButtons(body);
   }
 
+  function ensureNpcMapDialog(){
+    let dialog=document.getElementById('ff14-npc-map-dialog');
+    if(dialog)return dialog;
+    dialog=document.createElement('dialog');
+    dialog.id='ff14-npc-map-dialog';
+    dialog.className='ff14-npc-map-dialog';
+    dialog.innerHTML='<div class="ff14-npc-map-head"><strong id="ff14-npc-map-title">NPC 地圖</strong><button type="button" data-npc-map-close aria-label="關閉">×</button></div><div id="ff14-npc-map-body" class="ff14-npc-map-body"></div>';
+    document.body.appendChild(dialog);
+    dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close()});
+    dialog.querySelector('[data-npc-map-close]').addEventListener('click',()=>dialog.close());
+    return dialog;
+  }
+
+  function parseVisibleCoords(coords){
+    if(Array.isArray(coords)&&coords.length>=2)return [Number(coords[0]),Number(coords[1])];
+    if(coords&&typeof coords==='object')return [Number(coords.x??coords.X),Number(coords.y??coords.Y)];
+    const nums=String(coords||'').match(/-?\d+(?:\.\d+)?/g)||[];
+    return [Number(nums[0]),Number(nums[1])];
+  }
+
+  async function openNpcMap(zone,coords,label='NPC'){
+    const dialog=ensureNpcMapDialog(),body=document.getElementById('ff14-npc-map-body'),title=document.getElementById('ff14-npc-map-title');
+    const [x,y]=parseVisibleCoords(coords),zoneLabel=tc(zone)||zone;
+    title.textContent=`${label} · ${zoneLabel}`;
+    body.innerHTML=`<div class="muted">正在載入 ${esc(zoneLabel)} 地圖…</div>`;
+    if(typeof dialog.showModal==='function'&&!dialog.open)dialog.showModal();else dialog.setAttribute('open','');
+    if(!zone||!Number.isFinite(x)||!Number.isFinite(y)){
+      body.innerHTML='<div class="muted">這個 NPC 沒有足夠的地圖座標資料。</div>';return;
+    }
+    let map=null;try{map=await resolveMapRecord(zone)}catch(e){console.warn('NPC map lookup failed',e)}
+    if(!map){body.innerHTML=`<div class="muted">找不到 ${esc(zoneLabel)} 對應的 FF14 地圖。</div>`;return}
+    const url=mapAssetUrl(map.id);if(!url){body.innerHTML='<div class="muted">這張地圖沒有可用的底圖素材。</div>';return}
+    const left=gameCoordPct(x,map.sizeFactor),top=gameCoordPct(y,map.sizeFactor);
+    if(left===null||top===null){body.innerHTML='<div class="muted">NPC 座標格式無法辨識。</div>';return}
+    body.innerHTML=`<div class="fish-map-title"><strong>${esc(zoneLabel)}</strong> · ${esc(label)} · X/Y ${esc(x.toFixed(1))}, ${esc(y.toFixed(1))}</div><div class="ff14-map-wrap ff14-npc-map-wrap"><img class="ff14-map-image" src="${esc(url)}" alt="${esc(zoneLabel)} FF14 地圖"><div class="ff14-map-markers"><div class="ff14-map-marker ff14-npc-map-marker" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}%"><span class="ff14-map-dot"></span><span class="ff14-map-label">${esc(label)}</span></div></div></div><div class="muted fish-map-note">Map.Id: <code>${esc(map.id)}</code> · X/Y ${esc(x.toFixed(1))}, ${esc(y.toFixed(1))}</div>`;
+    const img=body.querySelector('.ff14-map-image');if(img)img.addEventListener('error',()=>{body.innerHTML='<div class="muted">FF14 地圖圖片載入失敗。</div>'},{once:true});
+  }
+
   function chooseSpot(name){
     const spot=document.getElementById('fish-picker-spot');
     if(spot&&[...spot.options].some(o=>o.value===name)){spot.value=name;spot.dispatchEvent(new Event('change',{bubbles:true}))}
@@ -172,9 +221,13 @@
       .ff14-map-label{font-weight:700;font-size:12px;white-space:nowrap;color:#fff;text-shadow:-1px -1px 2px #000,1px -1px 2px #000,-1px 1px 2px #000,1px 1px 2px #000}
       .ff14-map-marker.selected .ff14-map-dot{width:20px;height:20px}.ff14-map-marker:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:4px}
       .fish-map-scroll{overflow:auto;border:1px solid var(--border,#d8d8df);border-radius:12px;background:rgba(127,127,127,.04)}.fish-map-svg{display:block;width:100%;min-width:620px;height:auto}.fish-map-point{cursor:pointer}.fish-map-point circle{fill:currentColor;opacity:.65;stroke:Canvas;stroke-width:3}.fish-map-point text{font-size:13px;fill:currentColor;paint-order:stroke;stroke:Canvas;stroke-width:3px}.fish-map-note{margin-top:7px}.fish-map-warning{margin-top:9px}.fish-map-fallback{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.fish-map-fallback button span{opacity:.6;margin-left:5px}
-      @media(max-width:760px){.ff14-map-label{font-size:11px}.ff14-map-dot{width:13px;height:13px}.fish-map-svg{min-width:560px}}
+      .ff14-npc-map-dialog{width:min(94vw,820px);max-width:820px;border:1px solid var(--border,#d8d8df);border-radius:14px;padding:14px;background:Canvas;color:CanvasText}.ff14-npc-map-dialog::backdrop{background:rgba(0,0,0,.58)}
+      .ff14-npc-map-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}.ff14-npc-map-head button{font-size:24px;line-height:1;border:0;background:transparent;color:inherit;cursor:pointer;padding:2px 8px}.ff14-npc-map-body{min-height:80px}.ff14-npc-map-marker{cursor:default}.ff14-npc-map-marker .ff14-map-dot{width:20px;height:20px}
+      @media(max-width:760px){.ff14-map-label{font-size:11px}.ff14-map-dot{width:13px;height:13px}.fish-map-svg{min-width:560px}.ff14-npc-map-dialog{width:96vw;padding:10px}}
     `;document.head.appendChild(s);
   }
+
+  window.openFF14MapAt=(zone,coords,label)=>openNpcMap(zone,coords,label);
 
   window.addEventListener('DOMContentLoaded',()=>{
     addStyles();setTimeout(()=>{ensureMap();renderMap()},300);
