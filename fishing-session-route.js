@@ -2,7 +2,7 @@
 (function(){
   'use strict';
 
-  const APP_VERSION='v2026.08.27.28';
+  const APP_VERSION='v2026.08.27.29';
   const DEFAULT_SESSION_MIN=90;
   const ORDINARY_FISH_MIN=5;
   const MOVE_MIN=3;
@@ -14,7 +14,7 @@
   let restoreObserver=null;
 
   function read(key,def){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
-  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
   function idOf(v){return Number(v&&typeof v==='object'?(v.id??v.itemId??v.fishId):v)}
   function intSet(values){return new Set((values||[]).map(idOf).filter(Number.isFinite))}
   function itemText(v){const s=String(v||'');try{return typeof window.ff14TcItemText==='function'?window.ff14TcItemText(s):s}catch{return s}}
@@ -32,6 +32,25 @@
   function matchesMap(loc,p){if(p.region&&String(loc?.regionName||'')!==p.region)return false;if(p.zone&&String(loc?.zoneName||'')!==p.zone)return false;return true}
   function locationsFor(fish,info,p){const spots=fishLocations(fish).filter(loc=>matchesMap(loc,p));if(!info?.restricted||!Number(info.locationId))return spots;return spots.filter(x=>Number(x?.spotId)===Number(info.locationId))}
   function fishName(f){return itemText(f?.name||`Item ${f?.itemId||''}`)}
+  function spotDistance(a,b){
+    if(!a||!b)return null;
+    const ax=Number(a?.loc?.x),ay=Number(a?.loc?.y),bx=Number(b?.loc?.x),by=Number(b?.loc?.y);
+    if(![ax,ay,bx,by].every(Number.isFinite))return null;
+    return Math.hypot(ax-bx,ay-by);
+  }
+  function ordinaryDistancePenalty(current,candidate,next){
+    let penalty=0;
+    if(current){const d=spotDistance(current,candidate);if(Number.isFinite(d))penalty+=d/260}
+    if(next){
+      if(current){
+        const a=spotDistance(current,candidate),b=spotDistance(candidate,next),direct=spotDistance(current,next);
+        if([a,b,direct].every(Number.isFinite))penalty+=Math.max(0,a+b-direct)/180;
+      }else{
+        const d=spotDistance(candidate,next);if(Number.isFinite(d))penalty+=d/360;
+      }
+    }
+    return penalty;
+  }
 
   function ensureUi(){
     const version=document.querySelector('header p');if(version)version.textContent=version.textContent.replace(/v\d{4}\.\d{2}\.\d{2}\.\d+$/,APP_VERSION);
@@ -134,10 +153,13 @@
   function remainingOrdinaryCount(group,remaining){let n=0;for(const id of group.ordinary.keys())if(remaining.has(ordinaryPlanKey(group,id)))n++;return n}
   function takeOrdinary(group,remaining,count){const out=[];for(const[id,fish]of group.ordinary){const key=ordinaryPlanKey(group,id);if(!remaining.has(key))continue;remaining.delete(key);out.push(fish);if(out.length>=count)break}return out}
   function bestFiller(groups,remaining,nextTask,currentSpot){
-    let best=null,bestScore=-Infinity;
+    let best=null,bestScore=-Infinity;const current=currentSpot?groups.get(currentSpot):null,next=nextTask?.spot||null;
     for(const g of groups.values()){
       const n=remainingOrdinaryCount(g,remaining);if(!n)continue;
-      let score=n;if(currentSpot&&g.key===currentSpot)score+=2.5;if(nextTask&&g.key===nextTask.spot.key)score+=2;
+      let score=n*3;
+      if(current&&g.key===current.key)score+=5;
+      if(next&&g.key===next.key)score+=2;
+      score-=ordinaryDistancePenalty(current,g,next);
       if(score>bestScore){bestScore=score;best=g}
     }
     return best;
@@ -274,7 +296,7 @@
       const model=await buildModel(now,end,p,includeBig,token,box);if(!model||token!==renderToken)return;const route=plan(model,now,end);if(token!==renderToken)return;
       if(!route.length){box.innerHTML=`<span class="muted">${esc(placeText(p.zone))} 在接下來 ${minutes} 分鐘沒有找到可安排的未釣魚／前置窗口。</span>`;return}
       const currentTasks=model.tasks.filter(t=>t.start<=now&&now<t.end).length,futureCount=model.tasks.filter(t=>t.start>now&&t.start<end).length;
-      const html=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、真的換點才算 ${MOVE_MIN} 分。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">Planner 會盡量先把已開始的固定釣點清完；遇到魚窗可以暫時插隊，窗口處理完會優先回原本固定釣點續清。不同釣點只要目前仍有同一條未釣魚，都可以各自列入路線；實際標記釣到後，下次重算才會從其他釣點清單消失。</div>`;
+      const html=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、真的換點才算 ${MOVE_MIN} 分。挑新的白魚釣點時會把地圖 X/Y 距離與繞去下一窗口的成本一起算進去。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">Planner 會盡量先把已開始的固定釣點清完；遇到魚窗可以暫時插隊，窗口處理完會優先回原本固定釣點續清。不同釣點只要目前仍有同一條未釣魚，都可以各自列入路線；實際標記釣到後，下次重算才會從其他釣點清單消失。新的白魚釣點會偏向距離近、順路的點，避免無必要地橫跨整張地圖。</div>`;
       box.innerHTML=html;bindRouteButtons(box);publishRouteSnapshot(route,p,html);
     }catch(e){if(token!==renderToken)return;clearRouteState();console.warn('session route failed',e);box.innerHTML=`<span class="muted">路線計算失敗：${esc(e?.message||e)}。頁面仍可繼續使用。</span>`}
   }
