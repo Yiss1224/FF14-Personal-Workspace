@@ -13,7 +13,7 @@
 </head>
 <body>
   <header>
-    <div><h1>FF14 Personal Workspace</h1><p>日課、練等、釣魚進度集中管理 · v2026.08.27.10</p></div>
+    <div><h1>FF14 Personal Workspace</h1><p>日課、練等、釣魚進度集中管理 · v2026.08.27.11</p></div>
     <div id="sync-box" class="sync-box"><span id="sync-status">未登入</span><button id="sync-login">登入同步</button><button id="sync-now" hidden>立即同步</button><button id="sync-logout" hidden>登出</button></div>
   </header>
   <div id="auth-panel" class="auth-panel" hidden>
@@ -36,7 +36,7 @@
         <article><h2>今日 Daily</h2><div id="daily-list"></div></article>
         <article><h2>練等 ETA</h2><div id="level-summary"></div><hr><div id="level-multi-summary"></div></article>
         <article><h2>今晚怎麼玩</h2><div id="tonight-summary"></div></article>
-        <article><h2>釣魚 ETA</h2><div id="fish-summary"></div></article>
+        <article><h2>釣魚 ETA</h2><div id="fish-summary"></div><div style="margin-top:10px"><button type="button" onclick="document.querySelector('nav button[data-tab=&quot;fishing&quot;]')?.click();setTimeout(()=>{window.renderTodayFishing?.();document.querySelector('.fish-today-card')?.scrollIntoView({behavior:'smooth',block:'start'})},30)">今天釣什麼</button></div></article>
       </div>
     </section>
 
@@ -176,12 +176,12 @@
   <script src="tonight.js?v=20260825-1357"></script>
   <script src="cloud.js?v=20260827-0648"></script>
   <script src="fishing-npc-tc.js?v=20260827-1020"></script>
-  <script src="fishing-ui-v2.js?v=20260826-1931"></script>
+  <script src="fishing-ui-v2.js?v=20260827-1205"></script>
   <script src="fishing-map-groups.js?v=20260824-2206"></script>
   <script src="fishing-map.js?v=20260827-1020"></script>
   <script src="fishing-guide-renderer.js?v=20260826-1931"></script>
   <script src="fishing-window.js?v=20260827-1128"></script>
-  <script src="fishing-today.js?v=20260827-1150"></script>
+  <script src="fishing-today.js?v=20260827-1205"></script>
   <script src="fishing-progress-fix.js?v=20260824-2206"></script>
 </body>
 </html>
