@@ -3,7 +3,7 @@
   'use strict';
 
   const LIMIT=5;
-  let renderToken=0,timer=null;
+  let renderToken=0;
 
   function read(key,def){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -38,9 +38,8 @@
     if(box)return box;
     const summary=document.getElementById('fish-map-summary');if(!summary)return null;
     const section=document.createElement('div');section.className='fish-today-card';
-    section.innerHTML=`<div class="fish-today-head"><div><strong>今天釣什麼</strong><div class="muted">只抓今天有窗口的未釣魚；普通隨時魚留給掃圖清場。</div></div><div class="fish-today-actions"><label class="inline-check"><input id="fish-today-big" type="checkbox"> 包含魚王</label><button id="fish-today-refresh" type="button">更新推薦</button></div></div><div id="fish-today-result" class="fish-today-result"><span class="muted">正在整理今天的魚窗…</span></div>`;
+    section.innerHTML=`<div class="fish-today-head"><div><strong>今天釣什麼</strong><div class="muted">只抓今天有窗口的未釣魚；普通隨時魚留給掃圖清場。</div></div><div class="fish-today-actions"><label class="inline-check"><input id="fish-today-big" type="checkbox"> 包含魚王</label><button id="fish-today-refresh" type="button">今天釣什麼</button></div></div><div id="fish-today-result" class="fish-today-result"><span class="muted">要開始釣時再按「今天釣什麼」計算。</span></div>`;
     summary.insertAdjacentElement('afterend',section);
-    section.querySelector('#fish-today-big').addEventListener('change',render);
     section.querySelector('#fish-today-refresh').addEventListener('click',render);
     return section.querySelector('#fish-today-result');
   }
@@ -57,7 +56,7 @@
     const box=ensureBox();if(!box)return;
     const my=++renderToken,includeBig=!!document.getElementById('fish-today-big')?.checked,now=Date.now(),end=dayEnd(now),catalog=read('fishCatalog',[])||[],done=caught(),skip=skipped();
     if(typeof window.ff14FishingWindowInfo!=='function'){
-      box.innerHTML='<span class="muted">魚窗資料尚未準備好，請稍後再更新。</span>';return;
+      box.innerHTML='<span class="muted">魚窗資料尚未準備好，請稍後再按一次。</span>';return;
     }
     box.innerHTML='<span class="muted">正在計算今天剩下的魚窗…</span>';
     const base=catalog.filter(f=>Number(f?.itemId)>0&&f?.type!=='spearfishing'&&!done.has(Number(f.itemId))&&!skip.has(Number(f.itemId))&&(includeBig||!f.bigFish));
@@ -77,17 +76,16 @@
     });
     if(my!==renderToken)return;
     if(!rows.length){
-      box.innerHTML=`<div class="today-fish-empty">今天剩下的時間沒有符合條件的${includeBig?'窗口魚':'窗口白魚'}。<br><span class="muted">${includeBig?'連魚王也暫時沒有好時機 QAQ':'想看看魚王的話，可以勾「包含魚王」。'}</span></div>`;return;
+      box.innerHTML=`<div class="today-fish-empty">今天剩下的時間沒有符合條件的${includeBig?'窗口魚':'窗口白魚'}。<br><span class="muted">${includeBig?'連魚王也暫時沒有好時機 QAQ':'想看看魚王的話，可以勾「包含魚王」後再按一次。'}</span></div>`;return;
     }
     const shown=rows.slice(0,LIMIT);
-    box.innerHTML=`<div class="today-fish-summary muted">今天符合條件 ${rows.length} 條，先列最接近的 ${shown.length} 條。</div>${shown.map(({fish,info,loc})=>{
+    box.innerHTML=`<div class="today-fish-summary muted">以 ${esc(fmtClock(now))} 為基準 · 今天符合條件 ${rows.length} 條，先列最接近的 ${shown.length} 條。</div>${shown.map(({fish,info,loc})=>{
       const name=itemText(fish.name||`Item ${fish.itemId}`),region=placeText(loc.regionName||fish.regionName||''),zone=placeText(loc.zoneName||fish.zoneName||''),spot=placeText(loc.spotName||fish.spotName||'');
       return `<div class="today-fish-row"><div><span class="today-fish-name">${esc(name)}</span>${fish.bigFish?'<span class="today-fish-king">魚王</span>':''}</div><div class="today-fish-place">${[region,zone,spot].filter(Boolean).map(esc).join(' / ')}</div><div class="today-fish-status">${statusHtml(info)}</div></div>`;
     }).join('')}`;
   }
 
-  function schedule(){clearTimeout(timer);timer=setTimeout(render,180)}
-  function init(){addStyles();ensureBox();render();const root=document.getElementById('fishing');if(root)new MutationObserver(schedule).observe(root,{childList:true,subtree:true});setInterval(()=>{if(document.getElementById('fishing')?.classList.contains('active'))render()},60000)}
+  function init(){addStyles();ensureBox()}
   window.renderTodayFishing=render;
   window.addEventListener('DOMContentLoaded',init);
 })();
