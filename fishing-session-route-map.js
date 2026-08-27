@@ -56,31 +56,47 @@
     marker.appendChild(wrap);
   }
 
-  function markerPoint(marker){
-    if(!marker)return null;const left=parseFloat(marker.style.left),top=parseFloat(marker.style.top);
-    return Number.isFinite(left)&&Number.isFinite(top)?{left,top}:null;
+  function badgePoint(badge,wrapRect){
+    if(!badge||!wrapRect?.width||!wrapRect?.height)return null;
+    const r=badge.getBoundingClientRect();
+    return{x:r.left+r.width/2-wrapRect.left,y:r.top+r.height/2-wrapRect.top,r:Math.max(r.width,r.height)/2};
   }
 
   function shortenedSegment(a,b){
-    const dx=b.left-a.left,dy=b.top-a.top,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;
-    const inset=Math.min(3.4,Math.max(2.0,len*.08));
-    const sx=a.left+ux*inset,sy=a.top+uy*inset,ex=b.left-ux*inset,ey=b.top-uy*inset;
+    const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;
+    const startInset=Math.max(8,a.r+4),endInset=Math.max(8,b.r+4);
+    const sx=a.x+ux*startInset,sy=a.y+uy*startInset,ex=b.x-ux*endInset,ey=b.y-uy*endInset;
     const mx=(sx+ex)/2,my=(sy+ey)/2;
     return{sx,sy,mx,my,ex,ey};
   }
 
   function drawRouteLines(markersWrap,groups,markerMap){
     if(!markersWrap||groups.length<2)return;
-    const points=groups.map(g=>({group:g,point:markerPoint(markerMap.get(g.spot))})).filter(x=>x.point);if(points.length<2)return;
+    const wrapRect=markersWrap.getBoundingClientRect();
+    if(!wrapRect.width||!wrapRect.height)return;
+
+    const occurrence=new Map();
+    const points=[];
+    for(const group of groups){
+      const marker=markerMap.get(group.spot);if(!marker)continue;
+      const idx=occurrence.get(group.spot)||0;occurrence.set(group.spot,idx+1);
+      const badges=[...marker.querySelectorAll('.ff14-route-order')];
+      const badge=badges[Math.min(idx,badges.length-1)];
+      const point=badgePoint(badge,wrapRect);if(point)points.push({group,point});
+    }
+    if(points.length<2)return;
+
     const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
-    svg.setAttribute('class','ff14-route-line-layer');svg.setAttribute('viewBox','0 0 100 100');svg.setAttribute('preserveAspectRatio','none');
+    svg.setAttribute('class','ff14-route-line-layer');
+    svg.setAttribute('viewBox',`0 0 ${wrapRect.width.toFixed(2)} ${wrapRect.height.toFixed(2)}`);
+    svg.setAttribute('preserveAspectRatio','none');
     const defs=document.createElementNS(ns,'defs'),marker=document.createElementNS(ns,'marker');
     marker.setAttribute('id','ff14-route-arrow');marker.setAttribute('viewBox','0 0 10 10');marker.setAttribute('refX','5');marker.setAttribute('refY','5');marker.setAttribute('markerWidth','5.5');marker.setAttribute('markerHeight','5.5');marker.setAttribute('orient','auto');
     const arrow=document.createElementNS(ns,'path');arrow.setAttribute('d','M 0 0 L 10 5 L 0 10 z');arrow.setAttribute('class','ff14-route-arrow-head');marker.appendChild(arrow);defs.appendChild(marker);svg.appendChild(defs);
+
     for(let i=0;i<points.length-1;i++){
-      const a=points[i].point,b=points[i+1].point;if(Math.abs(a.left-b.left)<.01&&Math.abs(a.top-b.top)<.01)continue;
+      const a=points[i].point,b=points[i+1].point;if(Math.abs(a.x-b.x)<1&&Math.abs(a.y-b.y)<1)continue;
       const q=shortenedSegment(a,b),path=document.createElementNS(ns,'path');
-      // Two straight segments create a real midpoint vertex so marker-mid sits between the two fishing spots.
       path.setAttribute('d',`M ${q.sx.toFixed(2)} ${q.sy.toFixed(2)} L ${q.mx.toFixed(2)} ${q.my.toFixed(2)} L ${q.ex.toFixed(2)} ${q.ey.toFixed(2)}`);
       path.setAttribute('class','ff14-route-line');path.setAttribute('marker-mid','url(#ff14-route-arrow)');svg.appendChild(path);
     }
@@ -114,7 +130,7 @@
       .ff14-map-marker.session-route{z-index:4}
       .ff14-route-orders{position:absolute;left:10px;top:-24px;display:flex;gap:2px;pointer-events:none}
       .ff14-route-order{display:grid;place-items:center;min-width:20px;height:20px;padding:0 4px;border-radius:999px;background:Canvas;color:CanvasText;border:2px solid currentColor;font-size:11px;font-weight:900;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.45)}
-      .ff14-route-line-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible}
+      .ff14-route-line-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;overflow:visible}
       .ff14-route-line{fill:none;stroke:CanvasText;stroke-width:2.4;stroke-linecap:round;opacity:.62;vector-effect:non-scaling-stroke}
       .ff14-route-arrow-head{fill:CanvasText;opacity:.82}
       .fish-session-route-map-note{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin:-2px 0 8px;font-size:12px}
