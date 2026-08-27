@@ -2,7 +2,7 @@
 (function(){
   'use strict';
 
-  const APP_VERSION='v2026.08.27.29';
+  const APP_VERSION='v2026.08.27.30';
   const DEFAULT_SESSION_MIN=90;
   const ORDINARY_FISH_MIN=5;
   const MOVE_MIN=3;
@@ -38,19 +38,17 @@
     if(![ax,ay,bx,by].every(Number.isFinite))return null;
     return Math.hypot(ax-bx,ay-by);
   }
-  function ordinaryDistancePenalty(current,candidate,next){
-    let penalty=0;
-    if(current){const d=spotDistance(current,candidate);if(Number.isFinite(d))penalty+=d/260}
-    if(next){
-      if(current){
-        const a=spotDistance(current,candidate),b=spotDistance(candidate,next),direct=spotDistance(current,next);
-        if([a,b,direct].every(Number.isFinite))penalty+=Math.max(0,a+b-direct)/180;
-      }else{
-        const d=spotDistance(candidate,next);if(Number.isFinite(d))penalty+=d/360;
-      }
+  function ordinaryRouteCost(current,candidate,next){
+    const from=current?spotDistance(current,candidate):null,to=next?spotDistance(candidate,next):null;
+    if(current&&next){
+      const direct=spotDistance(current,next);
+      if([from,to,direct].every(Number.isFinite))return{known:true,primary:Math.max(0,from+to-direct),secondary:from};
     }
-    return penalty;
+    if(current&&Number.isFinite(from))return{known:true,primary:from,secondary:0};
+    if(next&&Number.isFinite(to))return{known:true,primary:to,secondary:0};
+    return{known:false,primary:Infinity,secondary:Infinity};
   }
+  function rankLess(a,b){for(let i=0;i<a.length;i++){if(a[i]===b[i])continue;return a[i]<b[i]}return false}
 
   function ensureUi(){
     const version=document.querySelector('header p');if(version)version.textContent=version.textContent.replace(/v\d{4}\.\d{2}\.\d{2}\.\d+$/,APP_VERSION);
@@ -153,14 +151,11 @@
   function remainingOrdinaryCount(group,remaining){let n=0;for(const id of group.ordinary.keys())if(remaining.has(ordinaryPlanKey(group,id)))n++;return n}
   function takeOrdinary(group,remaining,count){const out=[];for(const[id,fish]of group.ordinary){const key=ordinaryPlanKey(group,id);if(!remaining.has(key))continue;remaining.delete(key);out.push(fish);if(out.length>=count)break}return out}
   function bestFiller(groups,remaining,nextTask,currentSpot){
-    let best=null,bestScore=-Infinity;const current=currentSpot?groups.get(currentSpot):null,next=nextTask?.spot||null;
+    let best=null,bestRank=null;const current=currentSpot?groups.get(currentSpot):null,next=nextTask?.spot||null;
     for(const g of groups.values()){
       const n=remainingOrdinaryCount(g,remaining);if(!n)continue;
-      let score=n*3;
-      if(current&&g.key===current.key)score+=5;
-      if(next&&g.key===next.key)score+=2;
-      score-=ordinaryDistancePenalty(current,g,next);
-      if(score>bestScore){bestScore=score;best=g}
+      const cost=ordinaryRouteCost(current,g,next),rank=[cost.known?0:1,cost.primary,cost.secondary,-n];
+      if(!best||rankLess(rank,bestRank)){best=g;bestRank=rank}
     }
     return best;
   }
@@ -296,7 +291,7 @@
       const model=await buildModel(now,end,p,includeBig,token,box);if(!model||token!==renderToken)return;const route=plan(model,now,end);if(token!==renderToken)return;
       if(!route.length){box.innerHTML=`<span class="muted">${esc(placeText(p.zone))} 在接下來 ${minutes} 分鐘沒有找到可安排的未釣魚／前置窗口。</span>`;return}
       const currentTasks=model.tasks.filter(t=>t.start<=now&&now<t.end).length,futureCount=model.tasks.filter(t=>t.start>now&&t.start<end).length;
-      const html=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、真的換點才算 ${MOVE_MIN} 分。挑新的白魚釣點時會把地圖 X/Y 距離與繞去下一窗口的成本一起算進去。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">Planner 會盡量先把已開始的固定釣點清完；遇到魚窗可以暫時插隊，窗口處理完會優先回原本固定釣點續清。不同釣點只要目前仍有同一條未釣魚，都可以各自列入路線；實際標記釣到後，下次重算才會從其他釣點清單消失。新的白魚釣點會偏向距離近、順路的點，避免無必要地橫跨整張地圖。</div>`;
+      const html=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、真的換點才算 ${MOVE_MIN} 分。除窗口外，新的白魚釣點以地圖距離與順路程度優先，剩餘魚數只在距離接近時當參考。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">Planner 會盡量先把已開始的固定釣點清完；遇到魚窗可以暫時插隊，窗口處理完會優先回原本固定釣點續清。不同釣點只要目前仍有同一條未釣魚，都可以各自列入路線；實際標記釣到後，下次重算才會從其他釣點清單消失。沒有窗口強制插隊時，白魚路線會以少繞路、少折返為第一優先。</div>`;
       box.innerHTML=html;bindRouteButtons(box);publishRouteSnapshot(route,p,html);
     }catch(e){if(token!==renderToken)return;clearRouteState();console.warn('session route failed',e);box.innerHTML=`<span class="muted">路線計算失敗：${esc(e?.message||e)}。頁面仍可繼續使用。</span>`}
   }
