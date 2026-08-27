@@ -52,7 +52,7 @@
     if(!marker||!labels.length)return;
     marker.classList.add('session-route');
     const wrap=document.createElement('span');wrap.className='ff14-route-orders';
-    const badge=document.createElement('span');badge.className='ff14-route-order';badge.textContent=labels.length>1?`(${labels.join(' ')})`:labels[0];wrap.appendChild(badge);
+    const badge=document.createElement('span');badge.className='ff14-route-order';badge.textContent=labels.join(' ');wrap.appendChild(badge);
     marker.appendChild(wrap);
   }
 
@@ -109,7 +109,7 @@
     const markerMap=new Map([...body.querySelectorAll('.ff14-map-marker[data-map-spot]')].map(m=>[m.dataset.mapSpot,m]));
     for(const [spot,labels] of bySpot)addOrders(markerMap.get(spot),labels);
     drawRouteLines(body.querySelector('.ff14-map-markers'),groups,markerMap);
-    body.querySelectorAll('.fish-map-fallback [data-map-spot]').forEach(btn=>{const labels=bySpot.get(btn.dataset.mapSpot)||[];if(!labels.length)return;btn.classList.add('session-route-fallback');btn.dataset.routeOrder=labels.length>1?`(${labels.join(' ')})`:labels[0]});
+    body.querySelectorAll('.fish-map-fallback [data-map-spot]').forEach(btn=>{const labels=bySpot.get(btn.dataset.mapSpot)||[];if(!labels.length)return;btn.classList.add('session-route-fallback');btn.dataset.routeOrder=labels.join(' ')});
     const title=body.querySelector('.fish-map-title');
     if(title){const note=document.createElement('div');note.id='fish-session-route-map-note';note.className='fish-session-route-map-note';note.innerHTML=`<strong>Session 順序</strong> ${groups.map(g=>`<span>${esc(orderLabel(g.orders))}. ${esc(tc(g.spot))}</span>`).join('<span class="route-map-arrow">→</span>')}`;title.insertAdjacentElement('afterend',note)}
   }
