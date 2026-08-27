@@ -48,11 +48,16 @@
   function addStyles(){
     if(document.getElementById('fish-today-style'))return;
     const s=document.createElement('style');s.id='fish-today-style';s.textContent=`
-      .fish-today-card{margin:14px 0;padding:14px;border:1px solid var(--border,#d8d8df);border-radius:12px}.fish-today-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}.fish-today-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.fish-today-result{margin-top:12px;display:grid;gap:9px}.today-spot-row{padding:11px 12px;border-radius:10px;background:rgba(127,127,127,.07)}.today-spot-top{display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}.today-spot-name{font-weight:800}.today-spot-place{font-size:13px}.today-spot-count{font-weight:800}.today-spot-fish{margin-top:5px;font-size:13px}.today-spot-soon{margin-top:5px;font-size:13px}.today-spot-window{font-weight:700}.today-fish-king{font-size:11px;padding:2px 6px;border:1px solid currentColor;border-radius:999px;margin-left:4px}.today-fish-empty{padding:8px 0}.today-fish-summary{font-size:13px}
+      .fish-today-card{margin:14px 0;padding:14px;border:1px solid var(--border,#d8d8df);border-radius:12px}.fish-today-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}.fish-today-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.fish-today-result{margin-top:12px;display:grid;gap:9px}.today-spot-row{padding:11px 12px;border-radius:10px;background:rgba(127,127,127,.07)}.today-spot-top{display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}.today-spot-name{font-weight:800}.today-spot-place{font-size:13px}.today-spot-count{font-weight:800}.today-spot-fish{margin-top:5px;font-size:13px}.today-spot-soon{margin-top:5px;font-size:13px}.today-spot-window{font-weight:700}.today-fish-king{font-size:11px;padding:2px 6px;border:1px solid currentColor;border-radius:999px;margin-left:4px}.today-fish-empty{padding:8px 0}.today-fish-summary{font-size:13px}.today-spot-tags{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px}.today-spot-tag{appearance:none;border:1px solid currentColor;background:transparent;color:inherit;border-radius:999px;padding:3px 8px;font:inherit;font-size:12px;cursor:pointer}.today-spot-tag:hover{text-decoration:underline}.today-spot-tag.has-window{font-weight:800}.today-spot-tag.no-window{opacity:.68}
     `;document.head.appendChild(s);
   }
 
   function fishLabel(fish){return `${esc(itemText(fish.name||`Item ${fish.itemId}`))}${fish.bigFish?'<span class="today-fish-king">魚王</span>':''}`}
+  function bindSpotTags(root){
+    root.querySelectorAll('[data-today-spot]').forEach(tag=>tag.addEventListener('click',()=>{
+      if(typeof window.selectFishingSpot==='function')window.selectFishingSpot(tag.dataset.region||'',tag.dataset.zone||'',tag.dataset.spot||'');
+    }));
+  }
 
   async function render(){
     const box=ensureBox();if(!box)return;
@@ -70,22 +75,18 @@
       if(!info)continue;
       const availableNow=!info.restricted||!!info.current;
       const soon=!!(info.restricted&&!info.current&&info.next&&info.next[0]<end&&info.waitMs<=SOON_MS);
-      if(!availableNow&&!soon)continue;
-
       for(const loc of locationsFor(fish,info)){
         const key=spotKey(loc);
-        if(!groups.has(key))groups.set(key,{loc,nowFish:new Map(),soonFish:new Map(),earliestSoon:Infinity});
+        if(!groups.has(key))groups.set(key,{loc,nowFish:new Map(),soonFish:new Map(),windowFish:new Map(),earliestSoon:Infinity});
         const g=groups.get(key),id=Number(fish.itemId);
+        if(info.restricted)g.windowFish.set(id,{fish,info});
         if(availableNow)g.nowFish.set(id,{fish,info});
         if(soon){g.soonFish.set(id,{fish,info});g.earliestSoon=Math.min(g.earliestSoon,info.next[0])}
       }
     }
 
     const spots=[...groups.values()].filter(g=>g.nowFish.size>0).sort((a,b)=>
-      b.nowFish.size-a.nowFish.size||
-      b.soonFish.size-a.soonFish.size||
-      a.earliestSoon-b.earliestSoon||
-      String(a.loc?.spotName||'').localeCompare(String(b.loc?.spotName||''))
+      b.nowFish.size-a.nowFish.size||b.soonFish.size-a.soonFish.size||a.earliestSoon-b.earliestSoon||String(a.loc?.spotName||'').localeCompare(String(b.loc?.spotName||''))
     );
 
     if(my!==renderToken)return;
@@ -95,13 +96,15 @@
 
     const shown=spots.slice(0,LIMIT);
     box.innerHTML=`<div class="today-fish-summary muted">以 ${esc(fmtClock(now))} 為基準 · 先列現在可清魚種最多的 ${shown.length} 個漁場；90 分內開窗會作為同分優先提示。</div>${shown.map(g=>{
-      const loc=g.loc||{},region=placeText(loc.regionName||''),zone=placeText(loc.zoneName||''),spot=placeText(loc.spotName||'未知釣點');
+      const loc=g.loc||{},regionRaw=String(loc.regionName||''),zoneRaw=String(loc.zoneName||''),spotRaw=String(loc.spotName||'未知釣點'),region=placeText(regionRaw),zone=placeText(zoneRaw),spot=placeText(spotRaw);
       const nowFish=[...g.nowFish.values()].sort((a,b)=>Number(a.fish.bigFish)-Number(b.fish.bigFish)||String(a.fish.name||'').localeCompare(String(b.fish.name||'')));
       const soonFish=[...g.soonFish.values()].filter(x=>!g.nowFish.has(Number(x.fish.itemId))).sort((a,b)=>(a.info.next?.[0]??Infinity)-(b.info.next?.[0]??Infinity));
       const nowNames=nowFish.slice(0,8).map(x=>fishLabel(x.fish)).join('、')+(nowFish.length>8?`、…共 ${nowFish.length} 條`:'');
       const soonHtml=soonFish.length?`<div class="today-spot-soon">⏳ 快開窗：${soonFish.slice(0,3).map(x=>`<span class="today-spot-window">${fishLabel(x.fish)} ${esc(fmtDuration(x.info.waitMs))}後（${esc(fmtClock(x.info.next[0]))}）</span>`).join('、')}</div>`:'';
-      return `<div class="today-spot-row"><div class="today-spot-top"><div><span class="today-spot-name">${esc(spot)}</span><div class="today-spot-place">${[region,zone].filter(Boolean).map(esc).join(' / ')}</div></div><div class="today-spot-count">現在可釣 ${g.nowFish.size} 條</div></div><div class="today-spot-fish">${nowNames}</div>${soonHtml}</div>`;
+      const hasWindow=g.windowFish.size>0,tagText=hasWindow?`有窗口魚 ${g.windowFish.size}`:'無窗口魚';
+      return `<div class="today-spot-row"><div class="today-spot-top"><div><span class="today-spot-name">${esc(spot)}</span><div class="today-spot-place">${[region,zone].filter(Boolean).map(esc).join(' / ')}</div><div class="today-spot-tags"><button type="button" class="today-spot-tag ${hasWindow?'has-window':'no-window'}" data-today-spot="1" data-region="${esc(regionRaw)}" data-zone="${esc(zoneRaw)}" data-spot="${esc(spotRaw)}" title="跳到這個釣場">${esc(tagText)}</button></div></div><div class="today-spot-count">現在可釣 ${g.nowFish.size} 條</div></div><div class="today-spot-fish">${nowNames}</div>${soonHtml}</div>`;
     }).join('')}`;
+    bindSpotTags(box);
   }
 
   function init(){addStyles();ensureBox()}
