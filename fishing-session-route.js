@@ -1,4 +1,4 @@
-// Window-aware fishing session route planner. Heavy analysis runs only after a map is selected.
+// Window-aware fishing session route planner. Heavy analysis is explicit and map-scoped.
 (function(){
   'use strict';
 
@@ -7,8 +7,7 @@
   const MOVE_MIN=3;
   const MAX_STOPS=10;
   const YIELD_EVERY=4;
-  const AUTO_DELAY=140;
-  let renderToken=0,autoTimer=null;
+  let renderToken=0;
 
   function read(key,def){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -23,7 +22,7 @@
   function skipped(){try{if(typeof window.getSkippedIds==='function')return intSet(window.getSkippedIds())}catch{}return intSet(read('fishSkippedIds',[])||[])}
   function catalog(){return read('fishCatalog',[])||[]}
   function fishLocations(fish){if(typeof window.fishLocations==='function')return window.fishLocations(fish);return Array.isArray(fish?.spots)&&fish.spots.length?fish.spots:[fish]}
-  function picker(){return{region:String(document.getElementById('fish-picker-region')?.value||''),zone:String(document.getElementById('fish-picker-zone')?.value||'')}}
+  function pickerMap(){return{region:String(document.getElementById('fish-picker-region')?.value||''),zone:String(document.getElementById('fish-picker-zone')?.value||'')}}
   function routeMinutes(){const own=Number(document.getElementById('fish-route-session')?.value),today=Number(document.getElementById('fish-today-session')?.value);return Number.isFinite(own)&&own>0?own:(Number.isFinite(today)&&today>0?today:DEFAULT_SESSION_MIN)}
   function spotKey(loc){const id=Number(loc?.spotId)||0;return id?`id:${id}`:`name:${loc?.regionName||''}|${loc?.zoneName||''}|${loc?.spotName||''}`}
   function matchesMap(loc,p){if(p.region&&String(loc?.regionName||'')!==p.region)return false;if(p.zone&&String(loc?.zoneName||'')!==p.zone)return false;return true}
@@ -35,16 +34,16 @@
     const section=result.closest('.fishing-route-section');
     const head=section?.querySelector('.section-head');
     const title=head?.querySelector('h3');if(title)title.textContent='Session 路線';
-    const hint=head?.querySelector('.hint');if(hint)hint.textContent='選到地圖後才分析該張圖的魚窗；窗口急迫度決定先後，普通魚填窗口空檔。';
-    const button=document.getElementById('refresh-route-plan');if(button)button.textContent='重新計算這張圖';
+    const hint=head?.querySelector('.hint');if(hint)hint.textContent='先決定要刷哪張圖，再按按鈕才分析這張圖的魚窗與建議順序。';
+    const button=document.getElementById('refresh-route-plan');if(button)button.textContent='規劃這張圖路線';
     const toolbar=section?.querySelector('.bait-toolbar');
     if(toolbar&&!document.getElementById('fish-route-session')){
       const label=document.createElement('label');label.className='fish-route-session-label';label.innerHTML='<span>可釣時間</span><select id="fish-route-session"><option value="60">60 分</option><option value="90">90 分</option><option value="120">120 分</option></select>';
       toolbar.prepend(label);
       const sel=label.querySelector('select'),today=document.getElementById('fish-today-session');
       if(sel)sel.value=String(Number(today?.value)||DEFAULT_SESSION_MIN);
-      sel?.addEventListener('change',()=>{if(today)today.value=sel.value;scheduleAuto(40)});
-      today?.addEventListener('change',()=>{if(sel)sel.value=today.value;scheduleAuto(40)});
+      sel?.addEventListener('change',()=>{if(today)today.value=sel.value;markStale()});
+      today?.addEventListener('change',()=>{if(sel)sel.value=today.value;markStale()});
     }
     if(!document.getElementById('fish-session-route-style')){
       const style=document.createElement('style');style.id='fish-session-route-style';style.textContent=`
@@ -55,21 +54,15 @@
     return result;
   }
 
-  function showReady(){
-    const box=ensureUi();if(!box)return;
-    const p=picker();
-    if(!p.zone){box.innerHTML='<span class="muted">先選一張地圖；選到地圖後才會分析該張圖，不會在頁面載入時計算。</span>';return}
-    box.innerHTML=`<span class="muted">已選 <strong>${esc(placeText(p.zone))}</strong>，準備只分析這張圖的窗口…</span>`;
+  function readyText(){
+    const p=pickerMap();
+    return p.zone
+      ?`已選 <strong>${esc(placeText(p.zone))}</strong>。決定要刷這張圖後，再按「規劃這張圖路線」。`
+      :'先選一張地圖；選圖本身不會進行 Session 路線計算。';
   }
-
-  function cancelCurrent(){renderToken++;clearTimeout(autoTimer)}
-  function scheduleAuto(delay=AUTO_DELAY){
-    cancelCurrent();
-    const p=picker();
-    if(!p.zone){showReady();return}
-    showReady();
-    autoTimer=setTimeout(()=>render(true),delay);
-  }
+  function showReady(){const box=ensureUi();if(box)box.innerHTML=`<span class="muted">${readyText()}</span>`}
+  function cancelCurrent(){renderToken++}
+  function markStale(){cancelCurrent();showReady()}
 
   async function buildModel(now,end,p,includeBig,token,box){
     const done=caught(),skip=skipped(),rows=catalog(),byId=new Map(rows.map(f=>[Number(f?.itemId),f]).filter(([id])=>id>0)),groups=new Map(),tasks=[],taskKeys=new Set(),infoCache=new Map();
@@ -157,11 +150,11 @@
 
   function bindRouteButtons(root){root.querySelectorAll('[data-session-route-spot]').forEach(btn=>btn.addEventListener('click',()=>{if(typeof window.selectFishingSpot==='function')window.selectFishingSpot(btn.dataset.region||'',btn.dataset.zone||'',btn.dataset.spot||'')}))}
 
-  async function render(auto=false){
+  async function render(){
     const box=ensureUi();if(!box)return;
-    const p=picker(),minutes=routeMinutes();
+    const p=pickerMap(),minutes=routeMinutes();
     if(!p.zone){showReady();return}
-    if(typeof window.ff14FishingWindowInfo!=='function'){box.innerHTML='<span class="muted">魚窗資料尚未準備好，稍後會再計算；也可以按「重新計算這張圖」。</span>';return}
+    if(typeof window.ff14FishingWindowInfo!=='function'){box.innerHTML='<span class="muted">魚窗資料尚未準備好，請稍後再按一次。</span>';return}
     const token=++renderToken,now=Date.now(),end=now+minutes*60000,includeBig=!(document.getElementById('fish-hide-big')?.checked??true);
     box.innerHTML=`<span class="muted">正在分析 ${esc(placeText(p.zone))} 的 Session 路線…</span>`;
     try{
@@ -169,23 +162,24 @@
       const route=plan(model,now,end);if(token!==renderToken)return;
       if(!route.length){box.innerHTML=`<span class="muted">${esc(placeText(p.zone))} 在接下來 ${minutes} 分鐘沒有找到可安排的未釣魚／前置窗口。</span>`;return}
       const currentTasks=model.tasks.filter(t=>t.start<=now&&now<t.end).length,futureCount=model.tasks.filter(t=>t.start>now&&t.start<end).length;
-      box.innerHTML=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析目前選定地圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、換點 ${MOVE_MIN} 分。${auto?'換圖會自動取消舊計算。':'此結果為手動重新計算。'}</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">原則：快關窗口 ＞ 前置窗口 ＞ 普通魚填空檔 ＞ Session 尾段普通魚。</div>`;
+      box.innerHTML=`<div class="session-route-summary muted"><strong>${esc(placeText(p.zone))}</strong> · ${minutes} 分鐘 Session（${esc(fmtClock(now))}–${esc(fmtClock(end))}） · 分析 ${model.checked} 條未釣魚 · 目前窗口 ${currentTasks} · Session 內將開 ${futureCount}<br>只分析你按下按鈕時選定的這張圖；普通魚估 ${ORDINARY_FISH_MIN} 分／條、換點 ${MOVE_MIN} 分。</div><div class="session-route-list">${route.map((s,i)=>stopHtml(s,i)+(i<route.length-1?'<div class="session-route-arrow">↓</div>':'')).join('')}</div><div class="session-route-note muted">原則：快關窗口 ＞ 前置窗口 ＞ 普通魚填空檔 ＞ Session 尾段普通魚。</div>`;
       bindRouteButtons(box);
     }catch(e){if(token!==renderToken)return;console.warn('session route failed',e);box.innerHTML=`<span class="muted">路線計算失敗：${esc(e?.message||e)}。頁面仍可繼續使用。</span>`}
   }
 
   function init(){
     ensureUi();
-    // Capture the old route button so the original synchronous planner does not run too.
-    document.addEventListener('click',e=>{const btn=e.target?.closest?.('#refresh-route-plan');if(!btn)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();cancelCurrent();render(false)},true);
-    document.getElementById('fish-picker-region')?.addEventListener('change',()=>{cancelCurrent();if(!picker().zone)showReady()});
-    document.getElementById('fish-picker-zone')?.addEventListener('change',()=>scheduleAuto());
-    document.getElementById('fish-hide-big')?.addEventListener('change',()=>scheduleAuto(60));
+    // The existing app also listens to this button; capture it so only this planner runs.
+    document.addEventListener('click',e=>{const btn=e.target?.closest?.('#refresh-route-plan');if(!btn)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();render()},true);
+    // Map/filter changes only invalidate the previous result. They never start heavy analysis.
+    document.getElementById('fish-picker-region')?.addEventListener('change',markStale);
+    document.getElementById('fish-picker-zone')?.addEventListener('change',markStale);
+    document.getElementById('fish-hide-big')?.addEventListener('change',markStale);
     showReady();
   }
 
   window.renderSessionFishingRoute=render;
-  // Existing code calls this during page boot and picker changes. Keep it lightweight.
+  // Existing code calls renderRoutePlanner during boot/picker changes. Keep this deliberately cheap.
   window.renderRoutePlanner=showReady;
   window.resetSessionFishingRoute=showReady;
   window.addEventListener('DOMContentLoaded',init);
