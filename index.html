@@ -13,7 +13,7 @@
 </head>
 <body>
   <header>
-    <div><h1>FF14 Personal Workspace</h1><p>日課、練等、釣魚進度集中管理 · v2026.08.27.20</p></div>
+    <div><h1>FF14 Personal Workspace</h1><p>日課、練等、釣魚進度集中管理 · v2026.08.27.21</p></div>
     <div id="sync-box" class="sync-box"><span id="sync-status">未登入</span><button id="sync-login">登入同步</button><button id="sync-now" hidden>立即同步</button><button id="sync-logout" hidden>登出</button></div>
   </header>
   <div id="auth-panel" class="auth-panel" hidden>
@@ -154,14 +154,14 @@
         <div id="fish-map-summary" class="result"></div>
 
         <div class="section-head">
-          <div><h3>魚餌／釣法／秒數</h3><p class="hint">先選地圖或釣點，再自動顯示該範圍的推薦餌／泳餌路線、! / !! / !!!、提鉤、ET 時間與天氣。</p></div>
+          <div><h3>魚餌／釣法／秒數</h3><p class="hint">把魚糕社群釣法疊到掃圖清單：推薦餌／泳餌路線、! / !! / !!!、提鉤、ET 時間與天氣。秒數先連到釣點社群統計，不拿不完整資料硬填。</p></div>
           <button id="refresh-fish-methods">更新釣法資料</button>
         </div>
         <div id="fish-method-status" class="muted fish-method-status-note">尚未讀取釣法資料</div>
         <div class="bait-toolbar">
           <label class="inline-check"><input id="fish-bait-only-required" type="checkbox"> 購物清單只看「已確認萬能餌不可用」</label>
         </div>
-        <div id="fish-bait-summary" class="result"><span class="muted">先選地圖或釣點，再自動顯示該範圍的魚餌／釣法。</span></div>
+        <div id="fish-bait-summary" class="result"></div>
         <div id="fish-bait-list"></div>
         <p class="fish-method-source">「推薦餌」不等於「萬能餌一定不能用」。每隻魚可自行標成萬能餌可用／不可用／未確認；不可用與未確認才會進準備清單。取得方式按鈕會解析餌的 Item ID 後開 Teamcraft 資料頁。</p>
 
@@ -177,7 +177,6 @@
   <script src="cloud.js?v=20260827-0648"></script>
   <script src="fishing-npc-tc.js?v=20260827-1020"></script>
   <script src="fishing-ui-v2.js?v=20260827-1245"></script>
-  <script src="fishing-guide-scope.js?v=20260827-1342"></script>
   <script src="fishing-map-groups.js?v=20260824-2206"></script>
   <script src="fishing-map.js?v=20260827-1020"></script>
   <script src="fishing-guide-renderer.js?v=20260826-1931"></script>
@@ -185,7 +184,6 @@
   <script src="fishing-spot-window.js?v=20260827-1345"></script>
   <script src="fishing-today.js?v=20260827-1328"></script>
   <script src="fishing-map-recommend.js?v=20260827-1402"></script>
-  <script src="fishing-session-route.js?v=20260827-1458"></script>
   <script src="fishing-progress-fix.js?v=20260824-2206"></script>
 </body>
 </html>
