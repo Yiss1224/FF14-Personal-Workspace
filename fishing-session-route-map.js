@@ -6,7 +6,7 @@
 
   let timer=null;
 
-  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
+  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function tc(v){const s=String(v||'');try{return typeof window.ff14TcText==='function'?window.ff14TcText(s):s}catch{return s}}
   function pickerValue(id){return String(document.getElementById(id)?.value||'')}
 
@@ -19,8 +19,6 @@
     })).filter(x=>x.spot);
   }
 
-  // Merge only consecutive repeats. A later return to the same spot remains visible,
-  // because that can represent a real second window later in the Session.
   function routeGroups(){
     const out=[];
     for(const stop of rawStops()){
@@ -47,7 +45,6 @@
       btn.classList.remove('session-route-fallback');
       delete btn.dataset.routeOrder;
     });
-    // Clean up an overlay from v.23 if the browser kept the old DOM during hot reload.
     document.querySelector('#fish-zone-map-body .ff14-route-line-layer')?.remove();
     document.getElementById('fish-session-route-map-note')?.remove();
   }
@@ -91,16 +88,7 @@
     }
   }
 
-  function schedule(delay=60){
-    clearTimeout(timer);
-    timer=setTimeout(()=>{
-      applyOverlay();
-      // The base map may finish asynchronously after the Session result.
-      // Retry a finite number of times; these retries do not calculate fish windows.
-      setTimeout(applyOverlay,220);
-      setTimeout(applyOverlay,700);
-    },delay);
-  }
+  function schedule(delay=60){clearTimeout(timer);timer=setTimeout(applyOverlay,delay)}
 
   function addStyles(){
     if(document.getElementById('fish-session-route-map-style'))return;
