@@ -28,6 +28,10 @@
     new MutationObserver(enforceHeaderVersion).observe(line,{childList:true,characterData:true,subtree:true});
   }
 
+  function notifyCatalogRendered(){
+    try{document.dispatchEvent(new CustomEvent('ff14-fish-catalog-rendered'))}catch{}
+  }
+
   function detachInitialCatalog(){
     const node=document.getElementById('fish-catalog');
     if(!node||!node.parentNode)return;
@@ -95,9 +99,12 @@
       if(!hasNarrowScope()){
         renderLightweightSummary();
         box.innerHTML='<div class="empty">先選到地圖／釣點，或搜尋魚名，再顯示魚清單。</div>';
+        notifyCatalogRendered();
         return;
       }
-      return originalRender.apply(this,arguments);
+      const out=originalRender.apply(this,arguments);
+      notifyCatalogRendered();
+      return out;
     };
     window.renderFishCatalog=guardedRender;
     // Classic-script function declarations are globals; redirect identifier calls when possible.
