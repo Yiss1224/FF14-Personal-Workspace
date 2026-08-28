@@ -5,6 +5,7 @@
 
   const MIN_WIDTH=701;
   const STICKY_TOP=10;
+  const FLOAT_SCALE=.8;
   let mapNode=null;
   let routeNode=null;
   let mapPlaceholder=null;
@@ -19,7 +20,7 @@
     const s=document.createElement('style');
     s.id='fish-sticky-planner-style';
     s.textContent=`
-      #fish-floating-planner-dock{position:fixed;top:${STICKY_TOP}px;right:12px;width:min(44vw,600px);max-height:calc(100vh - ${STICKY_TOP*2}px);overflow:auto;overscroll-behavior:contain;z-index:90;padding:12px;border:1px solid var(--border,#d8d8df);border-radius:14px;background:Canvas;color:CanvasText;box-shadow:0 12px 34px rgba(0,0,0,.24);scrollbar-gutter:stable}
+      #fish-floating-planner-dock{position:fixed;top:${STICKY_TOP}px;right:12px;width:min(44vw,600px);max-height:calc(100vh - ${STICKY_TOP*2}px);overflow:auto;overscroll-behavior:contain;z-index:90;padding:12px;border:1px solid var(--border,#d8d8df);border-radius:14px;background:Canvas;color:CanvasText;box-shadow:0 12px 34px rgba(0,0,0,.24);scrollbar-gutter:stable;transform:scale(${FLOAT_SCALE});transform-origin:top right}
       #fish-floating-planner-dock[hidden]{display:none!important}
       #fish-floating-planner-dock .fish-zone-map{margin-top:0;padding-top:0;border-top:0}
       #fish-floating-planner-dock .fishing-route-section{margin:14px 0 0}
