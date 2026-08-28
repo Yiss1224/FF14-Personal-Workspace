@@ -185,5 +185,13 @@
     installRenderGuard();
     renderLightweightSummary();
     enforceHeaderVersion();
+
+    // fishing-guide.js builds the Session route controls immediately before #fish-catalog.
+    // Temporarily mount the empty/lightweight catalog for the rest of DOMContentLoaded so
+    // that UI can be created, then detach the catalog again unless the user already chose a map.
+    mountCatalog();
+    setTimeout(()=>{
+      if(!hasNarrowScope())unmountCatalog();
+    },0);
   });
 })();
