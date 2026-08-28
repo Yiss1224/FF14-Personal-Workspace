@@ -3,7 +3,7 @@
   'use strict';
 
   const XIVAPI_BASE='https://v2.xivapi.com/api';
-  const SPEAR_CACHE_SCHEMA=1;
+  const SPEAR_CACHE_SCHEMA=2;
   const CACHE_MS=7*24*60*60*1000;
   let refreshPromise=null;
 
@@ -35,7 +35,7 @@
   }
 
   function cleanLocation(v){
-    return {spotId:Number(v?.spotId)||0,spotName:String(v?.spotName||'未知刺魚點'),zoneName:String(v?.zoneName||'未知地區'),regionName:String(v?.regionName||'其他'),x:Number(v?.x)||null,y:Number(v?.y)||null};
+    return {spotId:Number(v?.spotId)||0,spotName:String(v?.spotName||'未知刺魚點'),zoneName:String(v?.zoneName||'未知地圖'),regionName:String(v?.regionName||'其他'),x:Number(v?.x)||null,y:Number(v?.y)||null};
   }
 
   function uniqueSpots(values){
@@ -53,7 +53,9 @@
     return {
       spotId:Number(row?.row_id)||0,
       spotName:nameOf(f.PlaceName)||'未知刺魚點',
-      zoneName:nameOf(territory.PlaceNameZone)||nameOf(territory.PlaceName)||'未知地區',
+      // For spearfishing, the actual map/territory name is TerritoryType.PlaceName.
+      // PlaceNameZone is a broader grouping and was incorrectly used as the map in schema 1.
+      zoneName:nameOf(territory.PlaceName)||nameOf(territory.PlaceNameZone)||'未知地圖',
       regionName:nameOf(territory.PlaceNameRegion)||'其他',
       x:Number(f.X)||null,
       y:Number(f.Y)||null
