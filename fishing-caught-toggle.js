@@ -2,6 +2,30 @@
 (function(){
   'use strict';
 
+  function wait(ms){return new Promise(resolve=>setTimeout(resolve,ms))}
+  function installReliableCloudSaveQueue(){
+    const original=window.cloudSave;
+    if(typeof original!=='function'||original.__ff14ReliableQueue)return;
+    let running=false,pending=false;
+    const wrapped=async function(){
+      if(running){pending=true;return}
+      running=true;
+      try{
+        do{
+          pending=false;
+          while((typeof ff14Saving!=='undefined'&&ff14Saving)||(typeof ff14Loading!=='undefined'&&ff14Loading)){
+            pending=true;
+            await wait(100);
+          }
+          await original();
+        }while(pending)
+      }finally{running=false}
+    };
+    wrapped.__ff14ReliableQueue=true;
+    window.cloudSave=wrapped;
+  }
+  installReliableCloudSaveQueue();
+
   function read(key,def=[]){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
   function ids(){try{return typeof window.getCaughtIds==='function'?window.getCaughtIds().map(Number):[...(read('fishcakeCaughtIds',[])||[]),...(read('fishCaughtIds',[])||[])].map(Number)}catch{return[]}}
   function write(next){
