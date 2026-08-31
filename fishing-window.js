@@ -59,7 +59,12 @@ function itemIdFromRow(row){const href=row.querySelector('a[href*="/fish/"]')?.g
 function visibleRows(){const root=document.getElementById('fish-catalog');if(!root)return[];return[...root.querySelectorAll('.fish-row')].filter(row=>row.getClientRects().length>0)}
 function applyRows(){if(!data)return;const now=Date.now();for(const row of visibleRows()){const grid=row.querySelector('.fish-method-grid');if(!grid)continue;const id=itemIdFromRow(row),i=info(id,now),text=i?describe(id,now,i):null;if(!text)continue;let el=grid.querySelector('.fish-window-live');if(!el){el=document.createElement('span');el.className='fish-window-live';grid.appendChild(el)}if(el.textContent!==text)el.textContent=text}}
 async function refresh(){await loadData();if(data)applyRows()}
-async function sharedInfo(itemId,now=Date.now()){await loadData();return data?info(itemId,now):null}
+async function sharedInfo(itemId,now=Date.now()){
+  await loadData();if(!data)return null;
+  const known=info(itemId,now);if(known)return known;
+  const id=Number(itemId)||0;
+  return{itemId:id,locationId:0,territoryId:0,restricted:false,timeUnlimited:true,weatherLimited:false,startHour:0,endHour:24,current:null,next:null,waitMs:0,currentLeftMs:null,nextDurationMs:null,fallback:true};
+}
 async function sharedDescribe(itemId,now=Date.now()){await loadData();if(!data)return null;const i=info(itemId,now);return i?describe(itemId,now,i):null}
 async function sharedPrerequisites(itemId){await loadData();return data?prerequisites(itemId):[]}
 function schedule(delay=60){clearTimeout(refreshTimer);refreshTimer=setTimeout(refresh,delay)}
