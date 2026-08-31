@@ -2,7 +2,7 @@
 (function(){
   'use strict';
 
-  const APP_VERSION='v2026.08.31.51';
+  const APP_VERSION='v2026.08.31.52';
   const version=document.querySelector('header p');
   if(version)version.textContent=version.textContent.replace(/v\d{4}\.\d{2}\.\d{2}\.\d+$/,APP_VERSION);
 
