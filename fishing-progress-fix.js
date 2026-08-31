@@ -55,12 +55,12 @@
     'galadion bay','the southern strait of merlthor','southern strait of merlthor',
     'the northern strait of merlthor','northern strait of merlthor','rhotano sea',
     'the cieldalaes','cieldalaes','rothlyt sound','the bloodbrine sea','bloodbrine sea',
-    'the sirensong sea','sirensong sea','公海','海釣','遠洋漁業'
+    'the sirensong sea','sirensong sea','公海','海釣','遠洋漁業','出海垂釣'
   ]);
   const norm=v=>String(v??'').trim().toLowerCase();
   const oceanText=v=>{
     const s=norm(v);
-    return !!s&&(oceanNames.has(s)||s.includes('ocean fishing')||s.includes('the endeavor')||s.includes('high seas'));
+    return !!s&&(oceanNames.has(s)||s.includes('ocean fishing')||s.includes('the endeavor')||s.includes('high seas')||s.includes('出海垂釣'));
   };
   const oceanStop=stop=>!!stop&&(oceanText(stop.regionName)||oceanText(stop.zoneName)||oceanText(stop.spotName));
 
