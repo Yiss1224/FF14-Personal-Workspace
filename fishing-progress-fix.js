@@ -2,7 +2,7 @@
 (function(){
   'use strict';
 
-  const APP_VERSION='v2026.08.31.52';
+  const APP_VERSION='v2026.09.07.54';
   const version=document.querySelector('header p');
   if(version)version.textContent=version.textContent.replace(/v\d{4}\.\d{2}\.\d{2}\.\d+$/,APP_VERSION);
 
@@ -50,73 +50,8 @@
     }
   };
 
-  const oceanNames=new Set([
-    'the high seas','high seas','the endeavor','endeavor',
-    'galadion bay','the southern strait of merlthor','southern strait of merlthor',
-    'the northern strait of merlthor','northern strait of merlthor','rhotano sea',
-    'the cieldalaes','cieldalaes','rothlyt sound','the bloodbrine sea','bloodbrine sea',
-    'the sirensong sea','sirensong sea','公海','海釣','遠洋漁業','出海垂釣'
-  ]);
-  const norm=v=>String(v??'').trim().toLowerCase();
-  const oceanText=v=>{
-    const s=norm(v);
-    return !!s&&(oceanNames.has(s)||s.includes('ocean fishing')||s.includes('the endeavor')||s.includes('high seas')||s.includes('出海垂釣'));
-  };
-  const oceanStop=stop=>!!stop&&(oceanText(stop.regionName)||oceanText(stop.zoneName)||oceanText(stop.spotName));
-
-  let oceanOnlyIds=null;
-  function rebuildOceanOnlyIds(){
-    const ids=new Set();
-    try{
-      const rows=JSON.parse(localStorage.getItem('fishCatalog')||'[]')||[];
-      for(const fish of rows){
-        const id=Number(fish?.itemId);
-        if(!Number.isFinite(id)||id<=0)continue;
-        const locs=typeof window.fishLocations==='function'?window.fishLocations(fish):(Array.isArray(fish?.spots)&&fish.spots.length?fish.spots:[fish]);
-        if(locs.length&&locs.every(oceanStop))ids.add(id);
-      }
-    }catch{}
-    oceanOnlyIds=ids;
-    return ids;
-  }
-  function isOceanOnlyFish(itemId){
-    const ids=oceanOnlyIds||rebuildOceanOnlyIds();
-    return ids.has(Number(itemId));
-  }
-
-  function pickerSelection(){
-    return {
-      region:document.getElementById('fish-picker-region')?.value||'',
-      zone:document.getElementById('fish-picker-zone')?.value||'',
-      spot:document.getElementById('fish-picker-spot')?.value||''
-    };
-  }
-  function matchesPicker(stop){
-    const p=pickerSelection();
-    if(p.region&&String(stop?.regionName||'')!==p.region)return false;
-    if(p.zone&&String(stop?.zoneName||'')!==p.zone)return false;
-    if(p.spot&&String(stop?.spotName||'')!==p.spot)return false;
-    return true;
-  }
-
-  if(typeof window.fgBuildSpotPlan==='function'){
-    const baseBuildSpotPlan=window.fgBuildSpotPlan;
-    window.fgBuildSpotPlan=function(){
-      return (baseBuildSpotPlan.apply(this,arguments)||[])
-        .filter(stop=>!oceanStop(stop))
-        .filter(matchesPicker);
-    };
-  }
-  window.isOceanFishingRouteStop=oceanStop;
-
-  if(typeof window.ff14FishingWindowInfo==='function'){
-    const baseWindowInfo=window.ff14FishingWindowInfo;
-    window.ff14FishingWindowInfo=async function(itemId,now){
-      if(isOceanOnlyFish(itemId))return null;
-      return baseWindowInfo.call(this,itemId,now);
-    };
-  }
-  document.addEventListener('ff14-fish-catalog-rendered',()=>{oceanOnlyIds=null});
+  // Compatibility alias; policy and matching live in the shared fishing runtime.
+  window.isOceanFishingRouteStop=window.FF14Fishing.isOceanLocation;
 
   function regexEsc(v){return String(v).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
   if(typeof ff14TcReplaceTextNode==='function'&&typeof ff14TcCache!=='undefined'){

@@ -6,24 +6,14 @@
   let renderToken=0;
   let timer=0;
 
-  function read(key,def){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
+  const shared=window.FF14Fishing;
+  const read=shared.read;
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function placeText(v){const s=String(v||'');try{return typeof window.ff14TcPlaceText==='function'?window.ff14TcPlaceText(s):s}catch{return s}}
   function itemText(v){const s=String(v||'');try{return typeof window.ff14TcItemText==='function'?window.ff14TcItemText(s):s}catch{return s}}
-  function idOf(v){return Number(v&&typeof v==='object'?(v.id??v.itemId??v.fishId):v)}
-  function uniqueInts(values){return new Set((values||[]).map(idOf).filter(Number.isFinite))}
-  function caught(){
-    try{if(typeof window.getCaughtIds==='function')return uniqueInts(window.getCaughtIds())}catch{}
-    return uniqueInts([...(read('fishcakeCaughtIds',[])||[]),...(read('fishCaughtIds',[])||[])]);
-  }
-  function skipped(){
-    try{if(typeof window.getSkippedIds==='function')return uniqueInts(window.getSkippedIds())}catch{}
-    return uniqueInts(read('fishSkippedIds',[])||[]);
-  }
-  function fishLocations(fish){
-    if(typeof window.fishLocations==='function')return window.fishLocations(fish);
-    return Array.isArray(fish?.spots)&&fish.spots.length?fish.spots:[fish];
-  }
+  const caught=shared.caughtIds;
+  const skipped=shared.skippedIds;
+  const fishLocations=shared.locations;
   function mapKey(loc){return `${loc?.regionName||''}|${loc?.zoneName||''}`}
 
   function ensureBox(){
@@ -69,7 +59,7 @@
     const maps=new Map();
     for(const fish of catalog){
       const id=Number(fish?.itemId);
-      if(!Number.isFinite(id)||id<=0||fish?.type==='spearfishing'||fish?.bigFish||done.has(id)||skip.has(id))continue;
+      if(!shared.recommendationEligible(fish)||fish?.bigFish||done.has(id)||skip.has(id))continue;
       const info=await window.ff14FishingWindowInfo(id,Date.now());
       if(my!==renderToken)return;
       // Unknown fish are excluded conservatively so a window fish can never leak into this list.

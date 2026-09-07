@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const saved={fishcakeCaughtIds:JSON.stringify([1,{itemId:2}]),fishCaughtIds:JSON.stringify([2,3]),fishSkippedIds:JSON.stringify([{id:4}])};
+const context={window:{},localStorage:{getItem:key=>saved[key]??null}};context.window=context.window;
+vm.runInNewContext(fs.readFileSync('fishing-shared.js','utf8'),context);
+const core=context.window.FF14Fishing;
+assert.deepEqual([...core.caughtIds()],[1,2,3]);
+assert.deepEqual([...core.skippedIds()],[4]);
+const inland={itemId:10,spots:[{spotId:1,zoneName:'Gridania'},{spotId:2,zoneName:'Limsa'}]};
+assert.equal(core.recommendationEligible(inland),true);
+assert.equal(core.recommendationEligible({itemId:11,spots:[{spotName:'The Endeavor'}]}),false);
+assert.equal(core.recommendationEligible({itemId:12,spots:[{spotName:'The Endeavor'},{spotName:'Costa'}]}),true);
+assert.equal(core.locationsForWindow(inland,{restricted:true,locationId:99}).length,2,'recommendations preserve unknown-location fallback');
+assert.equal(core.locationsForWindow(inland,{restricted:true,locationId:99},()=>true,false).length,0,'session routes preserve exact-location behavior');
+assert.equal(core.locationsForWindow(null,{restricted:false}).length,0);
+console.log('fishing shared smoke passed');

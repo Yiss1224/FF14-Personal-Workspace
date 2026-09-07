@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const html=fs.readFileSync('index.html','utf8');
+const sharedAt=html.indexOf('fishing-shared.js');
+for(const file of ['fishing-window.js','fishing-today.js','fishing-map-recommend.js','fishing-session-route.js','fishing-whitefish-hotspot.js'])assert(sharedAt<html.indexOf(file),`${file} loads after shared runtime`);
+const progress=fs.readFileSync('fishing-progress-fix.js','utf8');
+assert(!progress.includes('baseBuildSpotPlan'), 'spot-plan wrapper removed');
+assert(!progress.includes('baseWindowInfo'), 'window-info wrapper removed');
+const map=fs.readFileSync('fishing-map.js','utf8');
+assert(!map.includes('window.__fishMapTimer'), 'map render timer is no longer global');
+assert(map.includes("window.addEventListener('pagehide'"), 'map observer/timer have teardown');
+console.log('fishing structure smoke passed');
