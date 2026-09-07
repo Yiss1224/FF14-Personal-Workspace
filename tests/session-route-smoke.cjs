@@ -27,6 +27,7 @@ const docListeners={};
 const document={
   head:{appendChild(){}},
   getElementById(id){return els.get(id)||null},
+  querySelector(){return null},
   createElement(){return new FakeEl('created')},
   addEventListener(type,fn){(docListeners[type]??=[]).push(fn)}
 };
@@ -47,9 +48,11 @@ const windowObj={
   ff14FishingPrerequisites:async()=>[],
   ff14TcItemText:s=>s,ff14TcPlaceText:s=>s
 };
+class MutationObserver{observe(){}}
 
-const context={window:windowObj,document,localStorage,console,setTimeout,clearTimeout,Date,Map,Set,Promise,String,Number,Math,JSON};
+const context={window:windowObj,document,localStorage,MutationObserver,console,setTimeout,clearTimeout,setInterval:()=>0,Date,Map,Set,Promise,String,Number,Math,JSON};
 vm.createContext(context);
+vm.runInContext(fs.readFileSync('fishing-shared.js','utf8'),context,{filename:'fishing-shared.js'});
 const code=fs.readFileSync('fishing-session-route.js','utf8');
 vm.runInContext(code,context,{filename:'fishing-session-route.js'});
 

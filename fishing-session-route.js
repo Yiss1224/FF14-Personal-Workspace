@@ -2,7 +2,7 @@
 (function(){
   'use strict';
 
-  const APP_VERSION='v2026.08.27.32';
+  const APP_VERSION='v2026.09.07.54';
   const DEFAULT_SESSION_MIN=90;
   const ORDINARY_FISH_MIN=5;
   const MOVE_MIN=3;
@@ -13,24 +13,23 @@
   let restoreTimer=null;
   let restoreObserver=null;
 
-  function read(key,def){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
+  const shared=window.FF14Fishing;
+  const read=shared.read;
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
-  function idOf(v){return Number(v&&typeof v==='object'?(v.id??v.itemId??v.fishId):v)}
-  function intSet(values){return new Set((values||[]).map(idOf).filter(Number.isFinite))}
   function itemText(v){const s=String(v||'');try{return typeof window.ff14TcItemText==='function'?window.ff14TcItemText(s):s}catch{return s}}
   function placeText(v){const s=String(v||'');try{return typeof window.ff14TcPlaceText==='function'?window.ff14TcPlaceText(s):s}catch{return s}}
   function fmtClock(ms){return new Date(ms).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}
   function fmtMin(ms){if(!Number.isFinite(ms))return'—';return`${Math.max(0,Math.round(ms/60000))} 分`}
   function yieldUi(){return new Promise(resolve=>setTimeout(resolve,0))}
-  function caught(){try{if(typeof window.getCaughtIds==='function')return intSet(window.getCaughtIds())}catch{}return intSet([...(read('fishcakeCaughtIds',[])||[]),...(read('fishCaughtIds',[])||[])])}
-  function skipped(){try{if(typeof window.getSkippedIds==='function')return intSet(window.getSkippedIds())}catch{}return intSet(read('fishSkippedIds',[])||[])}
-  function catalog(){return read('fishCatalog',[])||[]}
-  function fishLocations(fish){if(typeof window.fishLocations==='function')return window.fishLocations(fish);return Array.isArray(fish?.spots)&&fish.spots.length?fish.spots:[fish]}
+  const caught=shared.caughtIds;
+  const skipped=shared.skippedIds;
+  const fishLocations=shared.locations;
+  const catalog=()=>shared.catalog();
   function pickerMap(){return{region:String(document.getElementById('fish-picker-region')?.value||''),zone:String(document.getElementById('fish-picker-zone')?.value||'')}}
   function routeMinutes(){const own=Number(document.getElementById('fish-route-session')?.value),today=Number(document.getElementById('fish-today-session')?.value);return Number.isFinite(own)&&own>0?own:(Number.isFinite(today)&&today>0?today:DEFAULT_SESSION_MIN)}
   function spotKey(loc){const id=Number(loc?.spotId)||0;return id?`id:${id}`:`name:${loc?.regionName||''}|${loc?.zoneName||''}|${loc?.spotName||''}`}
   function matchesMap(loc,p){if(p.region&&String(loc?.regionName||'')!==p.region)return false;if(p.zone&&String(loc?.zoneName||'')!==p.zone)return false;return true}
-  function locationsFor(fish,info,p){const spots=fishLocations(fish).filter(loc=>matchesMap(loc,p));if(!info?.restricted||!Number(info.locationId))return spots;return spots.filter(x=>Number(x?.spotId)===Number(info.locationId))}
+  function locationsFor(fish,info,p){return shared.locationsForWindow(fish,info,loc=>matchesMap(loc,p),false)}
   function fishName(f){return itemText(f?.name||`Item ${f?.itemId||''}`)}
   function spotDistance(a,b){
     if(!a||!b)return null;
@@ -114,7 +113,7 @@
     const done=caught(),skip=skipped(),rows=catalog(),byId=new Map(rows.map(f=>[Number(f?.itemId),f]).filter(([id])=>id>0)),groups=new Map(),tasks=[],taskKeys=new Set(),infoCache=new Map();
     const getInfo=async id=>{if(infoCache.has(id))return infoCache.get(id);const v=await window.ff14FishingWindowInfo(id,now);infoCache.set(id,v);return v};
     const groupFor=loc=>{const key=spotKey(loc);if(!groups.has(key))groups.set(key,{key,loc,ordinary:new Map()});return groups.get(key)};
-    const base=rows.filter(f=>Number(f?.itemId)>0&&f?.type!=='spearfishing'&&!done.has(Number(f.itemId))&&!skip.has(Number(f.itemId))&&(includeBig||!f.bigFish)&&fishLocations(f).some(loc=>matchesMap(loc,p)));
+    const base=rows.filter(f=>shared.recommendationEligible(f)&&!done.has(Number(f.itemId))&&!skip.has(Number(f.itemId))&&(includeBig||!f.bigFish)&&fishLocations(f).some(loc=>matchesMap(loc,p)));
     for(let i=0;i<base.length;i++){
       if(token!==renderToken)return null;
       const fish=base[i],id=Number(fish.itemId),info=await getInfo(id);if(token!==renderToken)return null;

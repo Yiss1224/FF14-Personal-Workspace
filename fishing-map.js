@@ -1,6 +1,7 @@
 // Fishing map: overlay fishing spots on official FFXIV map assets from XIVAPI.
 (function(){
   'use strict';
+  let renderTimer=0,catalogObserver=null;
 
   const XIVAPI='https://v2.xivapi.com/api';
   const MAP_CACHE_KEY='ff14FishingMapIndexV3';
@@ -185,6 +186,7 @@
   window.addEventListener('DOMContentLoaded',()=>{
     addStyles();setTimeout(()=>{ensureMap();renderMap()},300);
     document.addEventListener('change',e=>{if(['fish-picker-region','fish-picker-zone','fish-picker-spot'].includes(e.target?.id))setTimeout(renderMap,0)});
-    const target=document.getElementById('fish-catalog');if(target)new MutationObserver(()=>{clearTimeout(window.__fishMapTimer);window.__fishMapTimer=setTimeout(renderMap,100)}).observe(target,{childList:true});
+    const target=document.getElementById('fish-catalog');if(target){catalogObserver=new MutationObserver(()=>{clearTimeout(renderTimer);renderTimer=setTimeout(renderMap,100)});catalogObserver.observe(target,{childList:true})}
+    window.addEventListener('pagehide',()=>{clearTimeout(renderTimer);catalogObserver?.disconnect()},{once:true});
   });
 })();

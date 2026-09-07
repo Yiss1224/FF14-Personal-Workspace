@@ -60,6 +60,7 @@ function visibleRows(){const root=document.getElementById('fish-catalog');if(!ro
 function applyRows(){if(!data)return;const now=Date.now();for(const row of visibleRows()){const grid=row.querySelector('.fish-method-grid');if(!grid)continue;const id=itemIdFromRow(row),i=info(id,now),text=i?describe(id,now,i):null;if(!text)continue;let el=grid.querySelector('.fish-window-live');if(!el){el=document.createElement('span');el.className='fish-window-live';grid.appendChild(el)}if(el.textContent!==text)el.textContent=text}}
 async function refresh(){await loadData();if(data)applyRows()}
 async function sharedInfo(itemId,now=Date.now()){
+  if(window.FF14Fishing?.isOceanOnlyItem(itemId))return null;
   await loadData();if(!data)return null;
   const known=info(itemId,now);if(known)return known;
   const id=Number(itemId)||0;

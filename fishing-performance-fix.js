@@ -12,6 +12,8 @@
   let guardedRender=null;
   let catalogCache=null;
   let catalogCacheStamp='';
+  let scopeSyncTimer=null;
+  let catalogRenderTask=null;
 
   function enforceHeaderVersion(){
     if(!headerVersion)return;
@@ -118,8 +120,16 @@
     mounted=true;
   }
 
+  function cancelCatalogRender(){
+    if(catalogRenderTask===null)return;
+    if(typeof cancelIdleCallback==='function')cancelIdleCallback(catalogRenderTask);
+    else clearTimeout(catalogRenderTask);
+    catalogRenderTask=null;
+  }
+
   function unmountCatalog(){
     if(!catalogNode)return;
+    cancelCatalogRender();
     if(mounted){
       // Drop potentially large generated DOM before detaching so reopening stays cheap.
       catalogNode.replaceChildren();
@@ -130,6 +140,7 @@
   }
 
   function renderScopedCatalog(){
+    scopeSyncTimer=null;
     installRenderGuard();
     if(!hasNarrowScope()){
       unmountCatalog();
@@ -137,12 +148,14 @@
     }
     mountCatalog();
     const run=()=>{
+      catalogRenderTask=null;
       installRenderGuard();
       const fn=window.renderFishCatalog;
       if(typeof fn==='function')fn();
     };
-    if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:120});
-    else setTimeout(run,0);
+    cancelCatalogRender();
+    if(typeof requestIdleCallback==='function')catalogRenderTask=requestIdleCallback(run,{timeout:120});
+    else catalogRenderTask=setTimeout(run,0);
   }
 
   function syncScopeNow(){
@@ -152,7 +165,10 @@
     unmountCatalog();
   }
 
-  function scheduleScopeSync(){setTimeout(renderScopedCatalog,0)}
+  function scheduleScopeSync(delay=0){
+    if(scopeSyncTimer!==null)clearTimeout(scopeSyncTimer);
+    scopeSyncTimer=setTimeout(renderScopedCatalog,delay);
+  }
 
   detachInitialCatalog();
   installVersionGuard();
@@ -171,7 +187,9 @@
   document.addEventListener('input',e=>{
     if(e.target?.id!=='fish-search')return;
     syncScopeNow();
-    scheduleScopeSync();
+    // Typing used to queue a full catalog render for every keystroke. A short debounce
+    // keeps the result identical while only rendering the final query in a burst.
+    scheduleScopeSync(80);
   },true);
 
   document.addEventListener('change',e=>{

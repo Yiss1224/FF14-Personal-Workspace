@@ -10,35 +10,19 @@
   const PREP_SOON_WEIGHT=1;
   let renderToken=0;
 
-  function read(key,def){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
+  const shared=window.FF14Fishing;
+  const read=shared.read;
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function itemText(v){const s=String(v||'');try{return typeof window.ff14TcItemText==='function'?window.ff14TcItemText(s):s}catch{return s}}
   function placeText(v){const s=String(v||'');try{return typeof window.ff14TcPlaceText==='function'?window.ff14TcPlaceText(s):s}catch{return s}}
   function fmtDuration(ms){if(!Number.isFinite(ms)||ms<0)return'—';const min=Math.max(0,Math.round(ms/60000));if(min<60)return`${min} 分`;const h=Math.floor(min/60),m=min%60;return m?`${h} 小時 ${m} 分`:`${h} 小時`}
   function fmtClock(ms){return new Date(ms).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}
-  function idOf(v){return Number(v&&typeof v==='object'?(v.id??v.itemId??v.fishId):v)}
-  function uniqueInts(values){return new Set((values||[]).map(idOf).filter(Number.isFinite))}
-  function caught(){
-    try{if(typeof window.getCaughtIds==='function')return uniqueInts(window.getCaughtIds())}catch{}
-    return uniqueInts([...(read('fishcakeCaughtIds',[])||[]),...(read('fishCaughtIds',[])||[])])
-  }
-  function skipped(){
-    try{if(typeof window.getSkippedIds==='function')return uniqueInts(window.getSkippedIds())}catch{}
-    return uniqueInts(read('fishSkippedIds',[])||[])
-  }
+  const caught=shared.caughtIds;
+  const skipped=shared.skippedIds;
   function sessionMinutes(){const n=Number(document.getElementById('fish-today-session')?.value);return Number.isFinite(n)&&n>0?n:DEFAULT_SESSION_MIN}
 
-  function fishLocations(fish){
-    if(typeof window.fishLocations==='function')return window.fishLocations(fish);
-    return Array.isArray(fish?.spots)&&fish.spots.length?fish.spots:[fish];
-  }
-
-  function locationsFor(fish,info){
-    const spots=fishLocations(fish);
-    if(!info?.restricted||!Number(info.locationId))return spots;
-    const exact=spots.filter(x=>Number(x?.spotId)===Number(info.locationId));
-    return exact.length?exact:spots;
-  }
+  const fishLocations=shared.locations;
+  const locationsFor=shared.locationsForWindow;
 
   function spotKey(loc){
     const id=Number(loc?.spotId)||0;
@@ -103,14 +87,14 @@
 
   async function render(){
     const box=ensureBox();if(!box)return;
-    const my=++renderToken,includeBig=!!document.getElementById('fish-today-big')?.checked,minutes=sessionMinutes(),now=Date.now(),sessionEnd=now+minutes*60000,catalog=read('fishCatalog',[])||[],done=caught(),skip=skipped();
+    const my=++renderToken,includeBig=!!document.getElementById('fish-today-big')?.checked,minutes=sessionMinutes(),now=Date.now(),sessionEnd=now+minutes*60000,catalog=shared.catalog(),done=caught(),skip=skipped();
     if(typeof window.ff14FishingWindowInfo!=='function'){
       box.innerHTML='<span class="muted">魚窗資料尚未準備好，請稍後再按一次。</span>';return;
     }
     box.innerHTML='<span class="muted">正在判斷現在去哪裡最划算…</span>';
 
     const catalogById=new Map(catalog.map(f=>[Number(f?.itemId),f]).filter(([id])=>Number.isFinite(id)&&id>0));
-    const base=catalog.filter(f=>Number(f?.itemId)>0&&f?.type!=='spearfishing'&&!done.has(Number(f.itemId))&&!skip.has(Number(f.itemId))&&(includeBig||!f.bigFish));
+    const base=catalog.filter(f=>shared.recommendationEligible(f)&&!done.has(Number(f.itemId))&&!skip.has(Number(f.itemId))&&(includeBig||!f.bigFish));
     const groups=new Map(),prereqNeeds=new Map();
 
     for(const fish of base){

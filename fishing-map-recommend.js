@@ -9,19 +9,18 @@
   const PREP_SOON_WEIGHT=1;
   let renderToken=0,initTimer=null;
 
-  function read(key,def){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
+  const shared=window.FF14Fishing;
+  const read=shared.read;
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function itemText(v){const s=String(v||'');try{return typeof window.ff14TcItemText==='function'?window.ff14TcItemText(s):s}catch{return s}}
   function placeText(v){const s=String(v||'');try{return typeof window.ff14TcPlaceText==='function'?window.ff14TcPlaceText(s):s}catch{return s}}
   function fmtDuration(ms){if(!Number.isFinite(ms)||ms<0)return'—';const min=Math.max(0,Math.round(ms/60000));if(min<60)return`${min} 分`;const h=Math.floor(min/60),m=min%60;return m?`${h} 小時 ${m} 分`:`${h} 小時`}
   function fmtClock(ms){return new Date(ms).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}
-  function idOf(v){return Number(v&&typeof v==='object'?(v.id??v.itemId??v.fishId):v)}
-  function intSet(values){return new Set((values||[]).map(idOf).filter(Number.isFinite))}
-  function caught(){try{if(typeof window.getCaughtIds==='function')return intSet(window.getCaughtIds())}catch{}return intSet([...(read('fishcakeCaughtIds',[])||[]),...(read('fishCaughtIds',[])||[])])}
-  function skipped(){try{if(typeof window.getSkippedIds==='function')return intSet(window.getSkippedIds())}catch{}return intSet(read('fishSkippedIds',[])||[])}
+  const caught=shared.caughtIds;
+  const skipped=shared.skippedIds;
   function minutes(){const n=Number(document.getElementById('fish-today-session')?.value);return Number.isFinite(n)&&n>0?n:90}
-  function fishLocations(fish){if(typeof window.fishLocations==='function')return window.fishLocations(fish);return Array.isArray(fish?.spots)&&fish.spots.length?fish.spots:[fish]}
-  function locationsFor(fish,info){const spots=fishLocations(fish);if(!info?.restricted||!Number(info.locationId))return spots;const exact=spots.filter(x=>Number(x?.spotId)===Number(info.locationId));return exact.length?exact:spots}
+  const fishLocations=shared.locations;
+  const locationsFor=shared.locationsForWindow;
   function zoneKey(loc){const z=String(loc?.zoneName||'').trim(),r=String(loc?.regionName||'').trim();return `${r}|${z}`}
   function spotKey(loc){const id=Number(loc?.spotId)||0;return id?`id:${id}`:`name:${loc?.spotName||''}`}
   function fishLabel(fish){return `${esc(itemText(fish?.name||`Item ${fish?.itemId||''}`))}${fish?.bigFish?'<span class="today-fish-king">魚王</span>':''}`}
@@ -78,11 +77,11 @@
 
   async function renderMap(){
     if(!ensureUi())return;
-    const box=document.getElementById('fish-today-map-result'),my=++renderToken,includeBig=!!document.getElementById('fish-today-big')?.checked,mins=minutes(),now=Date.now(),end=now+mins*60000,catalog=read('fishCatalog',[])||[],done=caught(),skip=skipped();
+    const box=document.getElementById('fish-today-map-result'),my=++renderToken,includeBig=!!document.getElementById('fish-today-big')?.checked,mins=minutes(),now=Date.now(),end=now+mins*60000,catalog=shared.catalog(),done=caught(),skip=skipped();
     if(typeof window.ff14FishingWindowInfo!=='function'){box.innerHTML='<span class="muted">魚窗資料尚未準備好，請稍後再按一次。</span>';return}
     box.innerHTML='<span class="muted">正在比較哪張圖最值得待…</span>';
     const byId=new Map(catalog.map(f=>[Number(f?.itemId),f]).filter(([id])=>Number.isFinite(id)&&id>0));
-    const base=catalog.filter(f=>Number(f?.itemId)>0&&f?.type!=='spearfishing'&&!done.has(Number(f.itemId))&&!skip.has(Number(f.itemId))&&(includeBig||!f.bigFish));
+    const base=catalog.filter(f=>shared.recommendationEligible(f)&&!done.has(Number(f.itemId))&&!skip.has(Number(f.itemId))&&(includeBig||!f.bigFish));
     const groups=new Map(),prereqNeeds=new Map();
 
     for(const fish of base){
