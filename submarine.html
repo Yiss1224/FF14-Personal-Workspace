@@ -36,13 +36,13 @@
     </section>
 
     <section class="panel">
-      <div class="section-title"><div><h2>船隊進度</h2><p class="hint">新 FC 通常先用第一艘開點；Rank 20 的 J、Rank 30 的 O、Rank 40 的 T 可依序解鎖第 2、3、4 艘登記名額。可勾選已登記艘數。</p></div></div>
+      <div class="section-title"><div><h2>船隊進度</h2><p class="hint">Rank 20 的 J、Rank 30 的 O、Rank 40 的 T 可依序解鎖第 2、3、4 艘登記名額。可勾選已登記艘數；若有待開前置點，計算器會動態挑一艘可跑到該點的船開圖，其餘船優先練等。</p></div></div>
       <div id="fleet" class="fleet-grid"></div>
     </section>
 
     <section class="panel">
       <h2>當前派船計算器</h2>
-      <p class="hint">依船隻 Rank、EXP、配件與海圖上的已開點搜尋可行航線。若下一張海圖仍有前置點未開，會優先推薦能推進解鎖鏈的航線，並附上純升等最快航線供比較；每開出一點後，下一輪建議會接續下一個前置點。</p>
+      <p class="hint">依船隻 Rank、EXP、配件與海圖上的已開點搜尋可行航線。若下一張海圖仍有前置點未開，會從能到達目前前置點的船中挑一艘開圖兼練等，其餘船走各自最快升等線；若沒有船能到達，就全隊先練等。每開出一點後，下一輪建議會接續下一個前置點。</p>
       <div class="calc-controls">
         <label>回航時間上限
           <select id="calc-hours"><option value="24">24 小時</option><option value="36">36 小時</option><option value="48" selected>48 小時</option></select>
@@ -103,6 +103,6 @@
     </section>
   </main>
   <script src="submarine.js?v=20261007-5"></script>
-  <script src="submarine-calculator.js?v=20261007-10"></script>
+  <script src="submarine-calculator.js?v=20261007-11"></script>
 </body>
 </html>
