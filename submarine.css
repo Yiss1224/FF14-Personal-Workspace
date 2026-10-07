@@ -92,5 +92,5 @@ th{font-size:13px;background:#f6f8fb}
 .legend-dot.is-closed{background:#1875b7}
 .map-legend small{margin-left:auto}
 .map-legend a{color:#2459a8}
-@media(max-width:620px){.map-stage{aspect-ratio:1.35}.map-point{width:clamp(22px,6%,34px);height:clamp(22px,6%,34px);font-size:12px}.map-heading small{width:100%;margin-left:0}.map-legend small{width:100%;margin-left:0}}
+@media(max-width:620px){.map-point{width:clamp(22px,6%,34px);height:clamp(22px,6%,34px);font-size:12px}.map-heading small{width:100%;margin-left:0}.map-legend small{width:100%;margin-left:0}}
 @media(prefers-color-scheme:dark){.map-tab.active{background:#425b7c;color:#fff}.map-heading span,.map-heading small,.map-legend{color:#a8b1bf}.map-stage{border-color:#48525e}.map-legend a{color:#9bbcff}}
