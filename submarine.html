@@ -42,7 +42,7 @@
 
     <section class="panel">
       <h2>當前派船計算器</h2>
-      <p class="hint">依每艘船的 Rank、EXP、配件速度／航程，以及下方勾選的已開海域，搜尋每趟最多 5 個停靠點的可行航線，按「基礎 EXP／回航時間」排序。請把已開點勾選完整；自動配置會以升等速度為主，Rank 85 的 O→J 是金策線，不會被當成練等最佳線。</p>
+      <p class="hint">依船隻 Rank、EXP、配件與海圖上的已開點搜尋可行航線。若下一張海圖仍有前置點未開，會優先推薦能推進解鎖鏈的航線，並附上純升等最快航線供比較；每開出一點後，下一輪建議會接續下一個前置點。</p>
       <div class="calc-controls">
         <label>回航時間上限
           <select id="calc-hours"><option value="24">24 小時</option><option value="36">36 小時</option><option value="48" selected>48 小時</option></select>
@@ -52,14 +52,7 @@
       </div>
       <div id="ship-builds" class="build-grid"></div>
       <div id="calc-result" class="result">載入海域資料後即可計算；開放點預設只有溺沒海 A、B。</div>
-      <h3>開點投資評估</h3>
-      <p class="hint">評估下一個可開海域是否值得派船探索：把探索前置點所花的航程和取得的 EXP 算進去，再比較到目標 Rank 的總時間。探索機率未知，請調整成你自己的估值。</p>
-      <div class="calc-controls">
-        <label>每次探索發現新點機率（情境值）
-          <select id="unlock-chance"><option value="0.1">10%</option><option value="0.2">20%</option><option value="0.25" selected>25%</option><option value="0.33">33%</option><option value="0.5">50%</option><option value="1">一次必出</option></select>
-        </label>
-      </div>
-      <div id="unlock-eval" class="result">按「計算目前派船建議」後更新開點評估。</div>
+      
     </section>
 
     <section class="panel">
@@ -75,12 +68,6 @@
         <thead><tr><th>Rank</th><th>海域</th><th>建議航線</th><th>備註</th></tr></thead>
         <tbody id="route-table"></tbody>
       </table></div>
-    </section>
-
-    <section class="panel">
-      <h2>開圖與登記檢查表</h2>
-      <p class="hint">登記名額解鎖檢查仍保留；每個已開海域請在上方「已開啟海域」勾選，供路線計算使用。</p>
-      <div id="unlock-list" class="unlock-grid"></div>
     </section>
 
     <section class="panel">
@@ -115,7 +102,7 @@
       <p class="hint">資料以目前可查的 Patch 7.56 社群路線為基準。這個頁面只在目前瀏覽器保存紀錄；用「匯出紀錄」備份 JSON，換裝置時再匯入。</p>
     </section>
   </main>
-  <script src="submarine.js?v=20261007-3"></script>
-  <script src="submarine-calculator.js?v=20261007-7"></script>
+  <script src="submarine.js?v=20261007-4"></script>
+  <script src="submarine-calculator.js?v=20261007-8"></script>
 </body>
 </html>
