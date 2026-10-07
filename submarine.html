@@ -52,6 +52,14 @@
       </div>
       <div id="ship-builds" class="build-grid"></div>
       <div id="calc-result" class="result">載入海域資料後即可計算；開放點預設只有溺沒海 A、B。</div>
+      <h3>開點投資評估</h3>
+      <p class="hint">評估下一個可開海域是否值得派船探索：把探索前置點所花的航程和取得的 EXP 算進去，再比較到目標 Rank 的總時間。探索機率未知，請調整成你自己的估值。</p>
+      <div class="calc-controls">
+        <label>每次探索發現新點機率（情境值）
+          <select id="unlock-chance"><option value="0.1">10%</option><option value="0.2">20%</option><option value="0.25" selected>25%</option><option value="0.33">33%</option><option value="0.5">50%</option><option value="1">一次必出</option></select>
+        </label>
+      </div>
+      <div id="unlock-eval" class="result">按「計算目前派船建議」後更新開點評估。</div>
     </section>
 
     <section class="panel">
@@ -107,6 +115,6 @@
     </section>
   </main>
   <script src="submarine.js?v=20261007-2"></script>
-  <script src="submarine-calculator.js?v=20261007"></script>
+  <script src="submarine-calculator.js?v=20261007-2"></script>
 </body>
 </html>
