@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>FF14 潛水艇養成計畫</title>
+  <link rel="stylesheet" href="submarine.css?v=20261007">
+</head>
+<body>
+  <header>
+    <div>
+      <a class="back" href="index.html">← FF14 Personal Workspace</a>
+      <h1>⚓ 潛水艇養成計畫</h1>
+      <p>從第一艘 Rank 1 開始，逐步開圖、登記四艘，記錄燃料與修理材料。</p>
+    </div>
+    <div class="toolbar">
+      <button id="export-data" type="button">匯出紀錄</button>
+      <button id="import-data-button" type="button">匯入紀錄</button>
+      <input id="import-data" type="file" accept="application/json,.json" hidden>
+    </div>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>養成目標與估算</h2>
+      <p class="hint">本計畫先以 Rank 85 作為四艘共同的營運門檻：1–14 用 1111，15 起換成 1121，Rank 85 換成 3124（由 1121 加上 3004）。達標後可跑溺沒海 O→J。更高 Rank 與開完所有海圖可繼續做，不是開始 O→J 的前置條件。</p>
+      <div class="stock-grid">
+        <label>青燐水燃料庫存 <input id="fuel-stock" type="number" min="0" step="1"></label>
+        <label>魔導機械修理材料庫存 <input id="repair-stock" type="number" min="0" step="1"></label>
+        <label>1111 完整套數 <input id="parts-1111" type="number" min="0" step="1"></label>
+        <label>0020 船首套數 <input id="parts-0020" type="number" min="0" step="1"></label>
+        <label>3004 船體＋艦橋套數 <input id="parts-3004" type="number" min="0" step="1"></label>
+      </div>
+      <div id="estimate" class="estimate-grid"></div>
+      <p class="hint">趟數是規劃區間，不是保證值：出航經驗、目前已開海域、航程與新海域發現機率都會改變結果。先用這個區間排資源，之後以每艘實際航海紀錄校正。燃料依各海域各自計價，不可只用停靠點數推算。修理量的月耗參考是四艘全數每日跑 O→J 的長期維護值，練等期會不同。</p>
+    </section>
+
+    <section class="panel">
+      <div class="section-title"><div><h2>船隊進度</h2><p class="hint">新 FC 通常先用第一艘開點；Rank 20 的 J、Rank 30 的 O、Rank 40 的 T 可依序解鎖第 2、3、4 艘登記名額。可勾選已登記艘數。</p></div></div>
+      <div id="fleet" class="fleet-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>建議練等航線</h2>
+      <p class="hint">先完成同一段的地圖解鎖鏈；目標點尚未開出時，重複探索能開出它的前置點。表格航線是該 Rank 區間的經驗路線參考，已開地圖不齊時先走可用的最高經驗點。</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Rank</th><th>海域</th><th>建議航線</th><th>備註</th></tr></thead>
+        <tbody id="route-table"></tbody>
+      </table></div>
+    </section>
+
+    <section class="panel">
+      <h2>開圖與登記檢查表</h2>
+      <p class="hint">新海域發現不是每趟必出，清單適合記錄「已開啟」而非只勾「跑過」。門檻點的發現可能需要往返多趟。</p>
+      <div id="unlock-list" class="unlock-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>記錄一趟出航</h2>
+      <div class="log-form">
+        <label>日期 <input id="log-date" type="date"></label>
+        <label>潛水艇 <select id="log-ship"><option value="1">潛水艇 1</option><option value="2">潛水艇 2</option><option value="3">潛水艇 3</option><option value="4">潛水艇 4</option></select></label>
+        <label>航線／海域代碼 <input id="log-route" placeholder="例：B → E → J"></label>
+        <label>獲得 EXP <input id="log-exp" type="number" min="0" step="1" placeholder="可留白"></label>
+        <label>實耗燃料 <input id="log-fuel" type="number" min="0" step="1" placeholder="以出航畫面為準"></label>
+        <label>修理材料 <input id="log-repair" type="number" min="0" step="1" placeholder="本次實際消耗"></label>
+        <label class="wide">備註 <input id="log-note" placeholder="新開海域、回收時間、裝備更換等"></label>
+      </div>
+      <div class="row">
+        <button id="save-log" type="button">儲存出航紀錄</button>
+        <button id="clear-log-form" type="button">清空欄位</button>
+      </div>
+      <p class="hint">儲存時會從庫存扣掉填入的燃料與修理材料；如果當趟沒有修理，就填 0。數字以遊戲中的實耗紀錄為準。</p>
+      <div id="log-summary" class="result"></div>
+      <div class="table-wrap" id="log-table"></div>
+    </section>
+
+    <section class="panel sources">
+      <h2>資料來源與估算邊界</h2>
+      <ul>
+        <li><a href="https://nettoge.com/ff14-submarine-routes/" target="_blank" rel="noreferrer">Rank 區間練等與 O→J 路線（2026-09 更新）</a></li>
+        <li><a href="https://nettoge.com/words/ff14/submarine-rank/" target="_blank" rel="noreferrer">Rank 解鎖、累計經驗與配件門檻</a></li>
+        <li><a href="https://submarine.girin.dev/en/guide/unlock-route/" target="_blank" rel="noreferrer">海圖解鎖順序與跨海域門檻</a></li>
+        <li><a href="https://eu.finalfantasyxiv.com/lodestone/topics/detail/0004e37e08808a84652bcbf942f8ac40cfea7e12" target="_blank" rel="noreferrer">官方潛水艇與燃料說明</a></li>
+      </ul>
+      <p class="hint">資料以目前可查的 Patch 7.56 社群路線為基準。這個頁面只在目前瀏覽器保存紀錄；用「匯出紀錄」備份 JSON，換裝置時再匯入。</p>
+    </section>
+  </main>
+  <script src="submarine.js?v=20261007"></script>
+</body>
+</html>
