@@ -191,7 +191,6 @@ async function init(){
   $('calc-routes').onclick=calculate;
   $('calc-hours').onchange=calculate;
   $('calc-target-rank').onchange=calculate;
-  $('unlock-chance').onchange=calculate;
   window.addEventListener('storage',()=>{renderBuilds();renderSectors();calculate()});
   window.addEventListener('submarine-state-updated',()=>{renderBuilds();calculate()});
   calculate();
