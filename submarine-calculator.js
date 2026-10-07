@@ -140,55 +140,48 @@ function fmtTime(sec){
  const h=Math.floor(sec/3600),m=Math.round((sec%3600)/60);
  return h+' 小時 '+m+' 分';
 }
-function evaluateUnlocks(registered,open,hours,target,probability,s){
- const candidates=[];
- for(const ship of registered){
-  const rank=shipRank(ship),key=ship.build||'auto',current=bestRoutes(open,ship,key,hours,s,null,500)[0];
-  if(!current)continue;
-  const remaining=remainingToTarget(ship,target);
-  if(remaining<=0)continue;
-  const parents=new Set(open.map(p=>p.id));
-  const frontier=data.sectors.filter(p=>p.rank<=rank&&!open.some(x=>x.id===p.id)&&parents.has(p.unlockedBy));
-  for(const point of frontier){
-   const parent=open.find(p=>p.id===point.unlockedBy);
-   if(!parent)continue;
-   const hunt=bestRoutes(open,ship,key,hours,s,parent.id,350)[0];
-   if(!hunt)continue;
-   const expanded=open.concat(point);
-   const after=bestRoutes(expanded,ship,key,hours,s,null,500)[0];
-   if(!after||makeLabel(after.path)===makeLabel(current.path))continue;
-   const p=Math.max(0.01,Math.min(1,probability));
-   const expectedAttempts=1/p;
-   const remainingAfterHunt=Math.max(0,remaining-expectedAttempts*hunt.actualXp);
-   const newTrips=Math.ceil(remainingAfterHunt/Math.max(1,after.actualXp));
-   const oldTrips=Math.ceil(remaining/Math.max(1,current.actualXp));
-   const oldHours=oldTrips*current.time/3600;
-   const projectedHours=expectedAttempts*hunt.time/3600+newTrips*after.time/3600;
-   const saved=oldHours-projectedHours;
-   const expectedFuel=expectedAttempts*hunt.fuel+newTrips*after.fuel;
-   candidates.push({ship:ship.index+1,rank,point,parent,oldHours,projectedHours,saved,expectedFuel,route:after,hunt});
-  }
+function nextMapProgress(open){
+ const openIds=new Set(open.map(p=>p.id));
+ const target=[2,3].map(m=>data.sectors.find(p=>p.map===m&&p.letter==='A')).find(p=>p&&!openIds.has(p.id));
+ if(!target)return null;
+ const reverse=[],seen=new Set();let cursor=target;
+ while(cursor&&!openIds.has(cursor.id)&&!seen.has(cursor.id)){
+  seen.add(cursor.id);reverse.push(cursor);
+  cursor=cursor.unlockedBy?data.sectors.find(p=>p.id===cursor.unlockedBy):null;
  }
- return candidates.sort((a,b)=>b.saved-a.saved).slice(0,8);
+ if(!cursor||!openIds.has(cursor.id))return {target,chain:null,step:null,parent:null};
+ reverse.reverse();
+ const step=reverse[0],parent=step&&data.sectors.find(p=>p.id===step.unlockedBy);
+ return {target,chain:reverse,step,parent:parent&&openIds.has(parent.id)?parent:null};
 }
 function calculate(){
  if(!data)return;
  const s=state(),ships=s.ships||[],open=unlockedSectors(s,145),hours=Number($('calc-hours').value)||48,target=Math.max(2,Math.min(90,Number($('calc-target-rank').value)||85));
  const registered=ships.map((ship,i)=>({...ship,index:i})).filter(x=>x.registered);
- const chance=Number($('unlock-chance')?.value)||0.25;
+ const progress=nextMapProgress(open);
  if(!registered.length){$('calc-result').innerHTML='<span class="calc-warning">目前沒有勾選已登記的潛水艇。</span>';return}
  let totalFuel=0,totalRuns=0,allCards=[];
  for(const ship of registered){
   const rank=shipRank(ship),key=ship.build||'auto';
   const routes=bestRoutes(open,ship,key,hours,s);
   if(!routes.length){allCards.push('<article class="route-card"><h3>潛水艇 '+(ship.index+1)+'（Rank '+rank+'）</h3><div class="route-meta">目前勾選的海域、等級、零件航程與時間上限內找不到可行航線。請確認 A/B 已開、海域勾選完整，或提高時間上限／改配件。</div></article>');continue}
-  const best=routes[0],left=remainingToTarget(ship,target),runs=left?Math.ceil(left/best.actualXp):0;
-  totalFuel+=best.fuel;totalRuns+=runs;
-  allCards.push('<article class="route-card"><h3>潛水艇 '+(ship.index+1)+'：'+esc(makeLabel(best.path))+'</h3><div class="route-meta">Rank '+rank+' · 配置 '+esc(key==='auto'?(rank<15?'1111':'1121'):key)+' · 速度 '+buildStats(key==='auto'?(rank<15?'1111':'1121'):key,rank).speed+' / 航程 '+buildStats(key==='auto'?(rank<15?'1111':'1121'):key,rank).range+'</div><div class="route-kpis"><span>'+best.actualXp.toLocaleString()+' EXP/趟'+(best.usedExp?'（實測平均）':'（基礎值）')+'</span><span>'+fmtTime(best.time)+'</span><span>'+best.fuel+' 罐燃料</span><span>航程 '+best.range+'</span><span>'+((best.actualXp/best.time)*3600).toLocaleString(undefined,{maximumFractionDigits:0})+' EXP/小時</span></div><div class="route-meta">到 Rank '+target+'：還需約 '+left.toLocaleString()+' EXP，按此刻航線估 '+runs+' 趟（未計升級後路線改善及追加探索）。</div>'+routes.slice(1).map(r=>'<div class="route-meta">替代：'+esc(makeLabel(r.path))+' · '+r.actualXp.toLocaleString()+' EXP / '+fmtTime(r.time)+' / '+r.fuel+' 燃料</div>').join('')+'</article>');
+  const expBest=routes[0];
+  let gateRoute=null,gateReason='';
+  if(progress?.step&&progress.parent){
+   if(progress.parent.rank<=rank){
+    gateRoute=bestRoutes(open,ship,key,hours,s,progress.parent.id,500)[0]||null;
+    if(!gateRoute)gateReason='目前配件航程／回航時間無法到達前置點 '+maps[progress.parent.map]+' '+progress.parent.letter;
+   }else gateReason='前置點 '+maps[progress.parent.map]+' '+progress.parent.letter+' 需 Rank '+progress.parent.rank+'，目前 Rank '+rank;
+  }else if(progress?.step)gateReason='前置鏈中間有未標記為已開的點，請先在海圖上更新開放狀態。';
+  const chosen=gateRoute||expBest,opening=Boolean(gateRoute),remaining=remainingToTarget(ship,target),runs=remaining?Math.ceil(remaining/Math.max(1,chosen.actualXp)):0;
+  totalFuel+=chosen.fuel;totalRuns+=runs;
+  const routeTitle=opening?'開圖優先：'+makeLabel(chosen.path):makeLabel(chosen.path);
+  const targetText=progress?.step?'<div class="route-meta"><strong>下一張海圖前置：</strong>目標 '+maps[progress.target.map]+' '+progress.target.letter+'（Rank '+progress.target.rank+'）；目前先探索 '+maps[progress.parent?.map||progress.step.map]+' '+(progress.parent?.letter||'—')+'，推進至 '+maps[progress.step.map]+' '+progress.step.letter+'。'+(gateReason?' '+esc(gateReason):'')+'</div>':'';
+  const alternate=opening&&makeLabel(expBest.path)!==makeLabel(chosen.path)?'<div class="route-meta">純升等最快：'+esc(makeLabel(expBest.path))+' · '+expBest.actualXp.toLocaleString()+' EXP / '+fmtTime(expBest.time)+' / '+expBest.fuel+' 燃料</div>':'';
+  allCards.push('<article class="route-card"><h3>潛水艇 '+(ship.index+1)+'：'+esc(routeTitle)+'</h3><div class="route-meta">Rank '+rank+' · 配置 '+esc(key==='auto'?(rank<15?'1111':'1121'):key)+' · 速度 '+buildStats(key==='auto'?(rank<15?'1111':'1121'):key,rank).speed+' / 航程 '+buildStats(key==='auto'?(rank<15?'1111':'1121'):key,rank).range+'</div>'+targetText+'<div class="route-kpis"><span>'+chosen.actualXp.toLocaleString()+' EXP/趟'+(chosen.usedExp?'（實測平均）':'（基礎值）')+'</span><span>'+fmtTime(chosen.time)+'</span><span>'+chosen.fuel+' 罐燃料</span><span>航程 '+chosen.range+'</span><span>'+((chosen.actualXp/chosen.time)*3600).toLocaleString(undefined,{maximumFractionDigits:0})+' EXP/小時</span></div><div class="route-meta">到 Rank '+target+'：還需約 '+remaining.toLocaleString()+' EXP，按此刻推薦航線估 '+runs+' 趟（未計升級後路線改善及追加探索）。</div>'+alternate+(!opening?routes.slice(1).map(r=>'<div class="route-meta">替代：'+esc(makeLabel(r.path))+' · '+r.actualXp.toLocaleString()+' EXP / '+fmtTime(r.time)+' / '+r.fuel+' 燃料</div>').join(''):'')+'</article>');
  }
- $('calc-result').innerHTML=allCards.join('')+'<p class="hint">本輪推薦合計約 '+totalFuel+' 罐燃料；目前庫存 '+(Number(s.fuel)||0)+' 罐。各船以目前 Rank／配置獨立求解，路線最多 5 個停靠點。趟數以當前這條航線固定不變作估算，實際上升級、發現新海域及隨機追加探索都會改變結果。</p>'+(registered.some(x=>shipRank(x)>80)?'<p class="hint calc-warning">目前 route 資料只到海圖 3、Rank 80 的海域。Rank 81 以上會用已開且等級符合的最高資料點計算，請視為暫估。</p>':'');
- const investments=evaluateUnlocks(registered,open,hours,target,chance,s);
- $('unlock-eval').innerHTML=investments.length?investments.map(x=>'<article class="route-card"><h3>'+(x.saved>0?'值得評估開啟':'目前不建議優先開')+'：'+maps[x.point.map]+' '+x.point.letter+'（前置 '+maps[x.parent.map]+' '+x.parent.letter+'）</h3><div class="route-meta">潛水艇 '+x.ship+' · Rank '+x.rank+' · 假設發現率 '+Math.round(chance*100)+'%（期望探索 '+(1/chance).toFixed(1)+' 次）</div><div class="route-kpis"><span>目前到 Rank '+target+' 約 '+x.oldHours.toFixed(1)+' 小時</span><span>先開點再練約 '+x.projectedHours.toFixed(1)+' 小時</span><span>'+(x.saved>=0?'省':'多花')+' '+Math.abs(x.saved).toFixed(1)+' 小時</span><span>預估燃料 '+Math.ceil(x.expectedFuel)+' 罐</span></div><div class="route-meta">開點派船候選：'+esc(makeLabel(x.hunt.path))+'；開出後效率線：'+esc(makeLabel(x.route.path))+'</div></article>').join('')+'<p class="hint">只評估目前可嘗試開出的下一層海域；已把探索前置點途中取得的 EXP 計入。發現率是你的情境輸入，不是遊戲保證值。期望次數會是平均值，實際可能一次開出，也可能多跑數次。</p>':'<span class="calc-warning">目前沒有能立即嘗試、且會改變練等最佳路線的下一個海域。先照上方推薦練等，或確認已開海域勾選完整。</span>';
+ const progressNote=progress?.step?'<p class="hint">下一張海圖目標：'+maps[progress.target.map]+' '+progress.target.letter+'。前置點依序：'+(progress.chain?esc(makeLabel(progress.chain)):'路線資料缺少前置鏈')+'。每次實際開出一點後，更新海圖狀態，推薦會接著推進下一個前置點。</p>':'<p class="hint">目前計算資料未包含下一張海圖的前置路線；升等推薦會以已開海域為準。</p>';
+ $('calc-result').innerHTML=progressNote+allCards.join()+'<p class="hint">本輪推薦合計約 '+totalFuel+' 罐燃料；目前庫存 '+(Number(s.fuel)||0)+' 罐。各船以目前 Rank／配置獨立求解，路線最多 5 個停靠點。優先開圖的航線已計入本趟 EXP；地圖每更新一個已開點，下一輪推薦會前進到後續開圖步驟。</p>'+(registered.some(x=>shipRank(x)>80)?'<p class="hint calc-warning">目前 route 資料只到海圖 3、Rank 80 的海域。Rank 81 以上會用已開且等級符合的最高資料點計算，請視為暫估。</p>':'');
 }
 async function init(){
  try{
