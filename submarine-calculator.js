@@ -2,6 +2,12 @@
 'use strict';
 const KEY='ff14_submarine_planner_v1';
 const maps={1:'溺沒海',2:'灰海',3:'翠浪海'};
+const mapImages={1:'https://i.imgur.com/Paa93VG.png',2:'https://i.imgur.com/bAReiKQ.png',3:'https://i.imgur.com/Y545lQE.png'};
+const mapPositions={
+1:{A:[36.4,85.2],B:[32.9,75.3],C:[42.2,69.7],D:[23.6,83.7],E:[37.5,61.1],F:[48.5,85.8],G:[19.8,79.1],H:[7.6,83.7],I:[22.1,67.4],J:[51.2,60.3],K:[31.4,55.5],L:[15.6,57.3],M:[5.7,71.5],N:[45.1,54.7],O:[36.6,52.2],P:[17,55.5],Q:[6.8,35.6],R:[9.5,31],S:[18.9,48.6],T:[5.8,18.3],U:[27.1,34.4],V:[31.9,23.7],W:[41.1,35.9],X:[51.5,36.1],Y:[12.7,10.2],Z:[24,10.4],AA:[47.5,22.6],AB:[43.1,10.4],AC:[53,10.2],AD:[35.5,10.2]},
+2:{A:[16.6,74.9],B:[8.7,83.5],C:[16.7,57.1],D:[26.1,69.8],E:[34,76.1],F:[11.9,41.6],G:[21,44.4],H:[19.4,33.2],I:[29.1,58.6],J:[27.4,43.7],K:[6.8,28.7],L:[26.1,22.1],M:[47.2,57.6],N:[49.2,43.9],O:[45,69],P:[32.6,20.6],Q:[41.7,87.3],R:[45.7,9.2],S:[38.8,37.1],T:[10,15]},
+3:{A:[12,46.2],B:[14.3,70.3],C:[15.4,28.7],D:[6.3,20.3],E:[27.2,9.1],F:[13,8.1],G:[38.7,24.9],H:[39.6,8.9],I:[47.5,18.5],J:[41.3,40.1],K:[49.5,8.6],L:[50.5,30.2],M:[38,65]}
+};
 const builds={
  auto:{label:'自動練等配置',min:1},
  '1111':{label:'1111（鯊鯊全套）',min:1,speed:110,range:70},
@@ -33,18 +39,19 @@ function renderBuilds(){
  });
 }
 function renderSectors(){
- const s=state();s.unlocks=s.unlocks||{};
- $('sector-unlocks').innerHTML=[1,2,3].map(map=>{
-  const items=data.sectors.filter(x=>x.map===map);
-  return '<div class="sector-map"><h3>'+maps[map]+'</h3><div class="sector-list">'+items.map(point=>{
-   const isDefault=(map===1&&(point.letter==='A'||point.letter==='B'));
-   const checked=Boolean(s.unlocks[sectorUnlockKey(point.id)]??isDefault);
-   return '<label class="sector-check"><input type="checkbox" data-sector="'+point.id+'" '+(checked?'checked':'')+'>'+point.letter+' <small>R'+point.rank+'</small></label>'
-  }).join('')+'</div></div>'
+ const s=state(),map=Math.max(1,Math.min(3,Number(s.activeSectorMap)||1));
+ const items=data.sectors.filter(x=>x.map===map);
+ const opened=items.filter(p=>{const d=map===1&&(p.letter==='A'||p.letter==='B');return Boolean(s.unlocks?.[sectorUnlockKey(p.id)]??d)}).length;
+ const tabs=[1,2,3].map(m=>'<button type="button" class="map-tab '+(m===map?'active':'')+'" data-map-tab="'+m+'" aria-pressed="'+(m===map)+'">'+maps[m]+'</button>').join('');
+ const points=items.map(p=>{
+  const d=map===1&&(p.letter==='A'||p.letter==='B'),on=Boolean(s.unlocks?.[sectorUnlockKey(p.id)]??d),xy=mapPositions[map][p.letter]||[50,50],label=maps[map]+' '+p.letter;
+  return '<button type="button" class="map-point '+(on?'is-open':'is-closed')+'" style="left:'+xy[0]+'%;top:'+xy[1]+'%" data-sector="'+p.id+'" aria-pressed="'+on+'" aria-label="'+esc(label+'，Rank '+p.rank+'，'+(on?'已開啟':'未開啟')+'；點擊切換')+'" title="'+esc(label+' · Rank '+p.rank+' · '+(on?'已開啟':'未開啟')+'（點擊切換）')+'">'+esc(p.letter)+'</button>'
  }).join('');
- $('sector-unlocks').querySelectorAll('[data-sector]').forEach(el=>el.onchange=()=>{
-  persist(s=>{s.unlocks=s.unlocks||{};s.unlocks[sectorUnlockKey(el.dataset.sector)]=el.checked});
-  calculate();
+ $('sector-unlocks').innerHTML='<div class="map-tabs" role="tablist" aria-label="海圖">'+tabs+'</div><div class="map-heading"><strong>'+maps[map]+'</strong><span>'+opened+' / '+items.length+' 個海域已開</span><small>點海圖上的圓點切換狀態</small></div><div class="map-stage"><img src="'+mapImages[map]+'" alt="'+maps[map]+'潛水艇海域地圖" loading="lazy" referrerpolicy="no-referrer"><div class="map-points">'+points+'</div></div><div class="map-legend"><span><i class="legend-dot is-open"></i>已開啟</span><span><i class="legend-dot is-closed"></i>未開啟</span><small>玩家整理圖，來源：<a href="https://forum.square-enix.com/ffxiv/threads/357591-Submersible-Information-Thread" target="_blank" rel="noreferrer">FFXIV 官方論壇潛水艇資訊串</a></small></div>';
+ $('sector-unlocks').querySelectorAll('[data-map-tab]').forEach(el=>el.onclick=()=>{persist(s=>{s.activeSectorMap=Number(el.dataset.mapTab)});renderSectors()});
+ $('sector-unlocks').querySelectorAll('[data-sector]').forEach(el=>el.onclick=()=>{
+  const id=Number(el.dataset.sector),p=data.sectors.find(x=>x.id===id),d=p.map===1&&(p.letter==='A'||p.letter==='B'),was=Boolean(state().unlocks?.[sectorUnlockKey(id)]??d);
+  persist(s=>{s.unlocks=s.unlocks||{};s.unlocks[sectorUnlockKey(id)]=!was});renderSectors();calculate()
  });
 }
 function unlockedSectors(s,rank){
