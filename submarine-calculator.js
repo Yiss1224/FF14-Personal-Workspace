@@ -76,7 +76,7 @@ function routeMetrics(path,speed,buildRange){
 }
 function measuredExp(path,s){
  const route=makeLabel(path),shortRoute=path.map(p=>p.letter).join(' → ');
- const matches=(s.logs||[]).filter(x=>[route,shortRoute].includes(String(x.route||'').trim().replace(/\\s+/g,' '))&&Number(x.exp)>0);
+ const matches=(s.logs||[]).filter(x=>[route,shortRoute].includes(String(x.route||'').trim().replace(/\s+/g,' '))&&Number(x.exp)>0);
  if(!matches.length)return null;
  return matches.reduce((a,x)=>a+Number(x.exp),0)/matches.length;
 }
