@@ -16,7 +16,13 @@ const builds={
 };
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function state(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch{return {}}}
+function state(){
+ const base={fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4},ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0})),unlocks:{},logs:[]};
+ try{
+  const saved=JSON.parse(localStorage.getItem(KEY)||'null')||{};
+  return {...base,...saved,parts:{...base.parts,...(saved.parts||{})},ships:base.ships.map((ship,i)=>({...ship,...(saved.ships?.[i]||{})})),unlocks:saved.unlocks||{},logs:Array.isArray(saved.logs)?saved.logs:[]};
+ }catch{return base}
+}
 function persist(mutator){const s=state();mutator(s);localStorage.setItem(KEY,JSON.stringify(s))}
 let data=null;
 function rankRec(rank){return data.ranks.find(x=>x.rank===rank)||data.ranks.filter(x=>x.rank<=rank).at(-1)}
