@@ -76,7 +76,7 @@ function renderLogs(){
 function render(){
  $('fuel-stock').value=Number(state.fuel)||0;$('repair-stock').value=Number(state.repair)||0;
  $('parts-1111').value=Number(state.parts['1111'])||0;$('parts-0020').value=Number(state.parts['0020'])||0;$('parts-3004').value=Number(state.parts['3004'])||0;
- renderEstimate();renderFleet();renderRoutes();renderUnlocks();renderLogs();
+ renderEstimate();renderFleet();renderRoutes();renderLogs();
 }
 [['fuel-stock','fuel'],['repair-stock','repair']].forEach(([id,key])=>$(id).onchange=()=>{state[key]=Math.max(0,Number($(id).value)||0);save()});
 [['parts-1111','1111'],['parts-0020','0020'],['parts-3004','3004']].forEach(([id,key])=>$(id).onchange=()=>{state.parts[key]=Math.max(0,Number($(id).value)||0);save()});
