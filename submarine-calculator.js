@@ -53,7 +53,7 @@ function unlockedSectors(s,rank){
   return p.rank<=rank&&Boolean(s.unlocks?.[sectorUnlockKey(p.id)]??defaultOpen)
  });
 }
-function makeLabel(path){return path.map(p=>p.letter).join(' → ')}
+function makeLabel(path){return path.map((p,i)=>i===0||p.map!==path[i-1].map?(maps[p.map]||('海圖'+p.map))+' '+p.letter:p.letter).join(' → ')}
 function travelSeconds(distance,speed){
  const scaled=distance/40;
  return Math.floor(scaled*3990/speed*60/100);
@@ -75,8 +75,8 @@ function routeMetrics(path,speed,buildRange){
  return {range,time,fuel,xp};
 }
 function measuredExp(path,s){
- const route=makeLabel(path);
- const matches=(s.logs||[]).filter(x=>String(x.route||'').trim()===route&&Number(x.exp)>0);
+ const route=makeLabel(path),shortRoute=path.map(p=>p.letter).join(' → ');
+ const matches=(s.logs||[]).filter(x=>[route,shortRoute].includes(String(x.route||'').trim().replace(/\\s+/g,' '))&&Number(x.exp)>0);
  if(!matches.length)return null;
  return matches.reduce((a,x)=>a+Number(x.exp),0)/matches.length;
 }
@@ -100,11 +100,13 @@ function bestRoutes(available,ship,buildKey,maxHours,s,requiredId=null,beamLimit
     const nf=cur.fuel+p.fuel;
     const path=cur.path.concat(p),nx=cur.xp+p.xp;
     const route={path,prev:p.id,range:nr,time:nt,fuel:nf,xp:nx,used:new Set([...cur.used,p.id])};
-    results.push(route);next.push(route);
+    next.push(route);
    }
   }
   next.sort((a,b)=>(b.xp/b.time)-(a.xp/a.time)||(b.xp-a.xp));
   beam=next.slice(0,width);
+  const picked=requiredId===null?beam:next.filter(r=>r.path.some(p=>p.id===requiredId)).slice(0,width);
+  results.push(...picked);
   if(!beam.length)break;
  }
  const bestByLabel=new Map();
