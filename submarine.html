@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>FF14 潛水艇養成計畫</title>
-  <link rel="stylesheet" href="submarine.css?v=20261007">
+  <link rel="stylesheet" href="submarine.css?v=20261007-2">
 </head>
 <body>
   <header>
@@ -23,7 +23,7 @@
   <main>
     <section class="panel">
       <h2>養成目標與估算</h2>
-      <p class="hint">本計畫先以 Rank 85 作為四艘共同的營運門檻：1–14 用 1111，15 起換成 1121，Rank 85 換成 3124（由 1121 加上 3004）。達標後可跑溺沒海 O→J。更高 Rank 與開完所有海圖可繼續做，不是開始 O→J 的前置條件。</p>
+      <p class="hint">目標先設為 Rank 85，作為你先前規劃的金策門檻；計算器會以每艘船當下可跑的最高 EXP／時間航線為優先。Rank 85 後可切換 3124 跑 O→J 金策，但那不是最快練等線。</p>
       <div class="stock-grid">
         <label>青燐水燃料庫存 <input id="fuel-stock" type="number" min="0" step="1"></label>
         <label>魔導機械修理材料庫存 <input id="repair-stock" type="number" min="0" step="1"></label>
@@ -32,7 +32,7 @@
         <label>3004 船體＋艦橋套數 <input id="parts-3004" type="number" min="0" step="1"></label>
       </div>
       <div id="estimate" class="estimate-grid"></div>
-      <p class="hint">趟數是規劃區間，不是保證值：出航經驗、目前已開海域、航程與新海域發現機率都會改變結果。先用這個區間排資源，之後以每艘實際航海紀錄校正。燃料依各海域各自計價，不可只用停靠點數推算。修理量的月耗參考是四艘全數每日跑 O→J 的長期維護值，練等期會不同。</p>
+      <p class="hint">計算器依實際航線停靠點計燃料與回航時間。EXP 預估先用海域基礎值；若你在紀錄中輸入該航線的實際 EXP，之後會優先用你的實測平均校正。</p>
     </section>
 
     <section class="panel">
@@ -41,8 +41,28 @@
     </section>
 
     <section class="panel">
-      <h2>建議練等航線</h2>
-      <p class="hint">先完成同一段的地圖解鎖鏈；目標點尚未開出時，重複探索能開出它的前置點。表格航線是該 Rank 區間的經驗路線參考，已開地圖不齊時先走可用的最高經驗點。</p>
+      <h2>當前派船計算器</h2>
+      <p class="hint">依每艘船的 Rank、EXP、配件速度／航程，以及下方勾選的已開海域，搜尋每趟最多 5 個停靠點的可行航線，按「基礎 EXP／回航時間」排序。請把已開點勾選完整；自動配置會以升等速度為主，Rank 85 的 O→J 是金策線，不會被當成練等最佳線。</p>
+      <div class="calc-controls">
+        <label>回航時間上限
+          <select id="calc-hours"><option value="24">24 小時</option><option value="36">36 小時</option><option value="48" selected>48 小時</option></select>
+        </label>
+        <label>估算目標 Rank <input id="calc-target-rank" type="number" min="2" max="90" value="85"></label>
+        <button id="calc-routes" type="button">計算目前派船建議</button>
+      </div>
+      <div id="ship-builds" class="build-grid"></div>
+      <div id="calc-result" class="result">載入海域資料後即可計算；開放點預設只有溺沒海 A、B。</div>
+    </section>
+
+    <section class="panel">
+      <h2>已開啟海域（計算器使用）</h2>
+      <p class="hint">勾選遊戲裡已發現的海域。未勾選點不會被派入航線；探索開點有隨機性，若想練級與開圖並行，請先勾選實際已開出的點。</p>
+      <div id="sector-unlocks" class="sector-unlocks"></div>
+    </section>
+
+    <section class="panel">
+      <h2>建議練等航線參考</h2>
+      <p class="hint">下面保留常見 Rank 區間參考；實際派船請以上方計算器為準。</p>
       <div class="table-wrap"><table>
         <thead><tr><th>Rank</th><th>海域</th><th>建議航線</th><th>備註</th></tr></thead>
         <tbody id="route-table"></tbody>
@@ -51,7 +71,7 @@
 
     <section class="panel">
       <h2>開圖與登記檢查表</h2>
-      <p class="hint">新海域發現不是每趟必出，清單適合記錄「已開啟」而非只勾「跑過」。門檻點的發現可能需要往返多趟。</p>
+      <p class="hint">登記名額解鎖檢查仍保留；每個已開海域請在上方「已開啟海域」勾選，供路線計算使用。</p>
       <div id="unlock-list" class="unlock-grid"></div>
     </section>
 
@@ -86,6 +106,7 @@
       <p class="hint">資料以目前可查的 Patch 7.56 社群路線為基準。這個頁面只在目前瀏覽器保存紀錄；用「匯出紀錄」備份 JSON，換裝置時再匯入。</p>
     </section>
   </main>
-  <script src="submarine.js?v=20261007"></script>
+  <script src="submarine.js?v=20261007-2"></script>
+  <script src="submarine-calculator.js?v=20261007"></script>
 </body>
 </html>
