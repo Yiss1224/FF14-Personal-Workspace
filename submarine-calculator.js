@@ -191,6 +191,7 @@ async function init(){
   $('calc-target-rank').onchange=calculate;
   $('unlock-chance').onchange=calculate;
   window.addEventListener('storage',()=>{renderBuilds();renderSectors();calculate()});
+  window.addEventListener('submarine-state-updated',()=>{renderBuilds();calculate()});
   calculate();
  }catch(e){$('calc-result').textContent='海域資料載入失敗：'+e.message}
 }
