@@ -2,7 +2,7 @@
 'use strict';
 const KEY='ff14_submarine_planner_v1';
 const fresh=()=>({
-  fuel:0,repair:0,parts:{'1111':0,'0020':0,'3004':0},
+  fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4},
   ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0})),
   unlocks:{},logs:[]
 });
@@ -37,20 +37,14 @@ const unlockGroups=[
  {name:'紫礁海 → 南蒼茫洋（Rank 120）',steps:[['A',105],['B',105],['F',108],['J',113],['L',115],['Q',119],['T',120]]},
  {name:'南蒼茫洋 → 北洋（Rank 135）',steps:[['A',120],['B',120],['F',123],['I',127],['M',130],['N',131],['R',134],['T',135]]}
 ];
-function phase(rank){return rank<15?'1111':rank<85?'1121':'3124'}
+function phase(rank){return rank<15?'1111':'1121'}
 function renderEstimate(){
- const centerSorties=60, minSorties=50,maxSorties=75, perFuel=12;
- const totalRunsMid=centerSorties*4, fuelMid=totalRunsMid*perFuel;
- const fuelLow=minSorties*4*10,fuelHigh=maxSorties*4*14;
- const stock=Number(state.fuel)||0, repairs=Number(state.repair)||0;
- const coverage=fuelMid?Math.min(100,stock/fuelMid*100):0;
+ const s=Number(state.fuel)||0,r=Number(state.repair)||0;
  $('estimate').innerHTML=[
-  ['Rank 85 經驗目標','約 7,250 萬 EXP / 艘','依目前累計經驗表；開放四海圖不是此門檻的必要條件。'],
-  ['出航趟數粗估','每艘 50–75 趟','四艘合計約 '+(minSorties*4)+'–'+(maxSorties*4)+' 艘次。'],
-  ['燃料粗估','約 '+fuelLow.toLocaleString()+'–'+fuelHigh.toLocaleString(),'中位情境 '+fuelMid.toLocaleString()+'（60趟/艘 × 12）。'],
-  ['現有燃料涵蓋率','約 '+coverage.toFixed(0)+'%','目前輸入 '+stock.toLocaleString()+'；按中位情境尚差 '+Math.max(0,fuelMid-stock).toLocaleString()+'。'],
-  ['修理材料參考','約 '+(repairs/13.7).toFixed(0)+' 天','四艘每日 O→J 長期估值約 13.7 個/日；練等期間需按實耗修正。'],
-  ['養成組件需求','1111 ×4 → 0020 ×4 → 3004 ×4','0020 是升級船首的材料；3004 最後把 1121 換成 3124。']
+  ['初始目標','Rank 85','按每艘目前 Rank、EXP、開放海域與船速即時計算，不再用固定趟數估算。'],
+  ['目前庫存',s.toLocaleString()+' 罐燃料 / '+r.toLocaleString()+' 個修理材料','預設採用你提供的庫存；可直接修改。'],
+  ['零件庫存','1111 ×4、0020 ×4、3004 ×4','自動練等配置：Rank 1–14 用 1111，Rank 15 起建議 1121；3124 留作後續金策配置。'],
+  ['估算範圍','路線資料到 Rank 80','不含 Rank 81 以上的新海域；EXP 預估不計隨機追加探索。']
  ].map(x=>'<div class="stat"><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong><small>'+esc(x[2])+'</small></div>').join('');
 }
 function renderFleet(){
