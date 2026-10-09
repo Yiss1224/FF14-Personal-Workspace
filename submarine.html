@@ -42,7 +42,7 @@
 
     <section class="panel">
       <h2>當前派船計算器</h2>
-      <p class="hint">依船隻 Rank、EXP、配件與海圖上的已開點搜尋可行航線。若下一張海圖仍有前置點未開，會從能到達目前前置點的船中挑一艘開圖兼練等，其餘船走各自最快升等線；若沒有船能到達，就全隊先練等。每開出一點後，下一輪建議會接續下一個前置點。</p>
+      <p class="hint">依船隻 Rank、EXP、配件與海圖上的已開點搜尋可行航線。若下一張海圖仍有前置點未開，會從符合條件的船中優先派 Rank 最高的最多兩艘開圖兼練等，其餘船走各自最快升等線；若沒有船能到達，就全隊先練等。每開出一點後，下一輪建議會接續下一個前置點。</p>
       <div class="calc-controls">
         <label>回航時間上限
           <select id="calc-hours"><option value="24">24 小時</option><option value="36">36 小時</option><option value="48" selected>48 小時</option></select>
@@ -103,6 +103,6 @@
     </section>
   </main>
   <script src="submarine.js?v=20261007-5"></script>
-  <script src="submarine-calculator.js?v=20261007-11"></script>
+  <script src="submarine-calculator.js?v=20261009-1"></script>
 </body>
 </html>
