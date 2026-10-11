@@ -128,3 +128,10 @@ th{font-size:13px;background:#f6f8fb}
 @media(max-width:760px){.settlement-form{grid-template-columns:repeat(2,minmax(140px,1fr))}.settle-sector-field{grid-column:1/-1}}
 @media(max-width:470px){.settlement-form{grid-template-columns:1fr}.settle-sector-field,.settle-wide{grid-column:1}.settle-sector-picker{flex-wrap:wrap}}
 @media(prefers-color-scheme:dark){.settle-chip{background:#233852;border-color:#43627e}.settle-success{color:#8fdfb0}.settle-error{color:#ff9e97}.primary-action{color:#fff;background:#315f9a}.primary-action:hover{background:#4374b3}}
+
+/* 歷史紀錄直接歸在返航結算下，不再留重複輸入表單 */
+.settlement-history{margin-top:16px;border-top:1px solid #dce4ef;padding-top:13px}
+.settlement-history summary{cursor:pointer;font-size:14px;font-weight:650;color:#2459a8;padding:8px 0}
+.settlement-history summary:hover{text-decoration:underline}
+.settlement-history .table-wrap{margin-top:10px}
+@media(prefers-color-scheme:dark){.settlement-history{border-color:#414b59}.settlement-history summary{color:#9bbcff}}
