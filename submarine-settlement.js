@@ -132,6 +132,7 @@ function init(){
  $('settle-form').addEventListener('change',resetButton);
  window.addEventListener('submarine-build-state-updated',refreshPoints);
  window.addEventListener('submarine-state-updated',refreshPoints);
+ window.addEventListener('submarine-data-imported',()=>{clearForm();status('已載入備份；返航結算已切換到匯入的船隊資料。')});
  refreshShip();refreshPoints();
  fetch('submarine-route-data.json').then(r=>{
   if(!r.ok)throw new Error('HTTP '+r.status);
