@@ -17,13 +17,19 @@ const builds={
  '3124':{label:'3124（金策配置）',min:35,cost:40,speed:150,range:15}
 };
 const buildPieces={
- '1111':['1111','1111','1111','1111'],'1121':['1111','1111','0020','1111'],
- '1123':['1111','1111','0020','0003'],'3123':['3004','1111','0020','0003'],
- '3124':['3004','1111','0020','3004']
+ '1111':['1111:0','1111:1','1111:2','1111:3'],
+ '1121':['1111:0','1111:1','0020:2','1111:3'],
+ '1123':['1111:0','1111:1','0020:2','0003:3'],
+ '3123':['3004:0','1111:1','0020:2','0003:3'],
+ '3124':['3004:0','1111:1','0020:2','3004:3']
 };
 const partNames=['船體','船尾','船首','艦橋'],classNames={1:'鯊級',2:'雲鯨級',3:'鯨級',4:'腔棘魚級'};
 function validBuild(key,rank){const b=builds[key],rec=rankRec(rank);return Boolean(b&&b.min&&rec&&rank>=b.min&&rec.cap>=b.cost)}
-function stock(s){return Object.fromEntries(['1111','0020','3004','0003'].map(k=>[k,Math.max(0,Number(s.parts?.[k])||0)]))}
+function stock(s){
+ const result={};
+ for(const k of ['1111','0020','3004','0003'])for(const slot of [0,1,2,3])result[k+':'+slot]=Math.max(0,Number(s.parts?.[k])||0);
+ return result;
+}
 function allocate(build,used,total){
  const result={...used};for(const piece of buildPieces[build]||[])result[piece]=(result[piece]||0)+1;
  return Object.keys(result).every(piece=>result[piece]<=(total[piece]||0))?result:null;
