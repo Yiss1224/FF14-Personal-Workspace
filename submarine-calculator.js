@@ -444,7 +444,7 @@ async function init(){
   // 直接每天按計算會使用當天實際時刻；手動輸入時間後則以手動值為準。
   refreshDepartureClock();
   window.addEventListener('storage',()=>{renderBuilds();renderSectors();calculate()});
-  window.addEventListener('submarine-state-updated',()=>{renderBuilds();calculate()});
+  window.addEventListener('submarine-state-updated',()=>{renderBuilds();renderSectors();calculate()});
   calculate();
  }catch(e){$('calc-result').textContent='海域資料載入失敗：'+e.message}
 }
