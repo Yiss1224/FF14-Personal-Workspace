@@ -3,7 +3,7 @@
 const KEY='ff14_submarine_planner_v1';
 const fresh=()=>({
   fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4,'0003':0},
-  ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0})),
+  ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0,name:''})),
   unlocks:{},logs:[],activeSectorMap:1
 });
 let state;
@@ -77,6 +77,10 @@ const unlockGroups=[
  {name:'南蒼茫洋 → 北洋（Rank 135）',steps:[['A',120],['B',120],['F',123],['I',127],['M',130],['N',131],['R',134],['T',135]]}
 ];
 function phase(rank){return rank<15?'1111':'1121'}
+function shipLabel(index,ship){
+ const name=typeof ship?.name==='string'?ship.name.trim():'';
+ return '潛水艇 '+(index+1)+(name?' · '+name:'');
+}
 function renderEstimate(){
  const s=Number(state.fuel)||0,r=Number(state.repair)||0;
  $('estimate').innerHTML=[
@@ -90,8 +94,14 @@ function renderFleet(){
  $('fleet').innerHTML=state.ships.map((s,i)=>{
   const rank=Math.max(1,Math.min(145,Number(s.rank)||1)),route=rankRoutes.find(x=>rank>=x[0]&&rank<=x[1]);
   const build=s.currentBuild||phase(rank);
-  return '<article class="ship"><div class="head"><h3>潛水艇 '+(i+1)+'</h3><label class="checkbox"><input type="checkbox" data-registered="'+i+'" '+(s.registered?'checked':'')+'> 已登記</label></div><div class="ship-fields"><label>目前 Rank<input type="number" min="1" max="145" data-rank="'+i+'" value="'+rank+'"></label><label>本 Rank EXP<input type="number" min="0" step="1" data-exp="'+i+'" value="'+(Number(s.exp)||0)+'"></label></div><div class="ship-meta">已登記配置：<strong>'+build+'</strong><br>參考航線：'+(route?route[2]+' '+route[3]:'—')+'<br>已記錄出航：'+state.logs.filter(l=>Number(l.ship)===i+1).length+' 趟</div></article>'
+  const name=typeof s.name==='string'?s.name:'';
+  return '<article class="ship"><div class="head"><h3>'+esc(shipLabel(i,s))+'</h3><label class="checkbox"><input type="checkbox" data-registered="'+i+'" '+(s.registered?'checked':'')+'> 已登記</label></div><div class="ship-fields"><label class="ship-name-field">潛水艇名稱<input type="text" maxlength="40" data-ship-name="'+i+'" value="'+esc(name)+'" placeholder="可自由命名（留空恢復預設）"></label><label>目前 Rank<input type="number" min="1" max="145" data-rank="'+i+'" value="'+rank+'"></label><label>本 Rank EXP<input type="number" min="0" step="1" data-exp="'+i+'" value="'+(Number(s.exp)||0)+'"></label></div><div class="ship-meta">已登記配置：<strong>'+esc(build)+'</strong><br>參考航線：'+(route?esc(route[2]+' '+route[3]):'—')+'<br>已記錄出航：'+state.logs.filter(l=>Number(l.ship)===i+1).length+' 趟</div></article>'
  }).join('');
+ $('fleet').querySelectorAll('[data-ship-name]').forEach(el=>el.onchange=()=>{
+  const i=Number(el.dataset.shipName),name=el.value.trim();
+  state.ships[i].name=[...name].slice(0,40).join('');
+  save();
+ });
  $('fleet').querySelectorAll('[data-registered]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.registered].registered=el.checked;save()});
  $('fleet').querySelectorAll('[data-rank]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.rank].rank=Number(el.value)||1;save()});
  $('fleet').querySelectorAll('[data-exp]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.exp].exp=Number(el.value)||0;save()});
@@ -109,7 +119,7 @@ function renderUnlocks(){
 function renderLogs(){
  const runs=state.logs.length,fuelUsed=state.logs.reduce((a,l)=>a+(Number(l.fuel)||0),0),repairUsed=state.logs.reduce((a,l)=>a+(Number(l.repair)||0),0),xp=state.logs.reduce((a,l)=>a+(Number(l.exp)||0),0);
  $('log-summary').innerHTML='已記錄 <strong>'+runs+' 趟</strong>／累計 '+fuelUsed.toLocaleString()+' 燃料、'+repairUsed.toLocaleString()+' 修理材料、'+xp.toLocaleString()+' EXP。剩餘庫存：燃料 <strong>'+Number(state.fuel||0).toLocaleString()+'</strong>、修理材料 <strong>'+Number(state.repair||0).toLocaleString()+'</strong>。';
- $('log-table').innerHTML=runs?'<table><thead><tr><th>日期</th><th>艇</th><th>航線</th><th>EXP</th><th>燃料</th><th>修理</th><th>備註</th><th></th></tr></thead><tbody>'+state.logs.slice().reverse().map((l,idx)=>'<tr><td>'+esc(l.date)+'</td><td>'+esc(l.ship)+'</td><td>'+esc(l.route)+'</td><td>'+Number(l.exp||0).toLocaleString()+'</td><td>'+Number(l.fuel||0)+'</td><td>'+Number(l.repair||0)+'</td><td>'+(l.kind==='settlement'?'<strong>返航結算 · Rank '+esc(l.rankAfter)+' / EXP '+Number(l.expAfter||0).toLocaleString()+'</strong>；'+(l.openedSectors||[]).map(p=>esc(p.label)).join('、')+'<br>':'')+esc(l.note||'')+'</td><td><button type="button" data-delete="'+(runs-1-idx)+'">刪除</button></td></tr>').join('')+'</tbody></table>':'<div class="empty">還沒有出航紀錄。</div>';
+ $('log-table').innerHTML=runs?'<table><thead><tr><th>日期</th><th>艇</th><th>航線</th><th>EXP</th><th>燃料</th><th>修理</th><th>備註</th><th></th></tr></thead><tbody>'+state.logs.slice().reverse().map((l,idx)=>'<tr><td>'+esc(l.date)+'</td><td>'+esc(shipLabel(Number(l.ship)-1,state.ships[Number(l.ship)-1]))+'</td><td>'+esc(l.route)+'</td><td>'+Number(l.exp||0).toLocaleString()+'</td><td>'+Number(l.fuel||0)+'</td><td>'+Number(l.repair||0)+'</td><td>'+(l.kind==='settlement'?'<strong>返航結算 · Rank '+esc(l.rankAfter)+' / EXP '+Number(l.expAfter||0).toLocaleString()+'</strong>；'+(l.openedSectors||[]).map(p=>esc(p.label)).join('、')+'<br>':'')+esc(l.note||'')+'</td><td><button type="button" data-delete="'+(runs-1-idx)+'">刪除</button></td></tr>').join('')+'</tbody></table>':'<div class="empty">還沒有出航紀錄。</div>';
  $('log-table').querySelectorAll('[data-delete]').forEach(el=>el.onclick=()=>{const entry=state.logs[+el.dataset.delete];if(entry?.kind==='settlement'&&!confirm('刪除這筆返航結算？會回補消耗物資，但 Rank／EXP 和海圖不會倒回。若需修正可直接在上方手動修改。'))return;const l=state.logs.splice(+el.dataset.delete,1)[0];state.fuel=Number(state.fuel||0)+(Number(l.fuel)||0);state.repair=Number(state.repair||0)+(Number(l.repair)||0);save()});
 }
 function render(){
