@@ -4,7 +4,7 @@ const KEY='ff14_submarine_planner_v1';
 const fresh=()=>({
   fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4,'0003':0},
   ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0})),
-  unlocks:{},logs:[]
+  unlocks:{},logs:[],activeSectorMap:1
 });
 let state;
 try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');state=Object.assign(fresh(),saved||{});state.parts=Object.assign(fresh().parts,saved?.parts||{});state.ships=fresh().ships.map((x,i)=>Object.assign(x,saved?.ships?.[i]||{}));state.unlocks=saved?.unlocks||{};state.logs=Array.isArray(saved?.logs)?saved.logs:[]}catch(e){state=fresh()}
@@ -124,7 +124,19 @@ function render(){
 function exportBackup(){
  try{
   window.dispatchEvent(new Event('submarine-export-requested'));
-  const stored=JSON.parse(localStorage.getItem(KEY)||'null');
+  const stored=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(state);
+  if(!stored.plannerSettings){
+   stored.plannerSettings={
+    maxHours:Number($('calc-hours')?.value)||48,
+    targetRank:Number($('calc-target-rank')?.value)||85,
+    dailyPickup:!!$('daily-pickup')?.checked,
+    pickupStart:$('pickup-start')?.value||'19:00',
+    pickupEnd:$('pickup-end')?.value||'22:00',
+    departureTime:$('calc-departure-time')?.value||'19:00',
+    manualDeparture:false
+   };
+  }
+  if(stored.activeSectorMap===undefined)stored.activeSectorMap=1;
   if(!stored||!Array.isArray(stored.ships)||!Array.isArray(stored.logs))
    throw new Error('尚無完整的儲存資料，請先確認船隊資料。');
   const payload={schema:2,app:'ff14-submarine-planner',
