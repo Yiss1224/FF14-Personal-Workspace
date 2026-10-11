@@ -393,7 +393,7 @@ function calculate(){
    +swapText
    +'<div class="route-kpis"><span>'+route.actualXp.toLocaleString()+' EXP/趟'+(route.usedExp?'（實測）':'（基礎值）')+'</span>'
    +'<span>'+fmtTime(route.time)+'</span><span>'+route.fuel+' 罐燃料</span><span>航程 '+route.range+'</span>'
-   +(daily?'<span>最早收船：'+esc(pickupLabel(route.time))+'</span>':'')
+   +(daily?'<span>最早可收／再派：'+esc(pickupLabel(route.time))+'</span><span>本趟收船週期 '+esc(fmtTime(pickupElapsed(route.time,true)))+'</span>':'')
    +(deltaRate!==null?'<span>相較目前配置 '+(deltaRate>=0?'+':'')+deltaRate+'% EXP／收船週期</span>':'')+'</div>'
    +'<div class="route-meta">至 Rank '+target+' 尚需 '+remaining.toLocaleString()+' EXP；若一直跑這條約 '+runs+' 趟（升級與開圖後會改變）。</div>'
    +(opening?'<div class="route-meta">本輪探索 '+esc(maps[progress.step.map]+' '+progress.step.letter)+' 的前置點；成功開圖後請點地圖更新。</div>':'')
@@ -422,7 +422,7 @@ function calculate(){
  });
 }
 const defaultPlannerSettings={
- maxHours:48,targetRank:85,dailyPickup:true,pickupStart:'19:00',
+ maxHours:72,targetRank:85,dailyPickup:true,pickupStart:'19:00',
  pickupEnd:'22:00',departureTime:'19:00',manualDeparture:false
 };
 function validClock(value,fallback){
@@ -430,7 +430,9 @@ function validClock(value,fallback){
 }
 function plannerControls(settings){
  const s={...defaultPlannerSettings,...(settings||{})};
- $('calc-hours').value=[24,36,48].includes(Number(s.maxHours))?String(s.maxHours):'48';
+ // 舊版 48h 是預設限制；首次開放長航線後升到 72h。使用者日後可自行改回 48h。
+ if(settings&&Number(settings.maxHours)===48&&settings.expandedLongRoutes!==true)s.maxHours=72;
+ $('calc-hours').value=[24,36,48,50,52,72].includes(Number(s.maxHours))?String(s.maxHours):'72';
  $('calc-target-rank').value=Number.isInteger(Number(s.targetRank))&&Number(s.targetRank)>=2&&Number(s.targetRank)<=90?String(s.targetRank):'85';
  $('daily-pickup').checked=s.dailyPickup!==false;
  $('pickup-start').value=validClock(s.pickupStart,'19:00');
@@ -443,7 +445,7 @@ function savePlannerSettings(manualDeparture){
   maxHours:Number($('calc-hours').value),targetRank:Number($('calc-target-rank').value),
   dailyPickup:!!$('daily-pickup').checked,pickupStart:$('pickup-start').value,
   pickupEnd:$('pickup-end').value,departureTime:$('calc-departure-time').value,
-  manualDeparture:!!manualDeparture
+  manualDeparture:!!manualDeparture,expandedLongRoutes:true
  };
  persist(s=>{s.plannerSettings={...(s.plannerSettings||{}),...snapshot}});
 }
@@ -453,6 +455,8 @@ async function init(){
   data=await res.json();
   renderBuilds();renderSectors();
   let manuallySelectedDeparture=plannerControls(state().plannerSettings);
+  // 記錄已啟用長航線，避免之後手動切回 48h 又被升級。
+  if(state().plannerSettings?.expandedLongRoutes!==true)savePlannerSettings(manuallySelectedDeparture);
   function refreshDepartureClock(){
    if(manuallySelectedDeparture)return;
    const now=new Date(),minute=now.getHours()*60+now.getMinutes(),w=windowSettings();
