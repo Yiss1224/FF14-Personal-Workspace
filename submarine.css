@@ -135,3 +135,8 @@ th{font-size:13px;background:#f6f8fb}
 .settlement-history summary:hover{text-decoration:underline}
 .settlement-history .table-wrap{margin-top:10px}
 @media(prefers-color-scheme:dark){.settlement-history{border-color:#414b59}.settlement-history summary{color:#9bbcff}}
+
+/* 自訂船名保留船號；名稱與 Rank/EXP 欄位在同一張船隊卡片 */
+.ship-name-field{grid-column:1/-1}
+.ship .head h3{overflow-wrap:anywhere}
+.ship-name-field input{width:100%}
