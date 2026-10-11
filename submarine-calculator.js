@@ -266,10 +266,10 @@ function calculate(){
   return ship.build&&ship.build!=='auto'?[ship.build]:['1111','1121','1123','3123'];
  }
  let fixedUsage={},reserved0003=0,stockConflict='';
- for(const ship of registered.filter(x=>x.voyaging)){
+ for(const ship of registered.filter(x=>x.voyaging||shipRank(x)>=target)){
   const current=installed(ship);
   const next=allocate(current,fixedUsage,total);
-  if(!next){stockConflict='航行中配件占用量超過庫存，請確認各船「實際配置」與各類零件數量。';break}
+  if(!next){stockConflict='航行中或已畢業但尚未拆下的配件超過庫存，請檢查各船「實際配置」與零件數量。';break}
   fixedUsage=next;
   if(['1123','3123'].includes(current))reserved0003++;
  }
@@ -310,13 +310,19 @@ function calculate(){
    continue;
   }
   if(rank>=target){
+   const holding=['1123','3123'].includes(current);
    html.push('<article class="route-card"><h3>潛水艇 '+(ship.index+1)+'：已達 Rank '+target+'</h3>'
     +'<div class="route-meta">已達練等目標；建議換成 3124 跑 O → J。'
-    +(current!=='3124'?' 將 '+esc(current)+' 的配件拆下後即可讓其他返航船使用。':' 已是 3124 配置。')
-    +'</div></article>');
+    +(holding?'目前 '+esc(current)+' 上的 0003 還是已安裝狀態，暫時不會借給別艘。':'')
+    +(current==='3124'?' 已登記為 3124，無需換裝。':' 請先在遊戲內換裝，再確認釋出配件。')
+    +'</div>'
+    +(current!=='3124'?'<div class="switch-advice"><strong>建議換裝：'+esc(current)+' → 3124</strong><span>'
+      +esc(changes(current,'3124'))+'</span><button type="button" data-apply-build="'+ship.index
+      +'" data-new-build="3124">已換成 3124，更新紀錄</button></div>':'')
+    +'</article>');
    continue;
   }
-  const p=plans.find(x=>x.ship.index===ship.index),choice=selected.get(ship.index);
+    const p=plans.find(x=>x.ship.index===ship.index),choice=selected.get(ship.index);
   if(!choice){
    html.push('<article class="route-card"><h3>潛水艇 '+(ship.index+1)+'（Rank '+rank+'）</h3>'
     +'<p class="calc-warning">找不到符合庫存的完整船隊配置。'+esc(allocation.reason||'請檢查配件與可跑航點')+'</p></article>');
@@ -353,7 +359,7 @@ function calculate(){
  }
  const premiumAssigned=[...selected.values()].filter(c=>['1123','3123'].includes(c.key)).length;
  const free0003=Math.max(0,available0003-reserved0003-premiumAssigned);
- const header='<div class="route-meta"><strong>0003 智慧分配：</strong>持有 '+available0003+' 套；航行中占用 '+reserved0003
+ const header='<div class="route-meta"><strong>0003 智慧分配：</strong>持有 '+available0003+' 套；航行中／已畢業未拆配件占用 '+reserved0003
   +' 套；本輪派船分配 '+premiumAssigned+' 套；暫時未使用 '+free0003+' 套。'
   +' 本次比較最多四艘的可行組合，考慮剩餘 EXP、畢業瓶頸及必要開圖。</div>';
  const progressNote=progress?.step
