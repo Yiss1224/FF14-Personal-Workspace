@@ -426,16 +426,23 @@ async function init(){
   const res=await fetch('submarine-route-data.json');if(!res.ok)throw new Error('route data '+res.status);
   data=await res.json();
   renderBuilds();renderSectors();
-  $('calc-routes').onclick=calculate;
+  let manuallySelectedDeparture=false;
+  function refreshDepartureClock(){
+   if(manuallySelectedDeparture)return;
+   const now=new Date(),minute=now.getHours()*60+now.getMinutes(),w=windowSettings();
+   $('calc-departure-time').value=minute>=w.start&&minute<=w.end
+    ?String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')
+    :fmtClock(w.start*60);
+  }
+  $('calc-routes').onclick=()=>{refreshDepartureClock();calculate()};
   $('calc-hours').onchange=calculate;
   $('calc-target-rank').onchange=calculate;
-  ['daily-pickup','pickup-start','pickup-end','calc-departure-time'].forEach(id=>{
+  ['daily-pickup','pickup-start','pickup-end'].forEach(id=>{
    const ctrl=$(id);if(ctrl)ctrl.onchange=calculate;
   });
-  // 進入收船窗口時，自動預填瀏覽器當下時間；仍允許手動調整。
-  const now=new Date(),minute=now.getHours()*60+now.getMinutes(),w=windowSettings();
-  if(minute>=w.start&&minute<=w.end)
-   $('calc-departure-time').value=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  $('calc-departure-time').onchange=()=>{manuallySelectedDeparture=true;calculate()};
+  // 直接每天按計算會使用當天實際時刻；手動輸入時間後則以手動值為準。
+  refreshDepartureClock();
   window.addEventListener('storage',()=>{renderBuilds();renderSectors();calculate()});
   window.addEventListener('submarine-state-updated',()=>{renderBuilds();calculate()});
   calculate();
