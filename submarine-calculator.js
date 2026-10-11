@@ -80,7 +80,7 @@ function efficiency(route,daily){return route.actualXp/pickupElapsed(route.time,
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function state(){
- const base={fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4,'0003':0},ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0})),unlocks:{},logs:[]};
+ const base={fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4,'0003':0},ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0})),unlocks:{},logs:[],activeSectorMap:1};
  try{
   const saved=JSON.parse(localStorage.getItem(KEY)||'null')||{};
   return {...base,...saved,parts:{...base.parts,...(saved.parts||{})},ships:base.ships.map((ship,i)=>({...ship,...(saved.ships?.[i]||{})})),unlocks:saved.unlocks||{},logs:Array.isArray(saved.logs)?saved.logs:[]};
@@ -470,7 +470,7 @@ async function init(){
   window.addEventListener('submarine-export-requested',()=>savePlannerSettings(manuallySelectedDeparture));
   window.addEventListener('submarine-data-imported',()=>{
    manuallySelectedDeparture=plannerControls(state().plannerSettings);
-   refreshDepartureClock();renderBuilds();renderSectors();calculate();
+   renderBuilds();renderSectors();calculate();
   });
   refreshDepartureClock();
   window.addEventListener('storage',()=>{
