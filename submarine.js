@@ -62,7 +62,7 @@ function renderEstimate(){
  $('estimate').innerHTML=[
   ['初始目標','Rank 85','按每艘目前 Rank、EXP、開放海域與船速即時計算，不再用固定趟數估算。'],
   ['目前庫存',s.toLocaleString()+' 罐燃料 / '+r.toLocaleString()+' 個修理材料','預設採用你提供的庫存；可直接修改。'],
-  ['零件庫存','1111 ×'+(Number(state.parts['1111'])||0)+'、0020 ×'+(Number(state.parts['0020'])||0)+'、3004 ×'+(Number(state.parts['3004'])||0)+'、0003 ×'+(Number(state.parts['0003'])||0),'自動比較 1111、1121、1123、3123；各艘輪流選配，不超過零件庫存。'],
+  ['零件庫存','1111 ×'+(Number(state.parts['1111'])||0)+'、0020 ×'+(Number(state.parts['0020'])||0)+'、3004 ×'+(Number(state.parts['3004'])||0)+'、0003 ×'+(Number(state.parts['0003'])||0),'已開啟全艦隊 0003 智慧分配：依 Rank／EXP、已開航點、在航占用與預估 OJ 營運船日調整，每次收船後重新計算。'],
   ['估算範圍','路線資料到 Rank 80','不含 Rank 81 以上的新海域；EXP 預估不計隨機追加探索。']
  ].map(x=>'<div class="stat"><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong><small>'+esc(x[2])+'</small></div>').join('');
 }
@@ -94,7 +94,7 @@ function renderLogs(){
 }
 function render(){
  $('fuel-stock').value=Number(state.fuel)||0;$('repair-stock').value=Number(state.repair)||0;
- $('parts-1111').value=Number(state.parts['1111'])||0;$('parts-0020').value=Number(state.parts['0020'])||0;$('parts-3004').value=Number(state.parts['3004'])||0;
+ $('parts-1111').value=Number(state.parts['1111'])||0;$('parts-0020').value=Number(state.parts['0020'])||0;$('parts-3004').value=Number(state.parts['3004'])||0;$('parts-0003').value=Number(state.parts['0003'])||0;
  renderEstimate();renderFleet();renderRoutes();renderLogs();
 }
 [['fuel-stock','fuel'],['repair-stock','repair']].forEach(([id,key])=>$(id).onchange=()=>{state[key]=Math.max(0,Number($(id).value)||0);save()});
