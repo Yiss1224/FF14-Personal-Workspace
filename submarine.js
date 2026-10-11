@@ -27,8 +27,21 @@ window.addEventListener('submarine-build-state-updated',()=>{
    if(!state.ships[i])return;
    for(const key of ['build','currentBuild','voyaging'])if(Object.prototype.hasOwnProperty.call(ship,key))state.ships[i][key]=ship[key];
   });
+  state.unlocks=latest.unlocks||state.unlocks;
+  if(Object.prototype.hasOwnProperty.call(latest,'activeSectorMap'))state.activeSectorMap=latest.activeSectorMap;
   renderFleet();
  }catch(e){/* Keep current in-memory state when storage is malformed. */}
+});
+window.addEventListener('submarine-settlement-saved',()=>{
+ try{
+  const saved=JSON.parse(localStorage.getItem(KEY)||'null');
+  if(!saved)return;
+  state=Object.assign(fresh(),saved);
+  state.parts=Object.assign(fresh().parts,saved.parts||{});
+  state.ships=fresh().ships.map((x,i)=>Object.assign(x,saved.ships?.[i]||{}));
+  state.logs=Array.isArray(saved.logs)?saved.logs:[];
+  render();
+ }catch(e){console.error('返航結算同步失敗',e)}
 });
 const rankRoutes=[
  [1,4,'溺沒海','A → B','起步，先開 B→E 的前置鏈'],
@@ -89,8 +102,8 @@ function renderUnlocks(){
 function renderLogs(){
  const runs=state.logs.length,fuelUsed=state.logs.reduce((a,l)=>a+(Number(l.fuel)||0),0),repairUsed=state.logs.reduce((a,l)=>a+(Number(l.repair)||0),0),xp=state.logs.reduce((a,l)=>a+(Number(l.exp)||0),0);
  $('log-summary').innerHTML='已記錄 <strong>'+runs+' 趟</strong>／累計 '+fuelUsed.toLocaleString()+' 燃料、'+repairUsed.toLocaleString()+' 修理材料、'+xp.toLocaleString()+' EXP。剩餘庫存：燃料 <strong>'+Number(state.fuel||0).toLocaleString()+'</strong>、修理材料 <strong>'+Number(state.repair||0).toLocaleString()+'</strong>。';
- $('log-table').innerHTML=runs?'<table><thead><tr><th>日期</th><th>艇</th><th>航線</th><th>EXP</th><th>燃料</th><th>修理</th><th>備註</th><th></th></tr></thead><tbody>'+state.logs.slice().reverse().map((l,idx)=>'<tr><td>'+esc(l.date)+'</td><td>'+esc(l.ship)+'</td><td>'+esc(l.route)+'</td><td>'+Number(l.exp||0).toLocaleString()+'</td><td>'+Number(l.fuel||0)+'</td><td>'+Number(l.repair||0)+'</td><td>'+esc(l.note||'')+'</td><td><button type="button" data-delete="'+(runs-1-idx)+'">刪除</button></td></tr>').join('')+'</tbody></table>':'<div class="empty">還沒有出航紀錄。</div>';
- $('log-table').querySelectorAll('[data-delete]').forEach(el=>el.onclick=()=>{const l=state.logs.splice(+el.dataset.delete,1)[0];state.fuel=Number(state.fuel||0)+(Number(l.fuel)||0);state.repair=Number(state.repair||0)+(Number(l.repair)||0);save()});
+ $('log-table').innerHTML=runs?'<table><thead><tr><th>日期</th><th>艇</th><th>航線</th><th>EXP</th><th>燃料</th><th>修理</th><th>備註</th><th></th></tr></thead><tbody>'+state.logs.slice().reverse().map((l,idx)=>'<tr><td>'+esc(l.date)+'</td><td>'+esc(l.ship)+'</td><td>'+esc(l.route)+'</td><td>'+Number(l.exp||0).toLocaleString()+'</td><td>'+Number(l.fuel||0)+'</td><td>'+Number(l.repair||0)+'</td><td>'+(l.kind==='settlement'?'<strong>返航結算 · Rank '+esc(l.rankAfter)+' / EXP '+Number(l.expAfter||0).toLocaleString()+'</strong>；'+(l.openedSectors||[]).map(p=>esc(p.label)).join('、')+'<br>':'')+esc(l.note||'')+'</td><td><button type="button" data-delete="'+(runs-1-idx)+'">刪除</button></td></tr>').join('')+'</tbody></table>':'<div class="empty">還沒有出航紀錄。</div>';
+ $('log-table').querySelectorAll('[data-delete]').forEach(el=>el.onclick=()=>{const entry=state.logs[+el.dataset.delete];if(entry?.kind==='settlement'&&!confirm('刪除這筆返航結算？會回補消耗物資，但 Rank／EXP 和海圖不會倒回。若需修正可直接在上方手動修改。'))return;const l=state.logs.splice(+el.dataset.delete,1)[0];state.fuel=Number(state.fuel||0)+(Number(l.fuel)||0);state.repair=Number(state.repair||0)+(Number(l.repair)||0);save()});
 }
 function render(){
  $('fuel-stock').value=Number(state.fuel)||0;$('repair-stock').value=Number(state.repair)||0;
