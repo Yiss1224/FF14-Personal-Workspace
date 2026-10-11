@@ -48,7 +48,7 @@ function state(){
   return {...base,...saved,parts:{...base.parts,...(saved.parts||{})},ships:base.ships.map((ship,i)=>({...ship,...(saved.ships?.[i]||{})})),unlocks:saved.unlocks||{},logs:Array.isArray(saved.logs)?saved.logs:[]};
  }catch{return base}
 }
-function persist(mutator){const s=state();mutator(s);localStorage.setItem(KEY,JSON.stringify(s))}
+function persist(mutator){const s=state();mutator(s);localStorage.setItem(KEY,JSON.stringify(s));window.dispatchEvent(new Event('submarine-build-state-updated'))}
 let data=null;
 function rankRec(rank){return data.ranks.find(x=>x.rank===rank)||data.ranks.filter(x=>x.rank<=rank).at(-1)}
 function shipRank(ship){return Math.max(1,Number(ship.rank)||1)}
@@ -250,7 +250,13 @@ function calculate(){
   fuel+=route.fuel;
   const title=(opening?'開圖兼練等：':'升等優先：')+makeLabel(route.path);
   const swapNeeded=current!==key&&!ship.voyaging;
-  const swapText=swapNeeded?'<div class="switch-advice"><strong>本趟建議換裝：'+esc(current)+' → '+esc(key)+'</strong><span>'+esc(changes(current,key))+'</span><button type="button" data-apply-build="'+ship.index+'" data-new-build="'+key+'">已在遊戲換裝，更新紀錄</button></div>'
+  const previous=getRoutes(ship,current,opening&&progress?.parent?progress.parent.id:null)[0]||null;
+  const improvement=previous?Math.round((efficiency(route,daily)/efficiency(previous,daily)-1)*100):null;
+  const benefit=previous
+   ?(improvement>0?'同條件比較，預估每個收船週期 EXP 效率提升 '+improvement+'%。'
+      :'此配置更適合本趟指定開圖航線；並非單純為了 EXP 提升。')
+   :'原配置在目前時間上限內無法完成這趟指定航線。';
+  const swapText=swapNeeded?'<div class="switch-advice"><strong>本趟建議換裝：'+esc(current)+' → '+esc(key)+'</strong><span>'+esc(changes(current,key))+'</span><small>'+esc(benefit)+'</small><button type="button" data-apply-build="'+ship.index+'" data-new-build="'+key+'">已在遊戲換裝，更新紀錄</button></div>'
      :'<div class="route-meta">本趟使用 '+esc(key)+'；'+(ship.voyaging?'目前標記航行中，僅以已安裝配件估算。':'不用換裝。')+'</div>';
   html.push('<article class="route-card"><h3>潛水艇 '+(ship.index+1)+'：'+esc(title)+'</h3>'
    +'<div class="route-meta">Rank '+rank+' · 建議配置 <strong>'+esc(key)+'</strong> · 速度 '+stats.speed+' / 航程 '+stats.range+'</div>'
