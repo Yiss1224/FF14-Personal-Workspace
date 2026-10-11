@@ -36,8 +36,46 @@ function allocate(build,used,total){
 }
 function installed(ship){return builds[ship.currentBuild]?.min?ship.currentBuild:(shipRank(ship)<15?'1111':'1121')}
 function changes(from,to){return [...to].flatMap((code,i)=>code===from[i]?[]:[partNames[i]+'：'+classNames[from[i]]+' → '+classNames[code]]).join('；')}
-function cycleDays(sec){return Math.max(1,Math.ceil(sec/86400))}
-function efficiency(route,daily){return route.actualXp/(daily?cycleDays(route.time)*86400:route.time)}
+// 每日可以收船、再次派船的實際時間窗口（台灣瀏覽器當地時間）。
+const DAY=86400;
+function clockMinutes(id,fallback){
+ const str=document.getElementById(id)?.value;
+ if(typeof str!=='string'||!(/^\d{1,2}:\d{2}$/.test(str)))return fallback;
+ const [h,m]=str.split(':').map(Number);
+ return h>=0&&h<24&&m>=0&&m<60?h*60+m:fallback;
+}
+function windowSettings(){
+ const start=clockMinutes('pickup-start',19*60),end=clockMinutes('pickup-end',22*60);
+ const valid=end>start;
+ const from=valid?start:19*60,to=valid?end:22*60;
+ const departure=clockMinutes('calc-departure-time',from);
+ return {start:from,end:to,departure:Math.min(to,Math.max(from,departure)),valid,
+   departureInside:departure>=from&&departure<=to};
+}
+function pickupTiming(voyageSeconds){
+ const {start,end,departure}=windowSettings();
+ const depart=departure*60,arrival=depart+voyageSeconds;
+ const day=Math.floor(arrival/DAY),time=arrival-day*DAY;
+ const earliest=start*60,latest=end*60;
+ const pickup=time<earliest?day*DAY+earliest:
+   time<=latest?arrival:(day+1)*DAY+earliest;
+ return {elapsed:pickup-depart,waiting:pickup-arrival,day:Math.floor(pickup/DAY),
+   clock:pickup%DAY};
+}
+function pickupElapsed(voyageSeconds,daily){
+ return daily?pickupTiming(voyageSeconds).elapsed:voyageSeconds;
+}
+function fmtClock(seconds){
+ const secs=((Math.round(seconds)%DAY)+DAY)%DAY;
+ return String(Math.floor(secs/3600)).padStart(2,'0')+':'
+   +String(Math.floor((secs%3600)/60)).padStart(2,'0');
+}
+function pickupLabel(voyageSeconds){
+ const p=pickupTiming(voyageSeconds);
+ const dayText=p.day===1?'明天':p.day===2?'後天':'第 '+p.day+' 天';
+ return dayText+' '+fmtClock(p.clock);
+}
+function efficiency(route,daily){return route.actualXp/pickupElapsed(route.time,daily)}
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -146,7 +184,7 @@ function bestRoutes(available,ship,buildKey,maxHours,s,requiredId=null,beamLimit
     next.push({path:cur.path.concat(p),prev:p.id,range:nr,time:nt,fuel:cur.fuel+p.fuel,
       xp:cur.xp+p.xp,used:new Set([...cur.used,p.id])});
    }
-   const quick=r=>r.xp/(daily?cycleDays(r.time)*86400:r.time);
+   const quick=r=>r.xp/pickupElapsed(r.time,daily);
    next.sort((a,b)=>quick(b)-quick(a)||b.xp-a.xp);
    beam=next.slice(0,beamLimit);
    results.push(...(requiredId===null?beam:next.filter(x=>x.path.some(p=>p.id===requiredId)).slice(0,beamLimit)));
@@ -157,7 +195,7 @@ function bestRoutes(available,ship,buildKey,maxHours,s,requiredId=null,beamLimit
  for(const r of results){
   if(requiredId!==null&&!r.path.some(p=>p.id===requiredId))continue;
   const label=makeLabel(r.path),observed=measuredExp(r.path,s),xp=observed||r.xp;
-  const score=xp/(daily?cycleDays(r.time)*86400:r.time);
+  const score=xp/pickupElapsed(r.time,daily);
   if(!routes.has(label)||routes.get(label).score<score)routes.set(label,{...r,actualXp:xp,usedExp:Boolean(observed),score,build:buildKey});
  }
  return [...routes.values()].sort((a,b)=>b.score-a.score).slice(0,3);
@@ -226,7 +264,7 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
    const updated=allocate(option.key,usage,availableStock);
    if(!updated)continue;
    decisions.set(p.ship.index,{plan:p,option});
-   walk(i+1,updated,count+Number(option.opening),turns+(option.opening?cycleDays(option.route.time):0));
+   walk(i+1,updated,count+Number(option.opening),turns+(option.opening?pickupElapsed(option.route.time,daily):0));
    decisions.delete(p.ship.index);
   }
  }
@@ -237,11 +275,11 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
 function estimatedFinishDays(plan,option,targetRank,daily){
  const rem=remainingToTarget(plan.ship,targetRank);
  if(rem<=0)return 0;
- const turns=daily?cycleDays(option.route.time):option.route.time/86400;
+ const turns=pickupElapsed(option.route.time,daily)/DAY;
  // 本 Rank 之後的 EXP/日還會因新航點而上升；只用目前同海圖
  // 可找到的最快路線估算，並設保守底線，避免低 Rank 被誤判要幾百天。
  const bestKnown=Math.max(0,...plan.choices.map(x=>x.route.actualXp/
-        (daily?cycleDays(x.route.time):x.route.time/86400)));
+        (pickupElapsed(x.route.time,daily)/DAY)));
  const rank=plan.rank;
  const baseline=rank<25?170000:rank<50?340000:rank<70?750000:1300000;
  const futureRate=Math.max(baseline,bestKnown);
@@ -252,6 +290,9 @@ function calculate(){
  const s=state(),ships=s.ships||[],open=unlockedSectors(s,145),
   hours=Number($('calc-hours').value)||48,target=Math.max(2,Math.min(90,Number($('calc-target-rank').value)||85)),
   daily=Boolean($('daily-pickup')?.checked),total=stock(s),available0003=Math.max(0,Number(s.parts?.['0003'])||0);
+ const w=windowSettings();
+ if(daily&&!w.valid){$('calc-result').innerHTML='<p class="calc-warning">收船窗口結束時間必須晚於開始時間，且在同一天內。</p>';return}
+ if(daily&&!w.departureInside){$('calc-result').innerHTML='<p class="calc-warning">預計本次派船時間應在收船窗口內；請調整時間後再計算。</p>';return}
  const registered=ships.map((ship,i)=>({...ship,index:i})).filter(x=>x.registered);
  const progress=nextMapProgress(open);
  if(!registered.length){$('calc-result').innerHTML='<span class="calc-warning">目前沒有已登記潛艇。</span>';return}
@@ -330,11 +371,11 @@ function calculate(){
    continue;
   }
   const {key,route,opening,alternates}=choice,stats=buildStats(key,rank),remaining=remainingToTarget(ship,target);
-  const turns=daily?cycleDays(route.time):route.time/86400;
+  const turns=pickupElapsed(route.time,daily)/DAY;
   const runs=remaining?Math.ceil(remaining/Math.max(1,route.actualXp)):0;
   const previous=getRoutes(ship,current,opening&&progress?.parent?progress.parent.id:null)[0]||null;
   const deltaRate=previous?Math.round(((route.actualXp/turns)/
-       (previous.actualXp/(daily?cycleDays(previous.time):previous.time/86400))-1)*100):null;
+       (previous.actualXp/(pickupElapsed(previous.time,daily)/DAY))-1)*100):null;
   const reason=opening
    ?'優先完成必要開圖，避免全隊受前置航點阻塞。'
    :['1123','3123'].includes(key)
@@ -352,7 +393,7 @@ function calculate(){
    +swapText
    +'<div class="route-kpis"><span>'+route.actualXp.toLocaleString()+' EXP/趟'+(route.usedExp?'（實測）':'（基礎值）')+'</span>'
    +'<span>'+fmtTime(route.time)+'</span><span>'+route.fuel+' 罐燃料</span><span>航程 '+route.range+'</span>'
-   +(daily?'<span>占用 '+cycleDays(route.time)+' 次每日收船週期</span>':'')
+   +(daily?'<span>最早收船：'+esc(pickupLabel(route.time))+'</span>':'')
    +(deltaRate!==null?'<span>相較目前配置 '+(deltaRate>=0?'+':'')+deltaRate+'% EXP／收船週期</span>':'')+'</div>'
    +'<div class="route-meta">至 Rank '+target+' 尚需 '+remaining.toLocaleString()+' EXP；若一直跑這條約 '+runs+' 趟（升級與開圖後會改變）。</div>'
    +(opening?'<div class="route-meta">本輪探索 '+esc(maps[progress.step.map]+' '+progress.step.letter)+' 的前置點；成功開圖後請點地圖更新。</div>':'')
@@ -371,7 +412,7 @@ function calculate(){
  const warning=allocation.reason?'<p class="calc-warning">'+esc(allocation.reason)+'</p>':'';
  $('calc-result').innerHTML=header+progressNote+warning+html.join('')
   +'<p class="hint">本輪建議消耗約 '+fuel+' 罐燃料（庫存 '+(Number(s.fuel)||0)+'）。'
-  +(daily?'每天固定收船：超過 24 小時但不超過 48 小時的航線占兩個收船週期。':'以 EXP／實際時間比較。')
+  +(daily?'每天可收／派船窗口 '+fmtClock(windowSettings().start*60)+'～'+fmtClock(windowSettings().end*60)+'；考慮實際預計出航時間與下一次可收船時間。':'以 EXP／實際時間比較。')
   +' 智慧分配屬逐趟前瞻估算，不是保證全球最短畢業日；實際開圖 RNG、EXP 獎勵及未來航點變化仍會改變最佳選擇。</p>'
   +(registered.some(x=>shipRank(x)>80)?'<p class="hint calc-warning">航線資料目前只到海圖 3、Rank 80 的海域；Rank 81 以上使用現有海域預估。</p>':'');
  $('calc-result').querySelectorAll('[data-apply-build]').forEach(btn=>btn.onclick=()=>{
@@ -388,6 +429,13 @@ async function init(){
   $('calc-routes').onclick=calculate;
   $('calc-hours').onchange=calculate;
   $('calc-target-rank').onchange=calculate;
+  ['daily-pickup','pickup-start','pickup-end','calc-departure-time'].forEach(id=>{
+   const ctrl=$(id);if(ctrl)ctrl.onchange=calculate;
+  });
+  // 進入收船窗口時，自動預填瀏覽器當下時間；仍允許手動調整。
+  const now=new Date(),minute=now.getHours()*60+now.getMinutes(),w=windowSettings();
+  if(minute>=w.start&&minute<=w.end)
+   $('calc-departure-time').value=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   window.addEventListener('storage',()=>{renderBuilds();renderSectors();calculate()});
   window.addEventListener('submarine-state-updated',()=>{renderBuilds();calculate()});
   calculate();
