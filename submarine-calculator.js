@@ -80,7 +80,7 @@ function efficiency(route,daily){return route.actualXp/pickupElapsed(route.time,
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function state(){
- const base={fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4,'0003':0},ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0})),unlocks:{},logs:[],activeSectorMap:1};
+ const base={fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4,'0003':0},ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0,name:''})),unlocks:{},logs:[],activeSectorMap:1};
  try{
   const saved=JSON.parse(localStorage.getItem(KEY)||'null')||{};
   return {...base,...saved,parts:{...base.parts,...(saved.parts||{})},ships:base.ships.map((ship,i)=>({...ship,...(saved.ships?.[i]||{})})),unlocks:saved.unlocks||{},logs:Array.isArray(saved.logs)?saved.logs:[]};
@@ -90,6 +90,10 @@ function persist(mutator){const s=state();mutator(s);localStorage.setItem(KEY,JS
 let data=null;
 function rankRec(rank){return data.ranks.find(x=>x.rank===rank)||data.ranks.filter(x=>x.rank<=rank).at(-1)}
 function shipRank(ship){return Math.max(1,Number(ship.rank)||1)}
+function shipLabel(index,ship){
+ const name=typeof ship?.name==='string'?ship.name.trim():'';
+ return '潛水艇 '+(index+1)+(name?' · '+name:'');
+}
 function buildStats(build,rank){
  const b=builds[build]?.min?builds[build]:builds['1111'],rec=rankRec(rank)||{};
  return {speed:b.speed+(rec.v||0),range:b.range+(rec.d||0)};
@@ -99,7 +103,7 @@ function renderBuilds(){
  const ships=state().ships||[];
  $('ship-builds').innerHTML=ships.map((ship,i)=>{
   const rank=shipRank(ship),pref=ship.build||'auto',current=installed(ship);
-  return '<div class="build-row"><label>潛水艇 '+(i+1)+'（Rank '+rank+'）· 推薦模式<select data-build="'+i+'">'
+  return '<div class="build-row"><label>'+esc(shipLabel(i,ship))+'（Rank '+rank+'）· 推薦模式<select data-build="'+i+'">'
    +Object.entries(builds).map(([k,b])=>'<option value="'+k+'" '+(k===pref?'selected':'')+'>'+esc(b.label)+'</option>').join('')+'</select></label>'
    +'<label>目前實際配置<select data-installed="'+i+'">'+Object.entries(builds).filter(([k,b])=>b.min).map(([k,b])=>'<option value="'+k+'" '+(k===current?'selected':'')+'>'+esc(b.label)+'</option>').join('')+'</select></label>'
    +'<label class="build-check"><input type="checkbox" data-voyaging="'+i+'" '+(ship.voyaging?'checked':'')+'>航行中（鎖定配件）</label>'
@@ -236,7 +240,7 @@ function nextMapProgress(open){
 function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, daily){
  const requested=plans.filter(p=>!p.ship.voyaging&&p.rank<targetRank);
  // 仍然替其他可派船計算；單艘沒有可行航線不應拖垮整個船隊。
- const missing=requested.filter(p=>!p.choices.length).map(p=>p.ship.index+1);
+ const missing=requested.filter(p=>!p.choices.length).map(p=>shipLabel(p.ship.index,p.ship));
  const ready=requested.filter(p=>p.choices.length);
  if(!ready.length)return {chosen:new Map(),missing,
   reason:missing.length?'潛艇 '+missing.join('、')+' 找不到可行航線，請檢查海圖／Rank／回航上限。':null};
@@ -269,7 +273,7 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
   }
  }
  walk(0,fixedUsage,0,0);
- if(!best)return {chosen:new Map(),missing:ready.map(p=>p.ship.index+1),reason:'實際零件庫存不足，無法讓所有返航船同時配裝出航'};
+ if(!best)return {chosen:new Map(),missing:ready.map(p=>shipLabel(p.ship.index,p.ship)),reason:'實際零件庫存不足，無法讓所有返航船同時配裝出航'};
  return {chosen:new Map(best.entries.map(x=>[x.plan.ship.index,x.option])),missing,best,reason:missing.length?'潛艇 '+missing.join('、')+' 找不到可行航線，其他船仍正常推薦。':null};
 }
 function estimatedFinishDays(plan,option,targetRank,daily){
@@ -345,7 +349,7 @@ function calculate(){
  for(const ship of registered){
   const rank=shipRank(ship),current=installed(ship);
   if(ship.voyaging){
-   html.push('<article class="route-card"><h3>潛水艇 '+(ship.index+1)+'（Rank '+rank+'）</h3>'
+   html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'（Rank '+rank+'）</h3>'
     +'<div class="route-meta">航行中，'+esc(current)+' 配件已占用'
     +(builds[current]&&['1123','3123'].includes(current)?'（包含 0003 ×1）':'')
     +'。無法在返航前轉移配件；下次收船後取消「航行中」再計算。</div></article>');
@@ -353,7 +357,7 @@ function calculate(){
   }
   if(rank>=target){
    const holding=['1123','3123'].includes(current);
-   html.push('<article class="route-card"><h3>潛水艇 '+(ship.index+1)+'：已達 Rank '+target+'</h3>'
+   html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'：已達 Rank '+target+'</h3>'
     +'<div class="route-meta">已達練等目標；建議換成 3124 跑 O → J。'
     +(holding?'目前 '+esc(current)+' 上的 0003 還是已安裝狀態，暫時不會借給別艘。':'')
     +(current==='3124'?' 已登記為 3124，無需換裝。':' 請先在遊戲內換裝，再確認釋出配件。')
@@ -366,7 +370,7 @@ function calculate(){
   }
     const p=plans.find(x=>x.ship.index===ship.index),choice=selected.get(ship.index);
   if(!choice){
-   html.push('<article class="route-card"><h3>潛水艇 '+(ship.index+1)+'（Rank '+rank+'）</h3>'
+   html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'（Rank '+rank+'）</h3>'
     +'<p class="calc-warning">找不到符合庫存的完整船隊配置。'+esc(allocation.reason||'請檢查配件與可跑航點')+'</p></article>');
    continue;
   }
@@ -388,7 +392,7 @@ function calculate(){
        +'<button type="button" data-apply-build="'+ship.index+'" data-new-build="'+key+'">已在遊戲換裝，更新紀錄</button></div>'
     :'<div class="route-meta">本趟使用 '+esc(key)+'，不用換裝。'+esc(reason)+'</div>';
   fuel+=route.fuel;
-  html.push('<article class="route-card"><h3>潛水艇 '+(ship.index+1)+'：'+(opening?'開圖兼練等：':'升等優先：')+esc(makeLabel(route.path))+'</h3>'
+  html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'：'+(opening?'開圖兼練等：':'升等優先：')+esc(makeLabel(route.path))+'</h3>'
    +'<div class="route-meta">Rank '+rank+' · 建議配置 <strong>'+esc(key)+'</strong> · 速度 '+stats.speed+' / 航程 '+stats.range+'</div>'
    +swapText
    +'<div class="route-kpis"><span>'+route.actualXp.toLocaleString()+' EXP/趟'+(route.usedExp?'（實測）':'（基礎值）')+'</span>'
