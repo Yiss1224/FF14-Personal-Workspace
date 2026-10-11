@@ -421,12 +421,38 @@ function calculate(){
   persist(st=>{st.ships[i].currentBuild=next});renderBuilds();calculate();
  });
 }
+const defaultPlannerSettings={
+ maxHours:48,targetRank:85,dailyPickup:true,pickupStart:'19:00',
+ pickupEnd:'22:00',departureTime:'19:00',manualDeparture:false
+};
+function validClock(value,fallback){
+ return typeof value==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(value)?value:fallback;
+}
+function plannerControls(settings){
+ const s={...defaultPlannerSettings,...(settings||{})};
+ $('calc-hours').value=[24,36,48].includes(Number(s.maxHours))?String(s.maxHours):'48';
+ $('calc-target-rank').value=Number.isInteger(Number(s.targetRank))&&Number(s.targetRank)>=2&&Number(s.targetRank)<=90?String(s.targetRank):'85';
+ $('daily-pickup').checked=s.dailyPickup!==false;
+ $('pickup-start').value=validClock(s.pickupStart,'19:00');
+ $('pickup-end').value=validClock(s.pickupEnd,'22:00');
+ $('calc-departure-time').value=validClock(s.departureTime,'19:00');
+ return s.manualDeparture===true;
+}
+function savePlannerSettings(manualDeparture){
+ const snapshot={
+  maxHours:Number($('calc-hours').value),targetRank:Number($('calc-target-rank').value),
+  dailyPickup:!!$('daily-pickup').checked,pickupStart:$('pickup-start').value,
+  pickupEnd:$('pickup-end').value,departureTime:$('calc-departure-time').value,
+  manualDeparture:!!manualDeparture
+ };
+ persist(s=>{s.plannerSettings={...(s.plannerSettings||{}),...snapshot}});
+}
 async function init(){
  try{
   const res=await fetch('submarine-route-data.json');if(!res.ok)throw new Error('route data '+res.status);
   data=await res.json();
   renderBuilds();renderSectors();
-  let manuallySelectedDeparture=false;
+  let manuallySelectedDeparture=plannerControls(state().plannerSettings);
   function refreshDepartureClock(){
    if(manuallySelectedDeparture)return;
    const now=new Date(),minute=now.getHours()*60+now.getMinutes(),w=windowSettings();
@@ -434,16 +460,23 @@ async function init(){
     ?String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')
     :fmtClock(w.start*60);
   }
-  $('calc-routes').onclick=()=>{refreshDepartureClock();calculate()};
-  $('calc-hours').onchange=calculate;
-  $('calc-target-rank').onchange=calculate;
-  ['daily-pickup','pickup-start','pickup-end'].forEach(id=>{
-   const ctrl=$(id);if(ctrl)ctrl.onchange=calculate;
+  function updatePlanner(){savePlannerSettings(manuallySelectedDeparture);calculate()}
+  $('calc-routes').onclick=()=>{refreshDepartureClock();updatePlanner()};
+  ['calc-hours','calc-target-rank','daily-pickup','pickup-start','pickup-end'].forEach(id=>{
+   const ctrl=$(id);if(ctrl)ctrl.onchange=updatePlanner;
   });
-  $('calc-departure-time').onchange=()=>{manuallySelectedDeparture=true;calculate()};
-  // 直接每天按計算會使用當天實際時刻；手動輸入時間後則以手動值為準。
+  $('calc-departure-time').onchange=()=>{manuallySelectedDeparture=true;updatePlanner()};
+  // 匯出前把目前表單值一併寫回 JSON；匯入完整備份後再套用時間與偏好。
+  window.addEventListener('submarine-export-requested',()=>savePlannerSettings(manuallySelectedDeparture));
+  window.addEventListener('submarine-data-imported',()=>{
+   manuallySelectedDeparture=plannerControls(state().plannerSettings);
+   refreshDepartureClock();renderBuilds();renderSectors();calculate();
+  });
   refreshDepartureClock();
-  window.addEventListener('storage',()=>{renderBuilds();renderSectors();calculate()});
+  window.addEventListener('storage',()=>{
+   manuallySelectedDeparture=plannerControls(state().plannerSettings);
+   refreshDepartureClock();renderBuilds();renderSectors();calculate();
+  });
   window.addEventListener('submarine-state-updated',()=>{renderBuilds();renderSectors();calculate()});
   calculate();
  }catch(e){$('calc-result').textContent='海域資料載入失敗：'+e.message}
