@@ -137,6 +137,14 @@ th{font-size:13px;background:#f6f8fb}
 @media(prefers-color-scheme:dark){.settlement-history{border-color:#414b59}.settlement-history summary{color:#9bbcff}}
 
 /* 自訂船名保留船號；名稱與 Rank/EXP 欄位在同一張船隊卡片 */
-.ship-name-field{grid-column:1/-1}
-.ship .head h3{overflow-wrap:anywhere}
-.ship-name-field input{width:100%}
+.ship .head h3{overflow-wrap:anywhere;min-width:0;flex:1}
+.ship-head-actions{display:flex;gap:9px;align-items:center;flex-shrink:0}
+.ship-rename-button{padding:5px 9px;font-size:12px;white-space:nowrap}
+.ship-rename-editor[hidden]{display:none!important}
+.ship-rename-editor{display:flex;flex-direction:column;gap:7px;margin:10px 0;padding:10px;border:1px solid #dce4ef;border-radius:9px;background:#f6f8fb}
+.ship-rename-editor label{flex:1}
+.ship-rename-editor input{width:100%}
+.ship-rename-actions{display:flex;gap:7px}
+.ship-rename-actions button{padding:5px 10px;font-size:12px}
+@media(max-width:420px){.ship .head{flex-wrap:wrap}.ship-head-actions{margin-left:auto}.ship-head-actions .checkbox{white-space:nowrap}}
+@media(prefers-color-scheme:dark){.ship-rename-editor{background:#252c36;border-color:#414b59}}
