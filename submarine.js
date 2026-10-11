@@ -95,16 +95,55 @@ function renderFleet(){
   const rank=Math.max(1,Math.min(145,Number(s.rank)||1)),route=rankRoutes.find(x=>rank>=x[0]&&rank<=x[1]);
   const build=s.currentBuild||phase(rank);
   const name=typeof s.name==='string'?s.name:'';
-  return '<article class="ship"><div class="head"><h3>'+esc(shipLabel(i,s))+'</h3><label class="checkbox"><input type="checkbox" data-registered="'+i+'" '+(s.registered?'checked':'')+'> 已登記</label></div><div class="ship-fields"><label class="ship-name-field">潛水艇名稱<input type="text" maxlength="40" data-ship-name="'+i+'" value="'+esc(name)+'" placeholder="可自由命名（留空恢復預設）"></label><label>目前 Rank<input type="number" min="1" max="145" data-rank="'+i+'" value="'+rank+'"></label><label>本 Rank EXP<input type="number" min="0" step="1" data-exp="'+i+'" value="'+(Number(s.exp)||0)+'"></label></div><div class="ship-meta">已登記配置：<strong>'+esc(build)+'</strong><br>參考航線：'+(route?esc(route[2]+' '+route[3]):'—')+'<br>已記錄出航：'+state.logs.filter(l=>Number(l.ship)===i+1).length+' 趟</div></article>'
+  const shipTitle=esc(shipLabel(i,s));
+  return '<article class="ship"><div class="head"><h3>'+shipTitle+'</h3>'
+   +'<div class="ship-head-actions">'
+   +'<button type="button" class="ship-rename-button" data-edit-ship-name="'+i+'" aria-label="編輯'+shipTitle+'名稱">編輯名稱</button>'
+   +'<label class="checkbox"><input type="checkbox" data-registered="'+i+'" '+(s.registered?'checked':'')+'> 已登記</label></div></div>'
+   +'<div class="ship-rename-editor" data-ship-name-editor="'+i+'" hidden>'
+   +'<label>潛水艇名稱<input type="text" maxlength="40" data-ship-name-input="'+i+'" value="'+esc(name)+'" placeholder="留空恢復預設名稱"></label>'
+   +'<div class="ship-rename-actions"><button type="button" data-save-ship-name="'+i+'">儲存</button>'
+   +'<button type="button" data-cancel-ship-name="'+i+'">取消</button></div></div>'
+   +'<div class="ship-fields"><label>目前 Rank<input type="number" min="1" max="145" data-rank="'+i+'" value="'+rank+'"></label>'
+   +'<label>本 Rank EXP<input type="number" min="0" step="1" data-exp="'+i+'" value="'+(Number(s.exp)||0)+'"></label></div>'
+   +'<div class="ship-meta">已登記配置：<strong>'+esc(build)+'</strong><br>參考航線：'
+   +(route?esc(route[2]+' '+route[3]):'—')+'<br>已記錄出航：'+state.logs.filter(l=>Number(l.ship)===i+1).length+' 趟</div></article>';
  }).join('');
- $('fleet').querySelectorAll('[data-ship-name]').forEach(el=>el.onchange=()=>{
-  const i=Number(el.dataset.shipName),name=el.value.trim();
-  state.ships[i].name=[...name].slice(0,40).join('');
+ const fleet=$('fleet');
+ function closeEditor(i){
+  const editor=fleet.querySelector('[data-ship-name-editor="'+i+'"]');
+  if(editor)editor.hidden=true;
+  const edit=fleet.querySelector('[data-edit-ship-name="'+i+'"]');
+  if(edit)edit.setAttribute('aria-expanded','false');
+ }
+ function saveName(i){
+  const input=fleet.querySelector('[data-ship-name-input="'+i+'"]');
+  if(!input)return;
+  state.ships[i].name=[...input.value.trim()].slice(0,40).join('');
   save();
+ }
+ fleet.querySelectorAll('[data-edit-ship-name]').forEach(el=>el.onclick=()=>{
+  const i=Number(el.dataset.editShipName);
+  const editor=fleet.querySelector('[data-ship-name-editor="'+i+'"]');
+  const input=fleet.querySelector('[data-ship-name-input="'+i+'"]');
+  if(!editor||!input)return;
+  if(!editor.hidden){closeEditor(i);return;}
+  fleet.querySelectorAll('[data-ship-name-editor]').forEach(x=>x.hidden=true);
+  fleet.querySelectorAll('[data-edit-ship-name]').forEach(x=>x.setAttribute('aria-expanded','false'));
+  input.value=state.ships[i].name||'';
+  editor.hidden=false;el.setAttribute('aria-expanded','true');
+  input.focus();input.select();
  });
- $('fleet').querySelectorAll('[data-registered]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.registered].registered=el.checked;save()});
- $('fleet').querySelectorAll('[data-rank]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.rank].rank=Number(el.value)||1;save()});
- $('fleet').querySelectorAll('[data-exp]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.exp].exp=Number(el.value)||0;save()});
+ fleet.querySelectorAll('[data-save-ship-name]').forEach(el=>el.onclick=()=>saveName(Number(el.dataset.saveShipName)));
+ fleet.querySelectorAll('[data-cancel-ship-name]').forEach(el=>el.onclick=()=>closeEditor(Number(el.dataset.cancelShipName)));
+ fleet.querySelectorAll('[data-ship-name-input]').forEach(el=>el.onkeydown=e=>{
+  const i=Number(el.dataset.shipNameInput);
+  if(e.key==='Enter'){e.preventDefault();saveName(i);}
+  if(e.key==='Escape'){e.preventDefault();closeEditor(i);}
+ });
+ fleet.querySelectorAll('[data-registered]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.registered].registered=el.checked;save()});
+ fleet.querySelectorAll('[data-rank]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.rank].rank=Number(el.value)||1;save()});
+ fleet.querySelectorAll('[data-exp]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.exp].exp=Number(el.value)||0;save()});
 }
 function renderRoutes(){
  $('route-table').innerHTML=rankRoutes.map(r=>'<tr><td>'+r[0]+'–'+r[1]+'</td><td>'+r[2]+'</td><td><strong>'+r[3]+'</strong></td><td>'+r[4]+'</td></tr>').join('');
