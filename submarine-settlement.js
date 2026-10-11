@@ -130,6 +130,8 @@ function init(){
  $('settle-reset').onclick=()=>{clearForm();status('')};
  $('settle-form').addEventListener('input',resetButton);
  $('settle-form').addEventListener('change',resetButton);
+ window.addEventListener('submarine-build-state-updated',refreshPoints);
+ window.addEventListener('submarine-state-updated',refreshPoints);
  refreshShip();refreshPoints();
  fetch('submarine-route-data.json').then(r=>{
   if(!r.ok)throw new Error('HTTP '+r.status);
