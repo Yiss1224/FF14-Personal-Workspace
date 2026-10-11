@@ -15,7 +15,7 @@ function read(){
   return {
    ...raw,
    ships:Array.from({length:4},(_,i)=>({
-    registered:i===0,rank:1,exp:0,...(raw.ships?.[i]||{})
+    registered:i===0,rank:1,exp:0,name:'',...(raw.ships?.[i]||{})
    })),
    unlocks:raw.unlocks||{},
    logs:Array.isArray(raw.logs)?raw.logs:[]
@@ -31,6 +31,16 @@ function status(message,isError=false){
  el.className='settle-status '+(message?(isError?'settle-error':'settle-success'):'');
 }
 function resetButton(){$('settle-save').disabled=false}
+function shipLabel(index,ship){
+ const name=typeof ship?.name==='string'?ship.name.trim():'';
+ return '潛水艇 '+(index+1)+(name?' · '+name:'');
+}
+function refreshShipOptions(){
+ const select=$('settle-ship'),selected=select.value||'1';
+ const s=read();
+ select.innerHTML=s.ships.map((ship,i)=>'<option value="'+(i+1)+'">'+esc(shipLabel(i,ship))+'</option>').join('');
+ select.value=selected;
+}
 function refreshShip(){
  const ship=Number($('settle-ship').value)-1;
  try{
@@ -114,12 +124,13 @@ function commit(){
   window.dispatchEvent(new Event('submarine-state-updated'));
   clearForm();
   $('settle-save').disabled=true; // 防止沒有修改欄位時重複送出
-  status('潛水艇 '+shipNo+' 已結算：Rank '+rank+'、本 Rank EXP '+exp.toLocaleString()
+  status(shipLabel(shipNo-1,ship)+' 已結算：Rank '+rank+'、本 Rank EXP '+exp.toLocaleString()
     +'；開啟 '+newlyOpened.length+' 個航點。已同步更新船隊、出航紀錄及庫存。');
  }catch(e){status(e.message,true)}
 }
 function init(){
  $('settle-date').value=today();
+ refreshShipOptions();
  $('settle-ship').onchange=()=>{chosen=new Set();refreshShip();refreshPoints();status('')};
  $('settle-sector-add').onclick=()=>{
   const id=Number($('settle-sector-picker').value);
@@ -131,8 +142,10 @@ function init(){
  $('settle-form').addEventListener('input',resetButton);
  $('settle-form').addEventListener('change',resetButton);
  window.addEventListener('submarine-build-state-updated',refreshPoints);
- window.addEventListener('submarine-state-updated',refreshPoints);
- window.addEventListener('submarine-data-imported',()=>{clearForm();status('已載入備份；返航結算已切換到匯入的船隊資料。')});
+ window.addEventListener('submarine-state-updated',()=>{
+  refreshShipOptions();refreshPoints();
+ });
+ window.addEventListener('submarine-data-imported',()=>{refreshShipOptions();clearForm();status('已載入備份；返航結算已切換到匯入的船隊資料。')});
  refreshShip();refreshPoints();
  fetch('submarine-route-data.json').then(r=>{
   if(!r.ok)throw new Error('HTTP '+r.status);
