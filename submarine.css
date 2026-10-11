@@ -94,3 +94,13 @@ th{font-size:13px;background:#f6f8fb}
 .map-legend a{color:#2459a8}
 @media(max-width:620px){.map-point{width:clamp(22px,7vw,34px);height:clamp(22px,7vw,34px);font-size:12px}.map-heading small{width:100%;margin-left:0}.map-legend small{width:100%;margin-left:0}}
 @media(prefers-color-scheme:dark){.map-tab.active{background:#425b7c;color:#fff}.map-heading span,.map-heading small,.map-legend{color:#a8b1bf}.map-stage{border-color:#48525e}.map-legend a{color:#9bbcff}}
+
+/* 每趟動態換裝建議 */
+.stock-grid{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}
+.build-row label+label{margin-top:8px}
+.build-check{display:flex;flex-direction:row;align-items:center;gap:7px}
+.build-check input{width:auto;min-width:0}
+.switch-advice{display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin:9px 0;padding:10px;border:1px solid #92b8dc;border-radius:8px;background:#f0f7ff;font-size:13px}
+.switch-advice strong{color:#2459a8}
+.switch-advice button{padding:6px 10px;font-size:12px}
+@media(prefers-color-scheme:dark){.switch-advice{background:#202e3d;border-color:#526e89}.switch-advice strong{color:#a6cbff}}
