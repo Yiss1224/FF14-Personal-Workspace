@@ -18,6 +18,13 @@ const save=()=>{
    for(const key of ['build','currentBuild','voyaging'])if(Object.prototype.hasOwnProperty.call(ship,key))state.ships[i][key]=ship[key];
   });
  }catch(e){}
+ // 計算器、海圖可獨立寫入；一般手動欄位存檔不得覆寫較新的設定。
+ try{
+  const latest=JSON.parse(localStorage.getItem(KEY)||'{}');
+  if(Object.prototype.hasOwnProperty.call(latest,'plannerSettings'))state.plannerSettings=latest.plannerSettings;
+  if(Object.prototype.hasOwnProperty.call(latest,'activeSectorMap'))state.activeSectorMap=latest.activeSectorMap;
+  if(latest.unlocks&&typeof latest.unlocks==='object')state.unlocks=latest.unlocks;
+ }catch(e){}
  localStorage.setItem(KEY,JSON.stringify(state));render();window.dispatchEvent(new Event('submarine-state-updated'));
 };
 window.addEventListener('submarine-build-state-updated',()=>{
@@ -112,20 +119,52 @@ function render(){
 }
 [['fuel-stock','fuel'],['repair-stock','repair']].forEach(([id,key])=>$(id).onchange=()=>{state[key]=Math.max(0,Number($(id).value)||0);save()});
 [['parts-1111','1111'],['parts-0020','0020'],['parts-3004','3004'],['parts-0003','0003']].forEach(([id,key])=>$(id).onchange=()=>{state.parts[key]=Math.max(0,Number($(id).value)||0);save()});
-$('log-date').value=new Date().toISOString().slice(0,10);
-$('save-log').onclick=()=>{
- const fuel=Math.max(0,Number($('log-fuel').value)||0),repair=Math.max(0,Number($('log-repair').value)||0);
- if(fuel>Number(state.fuel||0)){alert('燃料庫存不足，請先更新庫存或確認輸入。');return}
- if(repair>Number(state.repair||0)){alert('修理材料庫存不足，請先更新庫存或確認輸入。');return}
- const ship=Number($('log-ship').value);
- state.logs.push({date:$('log-date').value||new Date().toISOString().slice(0,10),ship,route:$('log-route').value.trim(),exp:Number($('log-exp').value)||0,fuel,repair,note:$('log-note').value.trim()});
- state.fuel-=fuel;state.repair-=repair;
- ['log-route','log-exp','log-fuel','log-repair','log-note'].forEach(id=>$(id).value='');
- save();
-};
-$('clear-log-form').onclick=()=>['log-route','log-exp','log-fuel','log-repair','log-note'].forEach(id=>$(id).value='');
-$('export-data').onclick=()=>{const blob=new Blob([JSON.stringify({schema:1,exportedAt:new Date().toISOString(),data:state},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='ff14-submarine-log-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(url)};
+// 完整 JSON 備份採用持久化資料快照，避免只匯出本模組較舊的記憶體副本。
+// 包含動態配件、海圖、航行歷史、所有目前已儲存的頁面輸入與計算器設定。
+function exportBackup(){
+ try{
+  window.dispatchEvent(new Event('submarine-export-requested'));
+  const stored=JSON.parse(localStorage.getItem(KEY)||'null');
+  if(!stored||!Array.isArray(stored.ships)||!Array.isArray(stored.logs))
+   throw new Error('尚無完整的儲存資料，請先確認船隊資料。');
+  const payload={schema:2,app:'ff14-submarine-planner',
+   exportedAt:new Date().toISOString(),data:stored};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob),link=document.createElement('a');
+  link.href=url;link.download='ff14-submarine-full-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  link.click();URL.revokeObjectURL(url);
+ }catch(e){alert('匯出失敗：'+e.message)}
+}
+function importedState(obj){
+ const incoming=obj?.data||obj;
+ if(!incoming||typeof incoming!=='object'||!Array.isArray(incoming.ships)||!Array.isArray(incoming.logs))
+  throw new Error('檔案缺少船隊或航行歷史，無法辨識為潛艇備份。');
+ if(incoming.ships.length!==4)throw new Error('船隊資料不是四艘，為避免備份內容遺失而停止匯入。');
+ if(!incoming.parts||typeof incoming.parts!=='object'||Array.isArray(incoming.parts))
+  throw new Error('備份缺少配件庫存。');
+ const result=Object.assign(fresh(),incoming);
+ result.parts=Object.assign(fresh().parts,incoming.parts);
+ result.ships=fresh().ships.map((ship,i)=>Object.assign(ship,incoming.ships[i]||{}));
+ result.unlocks=incoming.unlocks&&typeof incoming.unlocks==='object'&&!Array.isArray(incoming.unlocks)?incoming.unlocks:{};
+ result.logs=incoming.logs;
+ // 舊版（schema 1／無 schema）的備份本身沒有計算器設定，不會憑空創造數據。
+ return result;
+}
+$('export-data').onclick=exportBackup;
 $('import-data-button').onclick=()=>$('import-data').click();
-$('import-data').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const obj=JSON.parse(await f.text()),incoming=obj.data||obj;if(!incoming.ships||!Array.isArray(incoming.logs))throw new Error('檔案格式不符');state=Object.assign(fresh(),incoming);state.parts=Object.assign(fresh().parts,incoming.parts||{});state.ships=fresh().ships.map((x,i)=>Object.assign(x,incoming.ships[i]||{}));state.logs=incoming.logs;save();alert('紀錄已匯入。')}catch(err){alert('匯入失敗：'+err.message)}e.target.value=''};
+$('import-data').onchange=async e=>{
+ const f=e.target.files?.[0];if(!f)return;
+ try{
+  const parsed=JSON.parse(await f.text()),restored=importedState(parsed);
+  // 直接覆寫儲存資料而非呼叫 save()，以免舊記憶體裡的配件配置覆蓋匯入值。
+  localStorage.setItem(KEY,JSON.stringify(restored));
+  state=restored;
+  render();
+  window.dispatchEvent(new Event('submarine-data-imported'));
+  window.dispatchEvent(new Event('submarine-state-updated'));
+  alert('完整備份已匯入：船隊、配件、庫存、海圖及全部航行歷史已還原；如備份包含計算器設定，也已套用。');
+ }catch(err){alert('匯入失敗，原始資料未變更：'+err.message)}
+ e.target.value='';
+};
 render();
 })();
