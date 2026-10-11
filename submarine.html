@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>FF14 潛水艇養成計畫</title>
-  <link rel="stylesheet" href="submarine.css?v=20261007-5">
+  <link rel="stylesheet" href="submarine.css?v=20261011-1">
 </head>
 <body>
   <header>
@@ -30,6 +30,7 @@
         <label>1111 完整套數 <input id="parts-1111" type="number" min="0" step="1"></label>
         <label>0020 船首套數 <input id="parts-0020" type="number" min="0" step="1"></label>
         <label>3004 船體＋艦橋套數 <input id="parts-3004" type="number" min="0" step="1"></label>
+        <label>0003 鯨級艦橋數量 <input id="parts-0003" type="number" min="0" step="1"></label>
       </div>
       <div id="estimate" class="estimate-grid"></div>
       <p class="hint">計算器依實際航線停靠點計燃料與回航時間。EXP 預估先用海域基礎值；若你在紀錄中輸入該航線的實際 EXP，之後會優先用你的實測平均校正。</p>
@@ -42,12 +43,13 @@
 
     <section class="panel">
       <h2>當前派船計算器</h2>
-      <p class="hint">依船隻 Rank、EXP、配件與海圖上的已開點搜尋可行航線。若下一張海圖仍有前置點未開，會從符合條件的船中優先派 Rank 最高的最多兩艘開圖兼練等，其餘船走各自最快升等線；若沒有船能到達，就全隊先練等。每開出一點後，下一輪建議會接續下一個前置點。</p>
+      <p class="hint">依 Rank、EXP、目前安裝配件與庫存，比較不同配件及已開航點的可行航線。只有返航後才可以依推薦換裝；如果還沒買 0003，把庫存填 0 就不會推薦需要鯨級艦橋的 1123／3123。若下一張海圖仍有前置點未開，會從符合條件的船中優先派 Rank 最高的最多兩艘開圖兼練等，其餘船走各自最快升等線；若沒有船能到達，就全隊先練等。每開出一點後，下一輪建議會接續下一個前置點。</p>
       <div class="calc-controls">
         <label>回航時間上限
           <select id="calc-hours"><option value="24">24 小時</option><option value="36">36 小時</option><option value="48" selected>48 小時</option></select>
         </label>
         <label>估算目標 Rank <input id="calc-target-rank" type="number" min="2" max="90" value="85"></label>
+        <label class="build-check"><input id="daily-pickup" type="checkbox" checked>每天固定同一時間收船（依整日週期最佳化）</label>
         <button id="calc-routes" type="button">計算目前派船建議</button>
       </div>
       <div id="ship-builds" class="build-grid"></div>
@@ -102,7 +104,7 @@
       <p class="hint">資料以目前可查的 Patch 7.56 社群路線為基準。這個頁面只在目前瀏覽器保存紀錄；用「匯出紀錄」備份 JSON，換裝置時再匯入。</p>
     </section>
   </main>
-  <script src="submarine.js?v=20261007-5"></script>
-  <script src="submarine-calculator.js?v=20261009-1"></script>
+  <script src="submarine.js?v=20261011-1"></script>
+  <script src="submarine-calculator.js?v=20261011-1"></script>
 </body>
 </html>
