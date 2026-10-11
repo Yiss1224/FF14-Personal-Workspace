@@ -104,3 +104,27 @@ th{font-size:13px;background:#f6f8fb}
 .switch-advice strong{color:#2459a8}
 .switch-advice button{padding:6px 10px;font-size:12px}
 @media(prefers-color-scheme:dark){.switch-advice{background:#202e3d;border-color:#526e89}.switch-advice strong{color:#a6cbff}}
+
+
+/* 一鍵返航結算；船隊原本的手動修改欄位保持不變。 */
+.settlement-form{display:grid;grid-template-columns:repeat(3,minmax(170px,1fr));gap:12px;margin:15px 0}
+.settlement-form label{min-width:0}
+.settle-sector-field{grid-column:1/3}
+.settle-sector-picker{display:flex;gap:8px}
+.settle-sector-picker select{min-width:0;flex:1}
+.settle-sector-picker button{white-space:nowrap}
+.settle-chips{display:flex;gap:7px;align-items:center;flex-wrap:wrap;min-height:38px;padding:5px 0}
+.settle-chips .hint{margin:0}
+.settle-chip{display:inline-flex;align-items:center;gap:6px;background:#eaf3ff;border:1px solid #bdd7ee;border-radius:999px;padding:4px 6px 4px 11px;font-size:12px}
+.settle-chip button{border:0;border-radius:50%;background:transparent;font-size:18px;line-height:1;padding:1px 5px}
+.settle-wide{grid-column:1/-1}
+.primary-action{color:#fff;background:#2563ab;border-color:#2563ab;font-weight:650}
+.primary-action:hover{background:#1d518e}
+.primary-action:disabled{opacity:.6;cursor:default}
+.settle-status{font-size:13px;line-height:1.55;margin-top:10px}
+.settle-status:empty{display:none}
+.settle-success{color:#136f4e}
+.settle-error{color:#b34335}
+@media(max-width:760px){.settlement-form{grid-template-columns:repeat(2,minmax(140px,1fr))}.settle-sector-field{grid-column:1/-1}}
+@media(max-width:470px){.settlement-form{grid-template-columns:1fr}.settle-sector-field,.settle-wide{grid-column:1}.settle-sector-picker{flex-wrap:wrap}}
+@media(prefers-color-scheme:dark){.settle-chip{background:#233852;border-color:#43627e}.settle-success{color:#8fdfb0}.settle-error{color:#ff9e97}.primary-action{color:#fff;background:#315f9a}.primary-action:hover{background:#4374b3}}
