@@ -2,7 +2,7 @@
 'use strict';
 const KEY='ff14_submarine_planner_v1';
 const fresh=()=>({
-  fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4},
+  fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4,'0003':0},
   ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0})),
   unlocks:{},logs:[]
 });
@@ -43,15 +43,15 @@ function renderEstimate(){
  $('estimate').innerHTML=[
   ['初始目標','Rank 85','按每艘目前 Rank、EXP、開放海域與船速即時計算，不再用固定趟數估算。'],
   ['目前庫存',s.toLocaleString()+' 罐燃料 / '+r.toLocaleString()+' 個修理材料','預設採用你提供的庫存；可直接修改。'],
-  ['零件庫存','1111 ×4、0020 ×4、3004 ×4','自動練等配置：Rank 1–14 用 1111，Rank 15 起建議 1121；3124 留作後續金策配置。'],
+  ['零件庫存','1111 ×'+(Number(state.parts['1111'])||0)+'、0020 ×'+(Number(state.parts['0020'])||0)+'、3004 ×'+(Number(state.parts['3004'])||0)+'、0003 ×'+(Number(state.parts['0003'])||0),'自動比較 1111、1121、1123、3123；各艘輪流選配，不超過零件庫存。'],
   ['估算範圍','路線資料到 Rank 80','不含 Rank 81 以上的新海域；EXP 預估不計隨機追加探索。']
  ].map(x=>'<div class="stat"><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong><small>'+esc(x[2])+'</small></div>').join('');
 }
 function renderFleet(){
  $('fleet').innerHTML=state.ships.map((s,i)=>{
   const rank=Math.max(1,Math.min(145,Number(s.rank)||1)),route=rankRoutes.find(x=>rank>=x[0]&&rank<=x[1]);
-  const build=phase(rank);
-  return '<article class="ship"><div class="head"><h3>潛水艇 '+(i+1)+'</h3><label class="checkbox"><input type="checkbox" data-registered="'+i+'" '+(s.registered?'checked':'')+'> 已登記</label></div><div class="ship-fields"><label>目前 Rank<input type="number" min="1" max="145" data-rank="'+i+'" value="'+rank+'"></label><label>本 Rank EXP<input type="number" min="0" step="1" data-exp="'+i+'" value="'+(Number(s.exp)||0)+'"></label></div><div class="ship-meta">建議配置：<strong>'+build+'</strong><br>參考航線：'+(route?route[2]+' '+route[3]:'—')+'<br>已記錄出航：'+state.logs.filter(l=>Number(l.ship)===i+1).length+' 趟</div></article>'
+  const build=s.currentBuild||phase(rank);
+  return '<article class="ship"><div class="head"><h3>潛水艇 '+(i+1)+'</h3><label class="checkbox"><input type="checkbox" data-registered="'+i+'" '+(s.registered?'checked':'')+'> 已登記</label></div><div class="ship-fields"><label>目前 Rank<input type="number" min="1" max="145" data-rank="'+i+'" value="'+rank+'"></label><label>本 Rank EXP<input type="number" min="0" step="1" data-exp="'+i+'" value="'+(Number(s.exp)||0)+'"></label></div><div class="ship-meta">已登記配置：<strong>'+build+'</strong><br>參考航線：'+(route?route[2]+' '+route[3]:'—')+'<br>已記錄出航：'+state.logs.filter(l=>Number(l.ship)===i+1).length+' 趟</div></article>'
  }).join('');
  $('fleet').querySelectorAll('[data-registered]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.registered].registered=el.checked;save()});
  $('fleet').querySelectorAll('[data-rank]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.rank].rank=Number(el.value)||1;save()});
@@ -79,7 +79,7 @@ function render(){
  renderEstimate();renderFleet();renderRoutes();renderLogs();
 }
 [['fuel-stock','fuel'],['repair-stock','repair']].forEach(([id,key])=>$(id).onchange=()=>{state[key]=Math.max(0,Number($(id).value)||0);save()});
-[['parts-1111','1111'],['parts-0020','0020'],['parts-3004','3004']].forEach(([id,key])=>$(id).onchange=()=>{state.parts[key]=Math.max(0,Number($(id).value)||0);save()});
+[['parts-1111','1111'],['parts-0020','0020'],['parts-3004','3004'],['parts-0003','0003']].forEach(([id,key])=>$(id).onchange=()=>{state.parts[key]=Math.max(0,Number($(id).value)||0);save()});
 $('log-date').value=new Date().toISOString().slice(0,10);
 $('save-log').onclick=()=>{
  const fuel=Math.max(0,Number($('log-fuel').value)||0),repair=Math.max(0,Number($('log-repair').value)||0);
