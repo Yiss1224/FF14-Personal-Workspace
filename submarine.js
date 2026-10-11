@@ -124,7 +124,7 @@ function render(){
 function exportBackup(){
  try{
   window.dispatchEvent(new Event('submarine-export-requested'));
-  const stored=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(state);
+  const stored=JSON.parse(localStorage.getItem(KEY)||'null')||JSON.parse(JSON.stringify(state));
   if(!stored.plannerSettings){
    stored.plannerSettings={
     maxHours:Number($('calc-hours')?.value)||48,
