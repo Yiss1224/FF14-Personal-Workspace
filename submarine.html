@@ -15,8 +15,8 @@
       <p>從第一艘 Rank 1 開始，逐步開圖、登記四艘，記錄燃料與修理材料。</p>
     </div>
     <div class="toolbar">
-      <button id="export-data" type="button">匯出紀錄</button>
-      <button id="import-data-button" type="button">匯入紀錄</button>
+      <button id="export-data" type="button">匯出完整備份</button>
+      <button id="import-data-button" type="button">匯入完整備份</button>
       <input id="import-data" type="file" accept="application/json,.json" hidden>
     </div>
   </header>
@@ -39,6 +39,25 @@
     <section class="panel">
       <div class="section-title"><div><h2>船隊進度</h2><p class="hint">Rank 20 的 J、Rank 30 的 O、Rank 40 的 T 可依序解鎖第 2、3、4 艘登記名額。可勾選已登記艘數；若有待開前置點，計算器會動態挑一艘可跑到該點的船開圖，其餘船優先練等。</p></div></div>
       <div id="fleet" class="fleet-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>當前派船計算器</h2>
+      <p class="hint">每天返航後更新四艘的 Rank、EXP 與海圖，再按計算。依實際可收／派船時間窗口計算下次收船時機（例如 19:00 出航的 26 小時航線，可以明天 21:00 收船）。系統依你輸入的 0003 套數，跨船比較可行的 1111／1121／1123／3123 配置，將有限配件優先分配給能增加整隊 OJ 營運船日、縮短最後畢業時間的船。需要開圖時，仍優先安排最多兩艘符合條件的船；航行中的配件會被保留。若已達 Rank 85 的船還裝著 0003，必須先實際換成 3124 並更新紀錄後，才可借給其他船。這是逐趟前瞻估算，不保證長期全局最佳。</p>
+      <div class="calc-controls">
+        <label>回航時間上限
+          <select id="calc-hours"><option value="24">24 小時</option><option value="36">36 小時</option><option value="48" selected>48 小時</option></select>
+        </label>
+        <label>估算目標 Rank <input id="calc-target-rank" type="number" min="2" max="90" value="85"></label>
+        <label class="build-check"><input id="daily-pickup" type="checkbox" checked>依每日可收船時段最佳化</label>
+        <label>每天可收船開始 <input id="pickup-start" type="time" value="19:00"></label>
+        <label>每天可收船結束 <input id="pickup-end" type="time" value="22:00"></label>
+        <label>預計本次派船時間 <input id="calc-departure-time" type="time" value="19:00"></label>
+        <button id="calc-routes" type="button">計算全艦隊配件與派船建議</button>
+      </div>
+      <div id="ship-builds" class="build-grid"></div>
+      <div id="calc-result" class="result">載入海域資料後即可計算；開放點預設只有溺沒海 A、B。</div>
+      
     </section>
 
     <section class="panel" id="return-settlement">
@@ -75,27 +94,13 @@
         <button id="settle-save" class="primary-action" type="button">確認返航並同步更新</button>
         <button id="settle-reset" type="button">清空這次結算</button>
       </div>
-      <p class="hint">返航後 Rank／EXP 請以遊戲顯示的數值為準；不會再把「本趟獲得 EXP」重複加上去。物資只會在按下確認時扣除一次。原本下方的手動出航紀錄仍可使用，請勿把同一趟重複登記。</p>
+      <p class="hint">返航後 Rank／EXP 請以遊戲顯示的數值為準；不會再把「本趟獲得 EXP」重複加上去。物資只會在按下確認時扣除一次。歷史出航紀錄（包含舊版本）統一保留在本區下方，無需重複登記。</p>
       <div class="settle-status" id="settle-status" role="status" aria-live="polite"></div>
-    </section>
-
-    <section class="panel">
-      <h2>當前派船計算器</h2>
-      <p class="hint">每天返航後更新四艘的 Rank、EXP 與海圖，再按計算。依實際可收／派船時間窗口計算下次收船時機（例如 19:00 出航的 26 小時航線，可以明天 21:00 收船）。系統依你輸入的 0003 套數，跨船比較可行的 1111／1121／1123／3123 配置，將有限配件優先分配給能增加整隊 OJ 營運船日、縮短最後畢業時間的船。需要開圖時，仍優先安排最多兩艘符合條件的船；航行中的配件會被保留。若已達 Rank 85 的船還裝著 0003，必須先實際換成 3124 並更新紀錄後，才可借給其他船。這是逐趟前瞻估算，不保證長期全局最佳。</p>
-      <div class="calc-controls">
-        <label>回航時間上限
-          <select id="calc-hours"><option value="24">24 小時</option><option value="36">36 小時</option><option value="48" selected>48 小時</option></select>
-        </label>
-        <label>估算目標 Rank <input id="calc-target-rank" type="number" min="2" max="90" value="85"></label>
-        <label class="build-check"><input id="daily-pickup" type="checkbox" checked>依每日可收船時段最佳化</label>
-        <label>每天可收船開始 <input id="pickup-start" type="time" value="19:00"></label>
-        <label>每天可收船結束 <input id="pickup-end" type="time" value="22:00"></label>
-        <label>預計本次派船時間 <input id="calc-departure-time" type="time" value="19:00"></label>
-        <button id="calc-routes" type="button">計算全艦隊配件與派船建議</button>
-      </div>
-      <div id="ship-builds" class="build-grid"></div>
-      <div id="calc-result" class="result">載入海域資料後即可計算；開放點預設只有溺沒海 A、B。</div>
-      
+      <details class="settlement-history">
+        <summary>查看全部出航／返航歷史（包含舊紀錄）</summary>
+        <div id="log-summary" class="result"></div>
+        <div class="table-wrap" id="log-table"></div>
+      </details>
     </section>
 
     <section class="panel">
@@ -113,27 +118,6 @@
       </table></div>
     </section>
 
-    <section class="panel">
-      <h2>手動記錄一趟出航（保留舊功能）</h2>
-      <p class="hint">此處只存出航紀錄並扣庫存，不會更新 Rank／本 Rank EXP 或開圖；若已使用上方返航結算，同一趟不必在這裡再登記。</p>
-      <div class="log-form">
-        <label>日期 <input id="log-date" type="date"></label>
-        <label>潛水艇 <select id="log-ship"><option value="1">潛水艇 1</option><option value="2">潛水艇 2</option><option value="3">潛水艇 3</option><option value="4">潛水艇 4</option></select></label>
-        <label>航線／海域代碼 <input id="log-route" placeholder="例：B → E → J"></label>
-        <label>獲得 EXP <input id="log-exp" type="number" min="0" step="1" placeholder="可留白"></label>
-        <label>實耗燃料 <input id="log-fuel" type="number" min="0" step="1" placeholder="以出航畫面為準"></label>
-        <label>修理材料 <input id="log-repair" type="number" min="0" step="1" placeholder="本次實際消耗"></label>
-        <label class="wide">備註 <input id="log-note" placeholder="新開海域、回收時間、裝備更換等"></label>
-      </div>
-      <div class="row">
-        <button id="save-log" type="button">儲存出航紀錄</button>
-        <button id="clear-log-form" type="button">清空欄位</button>
-      </div>
-      <p class="hint">儲存時會從庫存扣掉填入的燃料與修理材料；如果當趟沒有修理，就填 0。數字以遊戲中的實耗紀錄為準。</p>
-      <div id="log-summary" class="result"></div>
-      <div class="table-wrap" id="log-table"></div>
-    </section>
-
     <section class="panel sources">
       <h2>資料來源與估算邊界</h2>
       <ul>
@@ -143,11 +127,11 @@
         <li><a href="https://submarine.girin.dev/en/guide/unlock-route/" target="_blank" rel="noreferrer">海圖解鎖順序與跨海域門檻</a></li>
         <li><a href="https://eu.finalfantasyxiv.com/lodestone/topics/detail/0004e37e08808a84652bcbf942f8ac40cfea7e12" target="_blank" rel="noreferrer">官方潛水艇與燃料說明</a></li>
       </ul>
-      <p class="hint">資料以目前可查的 Patch 7.56 社群路線為基準。這個頁面只在目前瀏覽器保存紀錄；用「匯出紀錄」備份 JSON，換裝置時再匯入。</p>
+      <p class="hint">資料以目前可查的 Patch 7.56 社群路線為基準。這個頁面以目前瀏覽器儲存資料。完整 JSON 備份包含船隊 Rank／EXP、配件與在航狀態、物資、已開海圖、全部出航歷史，以及派船計算器設定；未按「確認返航」的暫存輸入不算正式紀錄。舊版備份也能匯入。</p>
     </section>
   </main>
-  <script src="submarine.js?v=20261011-4"></script>
-  <script src="submarine-calculator.js?v=20261011-5"></script>
-  <script src="submarine-settlement.js?v=20261011-5"></script>
+  <script src="submarine.js?v=20261011-6"></script>
+  <script src="submarine-calculator.js?v=20261011-6"></script>
+  <script src="submarine-settlement.js?v=20261011-6"></script>
 </body>
 </html>
