@@ -196,11 +196,12 @@ function nextMapProgress(open){
 // 目標是增加全艦隊的 OJ 營運船日，並降低最後一艘畢業拖延。
 // 這是逐趟啟發式排程，非已證明的全航程最優解。
 function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, daily){
- const ready=plans.filter(p=>!p.ship.voyaging&&p.rank<targetRank);
- // 每艘只有四種已驗證配置，因此可以窮舉整隊當次所有組合。
- const missing=[];
- for(const p of ready)if(!p.choices.length)missing.push(p.ship.index+1);
- if(missing.length)return {chosen:new Map(),missing,reason:'部分船沒有符合目前海圖／Rank／時間上限的航線'};
+ const requested=plans.filter(p=>!p.ship.voyaging&&p.rank<targetRank);
+ // 仍然替其他可派船計算；單艘沒有可行航線不應拖垮整個船隊。
+ const missing=requested.filter(p=>!p.choices.length).map(p=>p.ship.index+1);
+ const ready=requested.filter(p=>p.choices.length);
+ if(!ready.length)return {chosen:new Map(),missing,
+  reason:missing.length?'潛艇 '+missing.join('、')+' 找不到可行航線，請檢查海圖／Rank／回航上限。':null};
  let best=null;
  const decisions=new Map();
  function evaluate(usage,gateCount,gateTurns){
@@ -231,7 +232,7 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
  }
  walk(0,fixedUsage,0,0);
  if(!best)return {chosen:new Map(),missing:ready.map(p=>p.ship.index+1),reason:'實際零件庫存不足，無法讓所有返航船同時配裝出航'};
- return {chosen:new Map(best.entries.map(x=>[x.plan.ship.index,x.option])),missing:[],best,reason:null};
+ return {chosen:new Map(best.entries.map(x=>[x.plan.ship.index,x.option])),missing,best,reason:missing.length?'潛艇 '+missing.join('、')+' 找不到可行航線，其他船仍正常推薦。':null};
 }
 function estimatedFinishDays(plan,option,targetRank,daily){
  const rem=remainingToTarget(plan.ship,targetRank);
