@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>FF14 潛水艇養成計畫</title>
-  <link rel="stylesheet" href="submarine.css?v=20261011-1">
+  <link rel="stylesheet" href="submarine.css?v=20261011-4">
 </head>
 <body>
   <header>
@@ -39,6 +39,44 @@
     <section class="panel">
       <div class="section-title"><div><h2>船隊進度</h2><p class="hint">Rank 20 的 J、Rank 30 的 O、Rank 40 的 T 可依序解鎖第 2、3、4 艘登記名額。可勾選已登記艘數；若有待開前置點，計算器會動態挑一艘可跑到該點的船開圖，其餘船優先練等。</p></div></div>
       <div id="fleet" class="fleet-grid"></div>
+    </section>
+
+    <section class="panel" id="return-settlement">
+      <div class="section-title">
+        <div>
+          <h2>⚓ 返航結算</h2>
+          <p class="hint">收船後填一次即可同步更新船隊 Rank／本 Rank EXP、出航紀錄、庫存和新開航點。上方「船隊進度」仍可隨時手動修改。</p>
+        </div>
+      </div>
+      <div class="settlement-form" id="settle-form">
+        <label>返航日期 <input id="settle-date" type="date" required></label>
+        <label>潛水艇
+          <select id="settle-ship">
+            <option value="1">潛水艇 1</option><option value="2">潛水艇 2</option>
+            <option value="3">潛水艇 3</option><option value="4">潛水艇 4</option>
+          </select>
+        </label>
+        <label>航線／海域代碼（選填）<input id="settle-route" placeholder="例：溺沒海 B → E → J"></label>
+        <label>返航後 Rank <input id="settle-rank" type="number" min="1" max="145" step="1" required></label>
+        <label>返航後本 Rank EXP <input id="settle-exp" type="number" min="0" step="1" required></label>
+        <label>本趟獲得 EXP（選填）<input id="settle-gain" type="number" min="0" step="1" placeholder="用來記錄航線實測效率"></label>
+        <label>本趟消耗燃料 <input id="settle-fuel" type="number" min="0" step="1" placeholder="未填視為 0"></label>
+        <label>本趟消耗修理材料 <input id="settle-repair" type="number" min="0" step="1" placeholder="未填視為 0"></label>
+        <label class="settle-sector-field">這趟新開的航點（沒有就留空）
+          <span class="settle-sector-picker">
+            <select id="settle-sector-picker" aria-label="選擇新開的航點"><option value="">載入航點中…</option></select>
+            <button id="settle-sector-add" type="button">加入航點</button>
+          </span>
+        </label>
+        <div class="settle-chips" id="settle-sector-chips" aria-live="polite">本趟沒有新增航點。</div>
+        <label class="settle-wide">備註（選填）<input id="settle-note" placeholder="例：升級、更換配件、開圖備註"></label>
+      </div>
+      <div class="row">
+        <button id="settle-save" class="primary-action" type="button">確認返航並同步更新</button>
+        <button id="settle-reset" type="button">清空這次結算</button>
+      </div>
+      <p class="hint">返航後 Rank／EXP 請以遊戲顯示的數值為準；不會再把「本趟獲得 EXP」重複加上去。物資只會在按下確認時扣除一次。原本下方的手動出航紀錄仍可使用，請勿把同一趟重複登記。</p>
+      <div class="settle-status" id="settle-status" role="status" aria-live="polite"></div>
     </section>
 
     <section class="panel">
@@ -76,7 +114,8 @@
     </section>
 
     <section class="panel">
-      <h2>記錄一趟出航</h2>
+      <h2>手動記錄一趟出航（保留舊功能）</h2>
+      <p class="hint">此處只存出航紀錄並扣庫存，不會更新 Rank／本 Rank EXP 或開圖；若已使用上方返航結算，同一趟不必在這裡再登記。</p>
       <div class="log-form">
         <label>日期 <input id="log-date" type="date"></label>
         <label>潛水艇 <select id="log-ship"><option value="1">潛水艇 1</option><option value="2">潛水艇 2</option><option value="3">潛水艇 3</option><option value="4">潛水艇 4</option></select></label>
@@ -107,7 +146,7 @@
       <p class="hint">資料以目前可查的 Patch 7.56 社群路線為基準。這個頁面只在目前瀏覽器保存紀錄；用「匯出紀錄」備份 JSON，換裝置時再匯入。</p>
     </section>
   </main>
-  <script src="submarine.js?v=20261011-2"></script>
+  <script src="submarine.js?v=20261011-4"></script>
   <script src="submarine-calculator.js?v=20261011-3"></script>
 </body>
 </html>
