@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>FF14 潛水艇養成計畫</title>
-  <link rel="stylesheet" href="submarine.css?v=20261011-9">
+  <link rel="stylesheet" href="submarine.css?v=20261012-1">
 </head>
 <body>
   <header>
@@ -105,7 +105,7 @@
         <button id="settle-save" class="primary-action" type="button">確認返航並同步更新</button>
         <button id="settle-reset" type="button">清空這次結算</button>
       </div>
-      <p class="hint">返航後 Rank／EXP 請以遊戲顯示的數值為準；不會再把「本趟獲得 EXP」重複加上去。物資只會在按下確認時扣除一次。歷史出航紀錄（包含舊版本）統一保留在本區下方，無需重複登記。</p>
+      <p class="hint">貼上航行文字只協助預填部分欄位，Rank／本 Rank EXP 仍以遊戲畫面為準；不會再把「本趟獲得 EXP」重複加上去。物資只會在按下確認時扣除一次。歷史出航紀錄（包含舊版本）統一保留在本區下方，無需重複登記。</p>
       <div class="settle-status" id="settle-status" role="status" aria-live="polite"></div>
       <details id="ledger-details" class="settlement-history">
         <summary>收益帳本／每月掉落估值（展開才計算）</summary>
@@ -154,9 +154,9 @@
       <p class="hint">資料以目前可查的 Patch 7.56 社群路線為基準。這個頁面以目前瀏覽器儲存資料。完整 JSON 備份包含船隊 Rank／EXP、配件與在航狀態、物資、已開海圖、全部出航歷史，以及派船計算器設定；未按「確認返航」的暫存輸入不算正式紀錄。舊版備份也能匯入。</p>
     </section>
   </main>
-  <script src="submarine.js?v=20261011-9"></script>
+  <script src="submarine.js?v=20261012-1"></script>
   <script src="submarine-calculator.js?v=20261011-8"></script>
   <script src="submarine-settlement.js?v=20261012-1"></script>
-  <script defer src="submarine-ledger.js?v=20261012-1"></script>
+  <script defer src="submarine-ledger.js?v=20261012-2"></script>
 </body>
 </html>
