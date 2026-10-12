@@ -107,6 +107,19 @@
       </div>
       <p class="hint">返航後 Rank／EXP 請以遊戲顯示的數值為準；不會再把「本趟獲得 EXP」重複加上去。物資只會在按下確認時扣除一次。歷史出航紀錄（包含舊版本）統一保留在本區下方，無需重複登記。</p>
       <div class="settle-status" id="settle-status" role="status" aria-live="polite"></div>
+      <details id="ledger-details" class="settlement-history">
+        <summary>收益帳本／每月掉落估值（展開才計算）</summary>
+        <p class="hint">估值依手動設定單價計算，不代表實際出售收入；未設定價格視為 0，不影響練等建議。</p>
+        <label>月份 <input id="ledger-month" type="month"></label>
+        <div id="ledger-summary" class="result"></div>
+        <div class="table-wrap" id="ledger-rows"></div>
+        <div class="row">
+          <label>物品名稱 <input id="ledger-price-name" placeholder="例如打撈物"></label>
+          <label>每件 Gil <input id="ledger-price-value" type="number" value="0" min="0" step="1"></label>
+          <button type="button" id="ledger-price-save">儲存單價</button>
+        </div>
+        <p id="ledger-price-status" class="hint"></p>
+      </details>
       <details class="settlement-history">
         <summary>查看全部出航／返航歷史（包含舊紀錄）</summary>
         <div id="log-summary" class="result"></div>
@@ -143,6 +156,7 @@
   </main>
   <script src="submarine.js?v=20261011-9"></script>
   <script src="submarine-calculator.js?v=20261011-8"></script>
-  <script src="submarine-settlement.js?v=20261011-8"></script>
+  <script src="submarine-settlement.js?v=20261012-1"></script>
+  <script defer src="submarine-ledger.js?v=20261012-1"></script>
 </body>
 </html>
