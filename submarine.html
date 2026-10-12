@@ -79,7 +79,7 @@
         <div class="settle-route-select">
           <label>航線海圖 <select id="loot-map"><option value="1">溺沒海</option><option value="2">灰海</option><option value="3">翠浪海</option></select></label>
           <label>航線代碼 <input id="loot-route-input" type="text" maxlength="30" placeholder="ABE、OJ 或 A,AA,AB" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
-          <div class="settle-route-summary" id="loot-points" aria-live="polite">輸入 ABE、OJ；雙字母航點請用 A,AA,AB</div>
+          <div class="settle-route-summary" id="loot-points" aria-live="polite"></div>
           <input id="settle-route" type="hidden" value="">
         </div>
         <label>返航後 Rank <input id="settle-rank" type="number" min="1" max="145" step="1" required></label>
@@ -156,7 +156,7 @@
 
     <section class="panel">
       <h2>已開啟海域（計算器使用）</h2>
-      <p class="hint">在海圖上直接點選海域圓點切換已開／未開。未開點不會被派入航線；探索開點有隨機性，實際發現後再點一次標記為已開。</p>
+      
       <div id="sector-unlocks" class="sector-unlocks"></div>
     </section>
 
@@ -169,8 +169,8 @@
       </table></div>
     </section>
 
-    <section class="panel sources">
-      <h2>資料來源與估算邊界</h2>
+    <details class="panel sources">
+      <summary>資料來源與估算說明</summary>
       <ul>
         <li><a href="https://github.com/shambarick/mogship-core" target="_blank" rel="noreferrer">海域／Rank 計算資料（MIT；本工具採用海圖 1–3，需附授權）</a></li>
         <li><a href="https://nettoge.com/ff14-submarine-routes/" target="_blank" rel="noreferrer">Rank 區間練等與 O→J 路線（2026-09 更新）</a></li>
@@ -178,8 +178,8 @@
         <li><a href="https://submarine.girin.dev/en/guide/unlock-route/" target="_blank" rel="noreferrer">海圖解鎖順序與跨海域門檻</a></li>
         <li><a href="https://eu.finalfantasyxiv.com/lodestone/topics/detail/0004e37e08808a84652bcbf942f8ac40cfea7e12" target="_blank" rel="noreferrer">官方潛水艇與燃料說明</a></li>
       </ul>
-      <p class="hint">資料以目前可查的 Patch 7.56 社群路線為基準。這個頁面以目前瀏覽器儲存資料。完整 JSON 備份包含船隊 Rank／EXP、配件與在航狀態、物資、已開海圖、全部出航歷史，以及派船計算器設定；未按「確認返航」的暫存輸入不算正式紀錄。舊版備份也能匯入。</p>
-    </section>
+      <p class="hint">資料儲存在此瀏覽器；建議定期匯出完整備份。路線與時間為估算，實際以遊戲為準。</p>
+    </details>
   </main>
   <script src="submarine.js?v=20261012-2"></script>
   <script src="submarine-calculator.js?v=20261011-8"></script>
