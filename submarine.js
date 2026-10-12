@@ -23,6 +23,7 @@ const save=()=>{
   const latest=JSON.parse(localStorage.getItem(KEY)||'{}');
   if(Object.prototype.hasOwnProperty.call(latest,'plannerSettings'))state.plannerSettings=latest.plannerSettings;
   if(Object.prototype.hasOwnProperty.call(latest,'activeSectorMap'))state.activeSectorMap=latest.activeSectorMap;
+  if(latest.lootPrices)state.lootPrices=latest.lootPrices;
   if(latest.unlocks&&typeof latest.unlocks==='object')state.unlocks=latest.unlocks;
  }catch(e){}
  localStorage.setItem(KEY,JSON.stringify(state));render();window.dispatchEvent(new Event('submarine-state-updated'));
