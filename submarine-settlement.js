@@ -92,6 +92,7 @@ function num(id,name,required=false,max=Number.MAX_SAFE_INTEGER){
 }
 function commit(){
  try{
+  window.SubmarineRouteEntry?.validate();
   const s=read(),shipNo=Number($('settle-ship').value),ship=s.ships[shipNo-1];
   if(!ship?.registered)throw new Error('這艘船還沒登記，請先在上方「船隊進度」勾選已登記。');
   const date=$('settle-date').value;
