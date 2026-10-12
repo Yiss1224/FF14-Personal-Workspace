@@ -4,7 +4,7 @@ const KEY='ff14_submarine_planner_v1';
 const $=id=>document.getElementById(id);
 const labels={1:'溺沒海',2:'灰海',3:'翠浪海'};
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let sectors=null,chosen=new Set();
+let sectors=null,chosen=new Set(),justSaved=false;
 function today(){
  const d=new Date();
  return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
@@ -30,7 +30,7 @@ function status(message,isError=false){
  el.textContent=message;
  el.className='settle-status '+(message?(isError?'settle-error':'settle-success'):'');
 }
-function resetButton(){$('settle-save').disabled=false}
+function resetButton(){if(!justSaved)$('settle-save').disabled=false}
 function shipLabel(index,ship){
  const name=typeof ship?.name==='string'?ship.name.trim():'';
  return '潛水艇 '+(index+1)+(name?' · '+name:'');
@@ -91,6 +91,7 @@ function num(id,name,required=false,max=Number.MAX_SAFE_INTEGER){
  return n;
 }
 function commit(){
+ if(justSaved)return status('這趟已結算。如需登記下一趟，請先切換船隻或按「清空這次結算」。',true);
  try{
   window.SubmarineRouteEntry?.validate();
   const s=read(),shipNo=Number($('settle-ship').value),ship=s.ships[shipNo-1];
@@ -125,7 +126,8 @@ function commit(){
   window.dispatchEvent(new Event('submarine-settlement-saved'));
   window.dispatchEvent(new Event('submarine-state-updated'));
   clearForm();
-  $('settle-save').disabled=true; // 防止沒有修改欄位時重複送出
+  justSaved=true;
+  $('settle-save').disabled=true; // 必須切船或清空表單才可登記下一趟
   status(shipLabel(shipNo-1,ship)+' 已結算：Rank '+rank+'、本 Rank EXP '+exp.toLocaleString()
     +'；開啟 '+newlyOpened.length+' 個航點。已同步更新船隊、出航紀錄及庫存。');
  }catch(e){status(e.message,true)}
@@ -133,21 +135,21 @@ function commit(){
 function init(){
  $('settle-date').value=today();
  refreshShipOptions();
- $('settle-ship').onchange=()=>{chosen=new Set();refreshShip();refreshPoints();status('')};
+ $('settle-ship').onchange=()=>{justSaved=false;clearForm();window.dispatchEvent(new Event('submarine-settlement-reset'));status('')};
  $('settle-sector-add').onclick=()=>{
   const id=Number($('settle-sector-picker').value);
   if(!id||!sectors?.some(p=>p.id===id))return;
   chosen.add(id);resetButton();refreshPoints();
  };
  $('settle-save').onclick=commit;
- $('settle-reset').onclick=()=>{clearForm();window.dispatchEvent(new Event('submarine-settlement-reset'));status('')};
+ $('settle-reset').onclick=()=>{justSaved=false;clearForm();window.dispatchEvent(new Event('submarine-settlement-reset'));status('')};
  $('settle-form').addEventListener('input',resetButton);
  $('settle-form').addEventListener('change',resetButton);
  window.addEventListener('submarine-build-state-updated',refreshPoints);
  window.addEventListener('submarine-state-updated',()=>{
   refreshShipOptions();refreshPoints();
  });
- window.addEventListener('submarine-data-imported',()=>{refreshShipOptions();clearForm();status('已載入備份；返航結算已切換到匯入的船隊資料。')});
+ window.addEventListener('submarine-data-imported',()=>{justSaved=false;refreshShipOptions();clearForm();status('已載入備份；返航結算已切換到匯入的船隊資料。')});
  refreshShip();refreshPoints();
  fetch('submarine-route-data.json').then(r=>{
   if(!r.ok)throw new Error('HTTP '+r.status);
