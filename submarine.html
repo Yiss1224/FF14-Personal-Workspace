@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>FF14 潛水艇養成計畫</title>
-  <link rel="stylesheet" href="submarine.css?v=20261012-2">
+  <link rel="stylesheet" href="submarine.css?v=20261012-3">
 </head>
 <body>
   <header>
@@ -68,12 +68,6 @@
           <p class="hint">收船後填一次即可同步更新船隊 Rank／本 Rank EXP、出航紀錄、庫存和新開航點。上方「船隊進度」仍可隨時手動修改。</p>
         </div>
       </div>
-      <details class="voyage-paste"><summary>貼上返航文字，自動預填（測試版）</summary>
-        <p class="hint">辨識結果請自行核對；未辨識的原文會保留顯示，並不會直接儲存。</p>
-        <textarea id="voyage-raw-text" rows="5" placeholder="貼上遊戲內航行紀錄"></textarea>
-        <div class="row"><button id="voyage-parse" type="button">辨識並預填</button><span id="voyage-parse-status"></span></div>
-        <pre id="voyage-unmatched"></pre>
-      </details>
       <div class="settlement-form" id="settle-form">
         <label>返航日期 <input id="settle-date" type="date" required></label>
         <label>潛水艇
@@ -82,7 +76,14 @@
             <option value="3">潛水艇 3</option><option value="4">潛水艇 4</option>
           </select>
         </label>
-        <label>航線／海域代碼（選填）<input id="settle-route" placeholder="例：溺沒海 B → E → J"></label>
+        <div class="settle-route-select">
+          <label>航線海圖 <select id="loot-map"><option value="1">溺沒海</option><option value="2">灰海</option><option value="3">翠浪海</option></select></label>
+          <label>航點 <select id="loot-point"><option value="">載入中…</option></select></label>
+          <button id="loot-add-point" type="button">＋ 加入航點</button>
+          <button id="loot-clear-points" type="button">清空航線</button>
+          <div class="settle-route-summary" id="loot-points" aria-live="polite">尚未選擇航點</div>
+          <input id="settle-route" type="hidden" value="">
+        </div>
         <label>返航後 Rank <input id="settle-rank" type="number" min="1" max="145" step="1" required></label>
         <label>返航後本 Rank EXP <input id="settle-exp" type="number" min="0" step="1" required></label>
         <label>本趟獲得 EXP（選填）<input id="settle-gain" type="number" min="0" step="1" placeholder="用來記錄航線實測效率"></label>
@@ -95,34 +96,27 @@
           </span>
         </label>
         <div class="settle-chips" id="settle-sector-chips" aria-live="polite">本趟沒有新增航點。</div>
+        <div class="settle-loot-section">
+          <h3>本趟打撈物品（選填）</h3>
+          <p class="hint">依上方航線顯示可能掉落物；直接選物品與實際數量。名稱使用灰機 Wiki 簡轉繁資料，也可手動新增。</p>
+          <div class="row">
+            <label>掉落物 <select id="loot-select-item"><option value="">請先選擇航點</option></select></label>
+            <label>實際數量 <input id="loot-selected-qty" type="number" min="1" step="1" value="1"></label>
+            <button id="loot-add-selected" type="button">加入本趟掉落物</button>
+          </div>
+          <p id="loot-candidates" class="hint"></p>
+          <p id="loot-select-status" class="hint" role="status"></p>
+          <div id="voyage-loot-rows"></div>
+          <button id="voyage-add-item" type="button">＋ 手動新增物品</button>
+        </div>
+
         <label class="settle-wide">備註（選填）<input id="settle-note" placeholder="例：升級、更換配件、開圖備註"></label>
       </div>
-      <details id="loot-helper" class="voyage-loot">
-        <summary>依這趟航線選擇掉落物（灰機 Wiki）</summary>
-        <p class="hint">選這趟造訪的航點，僅顯示可能掉落的物品。物品名稱取自灰機 Wiki 的簡中資料並作初步繁體轉換，實際名稱請依台服顯示確認。</p>
-        <div class="row">
-          <label>海圖 <select id="loot-map"><option value="1">溺沒海</option><option value="2">灰海</option><option value="3">翠浪海</option></select></label>
-          <button type="button" id="loot-from-route">從上方航線帶入航點</button>
-        </div>
-        <div class="row"><label>航點 <select id="loot-point"></select></label>
-          <button id="loot-add-point" type="button">＋ 加入航點</button>
-          <button id="loot-clear-points" type="button">清空航點</button></div>
-        <p class="hint" id="loot-points"></p>
-        <div class="row"><label>掉落物 <select id="loot-select-item"></select></label>
-          <label>實際數量 <input id="loot-selected-qty" type="number" min="1" step="1" value="1"></label>
-          <button id="loot-add-selected" type="button">加入本趟掉落物</button></div>
-        <p id="loot-candidates" class="hint"></p><p id="loot-select-status" class="hint" role="status"></p>
-        <p class="hint">資料來源：<a target="_blank" rel="noreferrer" href="https://ff14.huijiwiki.com/wiki/Data:%E8%A1%A5%E5%85%85%E6%95%B0%E6%8D%AE/%E6%BD%9C%E6%B0%B4%E8%89%87.tabx">灰機 Wiki 潛水艇資料</a>。目前收錄溺沒海 A–Y、灰海 A–T、翠浪海 A–T，其他航點可手動輸入。</p>
-      </details>
-      <details class="voyage-loot" open><summary>本趟打撈物品（選填）</summary>
-        <div id="voyage-loot-rows"></div>
-        <button id="voyage-add-item" type="button">＋ 新增物品</button>
-      </details>
       <div class="row">
         <button id="settle-save" class="primary-action" type="button">確認返航並同步更新</button>
         <button id="settle-reset" type="button">清空這次結算</button>
       </div>
-      <p class="hint">貼上航行文字只協助預填部分欄位，Rank／本 Rank EXP 仍以遊戲畫面為準；不會再把「本趟獲得 EXP」重複加上去。物資只會在按下確認時扣除一次。歷史出航紀錄（包含舊版本）統一保留在本區下方，無需重複登記。</p>
+      <p class="hint">請確認返航後 Rank／本 Rank EXP 與實際掉落數量；不會再把「本趟獲得 EXP」重複加上去。物資只會在按下確認時扣除一次。歷史出航紀錄（包含舊版本）統一保留在本區下方，無需重複登記。</p>
       <div class="settle-status" id="settle-status" role="status" aria-live="polite"></div>
       <details id="ledger-details" class="settlement-history">
         <summary>收益帳本／每月掉落估值（展開才計算）</summary>
@@ -174,7 +168,7 @@
   <script src="submarine.js?v=20261012-1"></script>
   <script src="submarine-calculator.js?v=20261011-8"></script>
   <script src="submarine-settlement.js?v=20261012-1"></script>
-  <script defer src="submarine-ledger.js?v=20261012-3"></script>
-  <script defer src="submarine-drop-select.js?v=20261012-2"></script>
+  <script defer src="submarine-ledger.js?v=20261012-4"></script>
+  <script defer src="submarine-drop-select.js?v=20261012-3"></script>
 </body>
 </html>
