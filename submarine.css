@@ -148,3 +148,15 @@ th{font-size:13px;background:#f6f8fb}
 .ship-rename-actions button{padding:5px 10px;font-size:12px}
 @media(max-width:420px){.ship .head{flex-wrap:wrap}.ship-head-actions{margin-left:auto}.ship-head-actions .checkbox{white-space:nowrap}}
 @media(prefers-color-scheme:dark){.ship-rename-editor{background:#252c36;border-color:#414b59}}
+
+/* Return-log add-on: compact inputs, no expensive animations or extra libraries. */
+.voyage-paste,.voyage-loot{margin:12px 0;padding:10px;border:1px solid #dce4ef;border-radius:9px}
+.voyage-paste summary,.voyage-loot summary{cursor:pointer;font-weight:600}
+.voyage-paste textarea{display:block;width:100%;box-sizing:border-box;margin:10px 0;min-height:110px;resize:vertical;font:inherit}
+#voyage-unmatched{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;font-size:12px}
+.loot-line{display:grid;grid-template-columns:minmax(110px,1fr) 85px auto;gap:7px;margin:8px 0;align-items:center}
+.loot-line input{width:100%;min-width:0;box-sizing:border-box}
+.loot-line button{white-space:nowrap}
+#ledger-details>.row{margin:10px 0}
+@media(max-width:480px){.loot-line{grid-template-columns:minmax(80px,1fr) 65px auto;gap:4px}.loot-line button{padding:6px}}
+@media(prefers-color-scheme:dark){.voyage-paste,.voyage-loot{border-color:#414b59}}
