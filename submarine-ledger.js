@@ -31,7 +31,7 @@ function clear(){loot=[];$('voyage-raw-text').value='';$('voyage-parse-status').
 function values(){
  return loot.filter(x=>x.name).map(x=>{
   if(!Number.isSafeInteger(x.qty)||x.qty<1)throw Error('掉落物數量必須是正整數');
-  return {name:x.name,qty:x.qty};
+  return {name:x.name.slice(0,140),qty:x.qty};
  });
 }
 function monthly(){
@@ -48,7 +48,7 @@ function monthly(){
 $('voyage-parse').onclick=()=>{
  const x=parse($('voyage-raw-text').value);
  for(const [k,id] of Object.entries({gain:'settle-gain',fuel:'settle-fuel',repair:'settle-repair'}))if(x.fields[k]!==undefined)$(id).value=x.fields[k];
- loot.push(...x.items);render();
+ loot=x.items;render();
  $('voyage-parse-status').textContent='辨識 '+x.items.length+' 筆物品，預填 '+Object.keys(x.fields).length+' 個欄位。請確認後再儲存。';
  $('voyage-unmatched').textContent=x.unknown.join('\n');
 };
