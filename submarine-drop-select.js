@@ -31,7 +31,7 @@ function update(){
 }
 async function load(){
  if(loading)return loading;
- loading=fetch('submarine-drop-data.json?v=20261012-2').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(result=>{data=result;update()}).catch(e=>{
+ loading=fetch('submarine-drop-data.json?v=20261012-3').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(result=>{data=result;update()}).catch(e=>{
   $('loot-select-status').textContent='航點掉落資料載入失敗，可手動新增物品：'+e.message;
   loading=null;update();
  });
