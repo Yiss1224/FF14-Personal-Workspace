@@ -37,12 +37,12 @@ function values(){
 function monthly(){
  const s=read(),logs=(s.logs||[]).filter(l=>String(l.date||'').startsWith($('ledger-month').value));
  const price=s.lootPrices||{};
- let total=0,lines=[];
+ let total=0,lines=[],byShip=[0,0,0,0];
  for(const l of logs){
   const value=(l.loot||[]).reduce((sum,x)=>sum+x.qty*(price[x.name]||0),0);
-  total+=value;lines.push('<tr><td>'+esc(l.date)+'</td><td>'+l.ship+'</td><td>'+esc((l.loot||[]).map(x=>x.name+' × '+x.qty).join('、'))+'</td><td>'+value.toLocaleString()+'</td></tr>');
+  total+=value;if(l.ship>=1&&l.ship<=4)byShip[l.ship-1]+=value;lines.push('<tr><td>'+esc(l.date)+'</td><td>'+l.ship+'</td><td>'+esc((l.loot||[]).map(x=>x.name+' × '+x.qty).join('、'))+'</td><td>'+value.toLocaleString()+'</td></tr>');
  }
- $('ledger-summary').textContent=logs.length+' 趟／預估掉落價值 '+total.toLocaleString()+' Gil（非實際售出收入）';
+ $('ledger-summary').textContent=logs.length+' 趟／估值 '+total.toLocaleString()+' Gil（非已售收入、未扣成本）。船隊估值：'+byShip.map((v,i)=>(i+1)+' 號 '+v.toLocaleString()).join('／')+' Gil。';
  $('ledger-rows').innerHTML='<table><tr><th>日期</th><th>艇</th><th>掉落</th><th>價值</th></tr>'+lines.reverse().join('')+'</table>';
 }
 $('voyage-parse').onclick=()=>{
