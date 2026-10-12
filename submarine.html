@@ -128,6 +128,22 @@
           <button type="button" id="ledger-price-save">儲存單價</button>
         </div>
         <p id="ledger-price-status" class="hint"></p>
+        <div class="market-prices">
+          <h3>材料市價（Universalis）</h3>
+          <p class="hint">換金用的上等沉船飾品會自動以 NPC 固定售價計算，不需要查市場。其他材料需先對應物品 ID 才會查價；未對應或查不到的不計入估值。舊有手動定價會優先於市場行情。</p>
+          <div class="row"><label>查價伺服器
+            <select id="market-world">
+              <option value="陸行鳥">陸行鳥資料中心</option><option value="4028">伊弗利特</option>
+              <option value="4029">迦樓羅</option><option value="4030">利維坦</option>
+              <option value="4031">鳳凰</option><option value="4032">奧汀</option>
+              <option value="4033">巴哈姆特</option><option value="4034">拉姆</option><option value="4035">泰坦</option>
+            </select></label>
+            <button id="market-refresh" type="button">更新材料市價</button>
+          </div>
+          <p id="market-status" class="hint" role="status"></p>
+          <div id="market-items" class="market-items"></div>
+          <p class="hint">NPC 價格：戒指 27,000、手鐲 28,500、耳飾 30,000、項鍊 34,500 Gil／件。市場行情只在按更新時連線查詢，不會拖慢原本的派船計算。</p>
+        </div>
       </details>
       <details class="settlement-history">
         <summary>查看全部出航／返航歷史（包含舊紀錄）</summary>
@@ -166,7 +182,8 @@
   <script src="submarine.js?v=20261012-1"></script>
   <script src="submarine-calculator.js?v=20261011-8"></script>
   <script src="submarine-settlement.js?v=20261012-2"></script>
-  <script defer src="submarine-ledger.js?v=20261012-4"></script>
+  <script defer src="submarine-ledger.js?v=20261012-5"></script>
   <script defer src="submarine-drop-select.js?v=20261012-7"></script>
+  <script defer src="submarine-prices.js?v=20261012-1"></script>
 </body>
 </html>
