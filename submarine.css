@@ -160,3 +160,10 @@ th{font-size:13px;background:#f6f8fb}
 #ledger-details>.row{margin:10px 0}
 @media(max-width:480px){.loot-line{grid-template-columns:minmax(80px,1fr) 65px auto;gap:4px}.loot-line button{padding:6px}}
 @media(prefers-color-scheme:dark){.voyage-paste,.voyage-loot{border-color:#414b59}}
+
+/* Lazy sector-drop picker: preserve compact mobile layout. */
+#loot-helper .row{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin:10px 0}
+#loot-helper label{min-width:0;max-width:100%;flex:1 1 170px}
+#loot-helper select{max-width:100%;width:100%}
+#loot-helper input{max-width:100%;box-sizing:border-box}
+#loot-helper button{flex:0 0 auto}
