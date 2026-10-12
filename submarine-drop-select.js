@@ -14,6 +14,16 @@ function parseRoute(value,known){
  if(unknown.length)return {points:[],error:'找不到航點：'+[...new Set(unknown)].join('、')+'。請檢查海圖與代碼。'};
  return {points:tokens,error:''};
 }
+function showPrice(){
+ const sel=$('loot-select-item'),name=sel._names?.[Number(sel.value)];
+ const display=$('loot-price-preview');
+ if(!sel.value||!name){display.textContent='選擇物品即可查看單價與本筆估值。';return}
+ const found=window.SubmarinePrices?.lookup(name);
+ const qty=Number($('loot-selected-qty').value);
+ if(!found||!Number.isFinite(Number(found.price))){display.textContent=name+'：尚未查價。可在下方收益帳本設定物品 ID、更新行情或手動定價。';return}
+ const price=Number(found.price);
+ display.textContent=name+'｜'+price.toLocaleString()+' Gil／件（'+found.source+'）'+(Number.isSafeInteger(qty)&&qty>0?'｜'+qty+' 件合計 '+(price*qty).toLocaleString()+' Gil':'｜請輸入有效數量');
+}
 function update(){
  const map=$('loot-map').value,raw=$('loot-route-input').value;
  const known=data?.maps?.[map]||{},result=parseRoute(raw,known);
@@ -39,6 +49,7 @@ function update(){
  $('loot-select-item').innerHTML='<option value="">選擇打撈物品…</option>'+sorted.map((n,i)=>'<option value="'+i+'">'+esc(n)+'</option>').join('');
  $('loot-select-item')._names=sorted;
  $('loot-candidates').textContent=points.length?'此航線有 '+sorted.length+' 種候選物品（按 Wiki 收錄資料）':'輸入有效航線後即可選擇可能的掉落物。';
+ showPrice();
 }
 async function load(){
  if(loading)return loading;
@@ -56,6 +67,9 @@ fetch('submarine-route-data.json').then(r=>{if(!r.ok)throw Error('HTTP '+r.statu
  }
  update();
 }).catch(()=>{$('settle-fuel-info').textContent='燃料資料載入失敗，請手動輸入。'});
+$('loot-select-item').onchange=showPrice;
+$('loot-selected-qty').oninput=showPrice;
+window.addEventListener('submarine-prices-updated',showPrice);
 $('loot-map').onchange=update;
 $('loot-route-input').oninput=update;
 $('loot-route-input').onchange=()=>{$('loot-route-input').value=$('loot-route-input').value.trim().toUpperCase();update()};
