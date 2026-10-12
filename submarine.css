@@ -167,3 +167,15 @@ th{font-size:13px;background:#f6f8fb}
 #loot-helper select{max-width:100%;width:100%}
 #loot-helper input{max-width:100%;box-sizing:border-box}
 #loot-helper button{flex:0 0 auto}
+
+/* Unified return entry: route and loot are inline grid sections. */
+.settle-route-select,.settle-loot-section{grid-column:1/-1;min-width:0;display:flex;gap:9px;flex-wrap:wrap;align-items:end;padding:10px 0}
+.settle-route-select label{flex:1 1 125px;min-width:105px}
+.settle-route-select select{max-width:100%;width:100%}
+.settle-route-summary{flex-basis:100%;min-height:28px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.settle-route-summary .settle-chip{cursor:pointer}
+.settle-loot-section{display:block;border-top:1px solid var(--border,#a8adba);margin-top:8px}
+.settle-loot-section h3{font-size:1rem;margin:0 0 6px}
+.settle-loot-section .row{display:flex;gap:9px;flex-wrap:wrap;align-items:end}
+.settle-loot-section .row label{min-width:120px;flex:1 1 150px}
+.settle-loot-section select{width:100%;max-width:100%}
