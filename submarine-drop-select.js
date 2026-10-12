@@ -1,64 +1,49 @@
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
-let data=null,started=false,chosen=[];
 const labels={1:'溺沒海',2:'灰海',3:'翠浪海'};
-const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function options(){
- const map=$('loot-map').value,rows=data?.maps?.[map]||{};
- $('loot-point').innerHTML=Object.keys(rows).sort().map(k=>'<option value="'+k+'">'+k+'</option>').join('');
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let data=null,points=[],loading=null;
+function setRoute(){
+ const map=$('loot-map').value;
+ $('settle-route').value=points.length?labels[map]+' '+points.join(' → '):'';
+ $('loot-points').innerHTML=points.length?points.map((p,i)=>'<button type="button" class="settle-chip" data-route-index="'+i+'" title="移除這個航點">'+esc(p)+' ×</button>').join(''):'尚未選擇航點';
+ $('loot-points').querySelectorAll('[data-route-index]').forEach(b=>b.onclick=()=>{points.splice(Number(b.dataset.routeIndex),1);update()});
 }
-function render(){
- const map=$('loot-map').value,rows=data?.maps?.[map]||{};
- $('loot-points').textContent=chosen.length?'已選航點：'+chosen.join(' → '):'尚未指定這趟航線的航點';
- const all=new Map();
- for(const letter of chosen){
-  const tiers=rows[letter]||[];
-  tiers.forEach((names,i)=>names.forEach(name=>{
-   if(!all.has(name))all.set(name,{points:[],tier:[]});
-   const x=all.get(name);x.points.push(letter);x.tier.push(['低','中','高'][i]);
-  }));
- }
- const sorted=[...all.keys()].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
- $('loot-select-item').innerHTML='<option value="">選擇這趟實際拿到的物品…</option>'+
-  sorted.map((name,i)=>'<option value="'+i+'">'+esc(name)+'</option>').join('');
+function update(){
+ setRoute();
+ const rows=data?.maps?.[$('loot-map').value]||{};
+ const names=new Set();
+ for(const p of points)for(const tier of rows[p]||[])for(const item of tier)names.add(item);
+ const sorted=[...names].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+ $('loot-select-item').innerHTML='<option value="">選擇打撈物品…</option>'+sorted.map((n,i)=>'<option value="'+i+'">'+esc(n)+'</option>').join('');
  $('loot-select-item')._names=sorted;
- $('loot-candidates').textContent='候選 '+sorted.length+' 種物品；物品可能同時來自多個航點，數量請依遊戲實際結果填寫。';
+ $('loot-candidates').textContent=points.length?'此航線有 '+sorted.length+' 種候選物品（按 Wiki 收錄資料）':'加入航點後即可選擇可能的掉落物。';
 }
-function routePoints(){
- const raw=$('settle-route').value.toUpperCase().trim();
- const s=$('loot-map'),match=raw.match(/溺沒海|灰海|翠浪海/);
- if(match)s.value=Object.keys(labels).find(k=>labels[k]===match[0])||s.value;
- options();
- const rows=data?.maps?.[s.value]||{};
- let tokens=raw.match(/(?:^|[^A-Z])([A-Z])(?=$|[^A-Z])/g)||[];
- tokens=tokens.map(x=>x.trim()).filter(x=>rows[x]);
- chosen=[...new Set(tokens)];
- render();
+function fillPoints(){
+ const rows=data?.maps?.[$('loot-map').value]||{};
+ $('loot-point').innerHTML=Object.keys(rows).sort().map(p=>'<option value="'+p+'">'+p+'</option>').join('')||'<option value="">尚無航點資料</option>';
 }
-async function init(){
- if(started)return;started=true;
- try{
-  const res=await fetch('submarine-drop-data.json?v=20261012-2',{cache:'force-cache'});
-  if(!res.ok)throw Error('HTTP '+res.status);
-  data=await res.json();options();render();
-  $('loot-select-status').textContent='已載入 3 張海圖（共 65 個航點）的 Wiki 掉落清單。台服名稱請以遊戲為準；部分航點的 Wiki 資料可能為空。';
- }catch(e){$('loot-select-status').textContent='無法載入掉落資料：'+e.message+'。仍可手動新增物品。';}
+async function load(){
+ if(loading)return loading;
+ loading=fetch('submarine-drop-data.json?v=20261012-2').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(result=>{
+  data=result;fillPoints();update();
+ }).catch(e=>{$('loot-select-status').textContent='航點掉落資料載入失敗，可用「手動新增物品」：'+e.message;loading=null});
+ return loading;
 }
-$('loot-helper').addEventListener('toggle',()=>{if($('loot-helper').open)init()});
-$('loot-map').onchange=()=>{chosen=[];options();render()};
-$('loot-from-route').onclick=()=>{init().then(routePoints)};
-$('loot-add-point').onclick=()=>{if(!data)return;const point=$('loot-point').value;if(point&&!chosen.includes(point))chosen.push(point);render()};
-$('loot-clear-points').onclick=()=>{chosen=[];render()};
+$('loot-map').onchange=()=>{points=[];fillPoints();update()};
+$('loot-add-point').onclick=()=>{const p=$('loot-point').value;if(p&&data?.maps?.[$('loot-map').value]?.[p]&&!points.includes(p)){points.push(p);update()}};
+$('loot-clear-points').onclick=()=>{points=[];update()};
 $('loot-add-selected').onclick=()=>{
- const selected=$('loot-select-item').value,index=Number(selected),names=$('loot-select-item')._names||[];
- const name=names[index],qty=Number($('loot-selected-qty').value);
- if(selected===''||!name||!Number.isSafeInteger(qty)||qty<1||qty>1000000){$('loot-select-status').textContent='請選擇物品並填寫正整數數量。';return}
- if(!window.SubmarineLootDraft?.addItem){$('loot-select-status').textContent='掉落物表單尚未準備好。';return}
+ const select=$('loot-select-item'),index=Number(select.value),name=select._names?.[index],qty=Number($('loot-selected-qty').value);
+ if(select.value===''||!name||!Number.isSafeInteger(qty)||qty<1||qty>1000000){$('loot-select-status').textContent='請選擇掉落物並輸入有效的正整數數量。';return}
+ if(!window.SubmarineLootDraft?.addItem){$('loot-select-status').textContent='掉落物表單尚未載入。';return}
  window.SubmarineLootDraft.addItem(name,qty);
- $('loot-select-status').textContent='已加入 '+name+' × '+qty+'；請核對返航結算欄位。';
+ $('loot-select-status').textContent='已加入 '+name+' × '+qty;
 };
-window.addEventListener('submarine-settlement-saved',()=>{chosen=[];render()});
-window.addEventListener('submarine-settlement-reset',()=>{chosen=[];render()});
-window.addEventListener('submarine-data-imported',()=>{chosen=[];render()});
+function clear(){points=[];setRoute();update();$('loot-select-status').textContent=''}
+window.addEventListener('submarine-settlement-saved',clear);
+window.addEventListener('submarine-settlement-reset',clear);
+window.addEventListener('submarine-data-imported',clear);
+load();
 })();
