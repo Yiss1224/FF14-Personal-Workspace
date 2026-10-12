@@ -97,6 +97,10 @@
         <div class="settle-chips" id="settle-sector-chips" aria-live="polite">本趟沒有新增航點。</div>
         <label class="settle-wide">備註（選填）<input id="settle-note" placeholder="例：升級、更換配件、開圖備註"></label>
       </div>
+      <details class="voyage-loot" open><summary>本趟打撈物品（選填）</summary>
+        <div id="voyage-loot-rows"></div>
+        <button id="voyage-add-item" type="button">＋ 新增物品</button>
+      </details>
       <div class="row">
         <button id="settle-save" class="primary-action" type="button">確認返航並同步更新</button>
         <button id="settle-reset" type="button">清空這次結算</button>
