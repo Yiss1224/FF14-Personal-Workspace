@@ -39,7 +39,7 @@ async function refresh(){
  if(pending)return;pending=true;$('market-refresh').disabled=true;
  try{
   const state=load(),world=$('market-world').value;
-  state.marketWorld=world;localStorage.setItem(KEY,JSON.stringify(state));
+  if(state.marketWorld&&state.marketWorld!==world)live={};state.marketWorld=world;localStorage.setItem(KEY,JSON.stringify(state));
   const ids=state.lootItemIds||{};
   const inverse=new Map();
   for(const [name,id] of Object.entries(ids))if(Number.isSafeInteger(Number(id))&&Number(id)>0&&!Object.prototype.hasOwnProperty.call(npc,name)){
