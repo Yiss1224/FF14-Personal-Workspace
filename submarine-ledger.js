@@ -4,11 +4,22 @@ const KEY='ff14_submarine_planner_v1',$=id=>document.getElementById(id);
 let loot=[];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const read=()=>JSON.parse(localStorage.getItem(KEY)||'{}');
+function renderTotal(){
+ let total=0,missing=new Set();
+ for(const x of loot){
+  if(!x.name||!Number.isSafeInteger(Number(x.qty))||Number(x.qty)<1)continue;
+  const unit=window.SubmarinePrices?.lookup(x.name)?.price;
+  if(typeof unit==='number'&&Number.isFinite(unit))total+=unit*Number(x.qty);
+  else missing.add(x.name);
+ }
+ $('voyage-loot-total').textContent='本趟掉落總估值：'+total.toLocaleString('en-US')+' Gil'+(missing.size?'（'+missing.size+' 種未查價，未計入）':'')+'｜非實際售出收入';
+}
 function render(){
  $('voyage-loot-rows').innerHTML=loot.map((x,i)=>'<div class="loot-line"><input data-loot-name="'+i+'" value="'+esc(x.name)+'" placeholder="物品名稱"><input data-loot-qty="'+i+'" type="number" min="1" value="'+x.qty+'"><button data-loot-remove="'+i+'" type="button">移除</button></div>').join('');
- $('voyage-loot-rows').querySelectorAll('[data-loot-name]').forEach(el=>el.onchange=()=>loot[+el.dataset.lootName].name=el.value.trim());
- $('voyage-loot-rows').querySelectorAll('[data-loot-qty]').forEach(el=>el.onchange=()=>loot[+el.dataset.lootQty].qty=Number(el.value));
+ $('voyage-loot-rows').querySelectorAll('[data-loot-name]').forEach(el=>el.onchange=()=>(loot[+el.dataset.lootName].name=el.value.trim(),renderTotal()));
+ $('voyage-loot-rows').querySelectorAll('[data-loot-qty]').forEach(el=>el.onchange=()=>(loot[+el.dataset.lootQty].qty=Number(el.value),renderTotal()));
  $('voyage-loot-rows').querySelectorAll('[data-loot-remove]').forEach(el=>el.onclick=()=>{loot.splice(+el.dataset.lootRemove,1);render()});
+ renderTotal();
 }
 function clear(){loot=[];render()}
 function values(){
@@ -43,12 +54,12 @@ $('ledger-details').addEventListener('toggle',()=>{if(!$('ledger-details').open)
  monthly();
 });
 $('ledger-month').onchange=monthly;
-window.addEventListener('submarine-prices-updated',()=>{if($('ledger-details').open)monthly()});
+window.addEventListener('submarine-prices-updated',()=>{renderTotal();if($('ledger-details').open)monthly()});
 $('ledger-price-save').onclick=()=>{
  const name=$('ledger-price-name').value.trim(),p=Number($('ledger-price-value').value);
  if(!name||!Number.isSafeInteger(p)||p<0){alert('物品名稱及價格格式不符');return}
  const s=read();s.lootPrices=s.lootPrices||{};s.lootPrices[name]=p;
- localStorage.setItem(KEY,JSON.stringify(s));monthly();$('ledger-price-status').textContent=name+'：'+p+' Gil／件，已儲存。';
+ localStorage.setItem(KEY,JSON.stringify(s));renderTotal();monthly();$('ledger-price-status').textContent=name+'：'+p+' Gil／件，已儲存。';
 };
 render();
 })();
