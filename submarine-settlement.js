@@ -107,6 +107,7 @@ function commit(){
    throw new Error('返航後 Rank／EXP 低於船隊現有進度；如需校正歷史資料，請先從上方手動欄位修改。');
   if(fuel>Number(s.fuel||0))throw new Error('燃料庫存不足，請確認用量或先在上方補正庫存。');
   if(repair>Number(s.repair||0))throw new Error('修理材料庫存不足，請確認用量或先在上方補正庫存。');
+  const loot=window.SubmarineLootDraft?window.SubmarineLootDraft.getItems():[];
   const newlyOpened=sectors?[...chosen].map(id=>sectors.find(x=>x.id===id)).filter(Boolean)
    .filter(p=>!opened(p,s)).map(p=>({id:p.id,label:labels[p.map]+' '+p.letter})):[];
   if(chosen.size&&!sectors)throw new Error('航點清單尚未載入，請改到海圖手動更新。');
@@ -114,7 +115,7 @@ function commit(){
    kind:'settlement',date,ship:shipNo,route:$('settle-route').value.trim(),
    exp:gained??0,fuel,repair,note:$('settle-note').value.trim(),
    rankBefore:Number(ship.rank)||1,expBefore:Number(ship.exp)||0,
-   rankAfter:rank,expAfter:exp,openedSectors:newlyOpened
+   rankAfter:rank,expAfter:exp,openedSectors:newlyOpened,loot
   });
   s.fuel=Number(s.fuel||0)-fuel;s.repair=Number(s.repair||0)-repair;
   ship.rank=rank;ship.exp=exp;ship.voyaging=false;
@@ -138,7 +139,7 @@ function init(){
   chosen.add(id);resetButton();refreshPoints();
  };
  $('settle-save').onclick=commit;
- $('settle-reset').onclick=()=>{clearForm();status('')};
+ $('settle-reset').onclick=()=>{clearForm();window.dispatchEvent(new Event('submarine-settlement-reset'));status('')};
  $('settle-form').addEventListener('input',resetButton);
  $('settle-form').addEventListener('change',resetButton);
  window.addEventListener('submarine-build-state-updated',refreshPoints);
