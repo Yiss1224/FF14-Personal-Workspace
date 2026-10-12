@@ -51,9 +51,9 @@ $('loot-from-route').onclick=()=>{init().then(routePoints)};
 $('loot-add-point').onclick=()=>{if(!data)return;const point=$('loot-point').value;if(point&&!chosen.includes(point))chosen.push(point);render()};
 $('loot-clear-points').onclick=()=>{chosen=[];render()};
 $('loot-add-selected').onclick=()=>{
- const index=Number($('loot-select-item').value),names=$('loot-select-item')._names||[];
+ const selected=$('loot-select-item').value,index=Number(selected),names=$('loot-select-item')._names||[];
  const name=names[index],qty=Number($('loot-selected-qty').value);
- if(!name||!Number.isSafeInteger(qty)||qty<1||qty>1000000){$('loot-select-status').textContent='請選擇物品並填寫正整數數量。';return}
+ if(selected===''||!name||!Number.isSafeInteger(qty)||qty<1||qty>1000000){$('loot-select-status').textContent='請選擇物品並填寫正整數數量。';return}
  if(!window.SubmarineLootDraft?.addItem){$('loot-select-status').textContent='掉落物表單尚未準備好。';return}
  window.SubmarineLootDraft.addItem(name,qty);
  $('loot-select-status').textContent='已加入 '+name+' × '+qty+'；請核對返航結算欄位。';
