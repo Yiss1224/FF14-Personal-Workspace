@@ -20,12 +20,17 @@ function values(){
 function monthly(){
  const s=read(),logs=(s.logs||[]).filter(l=>String(l.date||'').startsWith($('ledger-month').value));
  const price=s.lootPrices||{};
- let total=0,lines=[],byShip=[0,0,0,0];
+ let total=0,lines=[],byShip=[0,0,0,0],unpriced=new Set();
  for(const l of logs){
-  const value=(l.loot||[]).reduce((sum,x)=>sum+x.qty*(price[x.name]||0),0);
+  const value=(l.loot||[]).reduce((sum,x)=>{
+   const record=window.SubmarinePrices?.lookup(x.name);
+   const unit=record?.price??(Number.isFinite(Number(price[x.name]))?Number(price[x.name]):null);
+   if(unit===null||unit===undefined){unpriced.add(x.name);return sum;}
+   return sum+x.qty*unit;
+  },0);
   total+=value;if(l.ship>=1&&l.ship<=4)byShip[l.ship-1]+=value;lines.push('<tr><td>'+esc(l.date)+'</td><td>'+l.ship+'</td><td>'+esc((l.loot||[]).map(x=>x.name+' × '+x.qty).join('、'))+'</td><td>'+value.toLocaleString()+'</td></tr>');
  }
- $('ledger-summary').textContent=logs.length+' 趟／估值 '+total.toLocaleString()+' Gil（非已售收入、未扣成本）。船隊估值：'+byShip.map((v,i)=>(i+1)+' 號 '+v.toLocaleString()).join('／')+' Gil。';
+ $('ledger-summary').textContent=logs.length+' 趟／估值 '+total.toLocaleString()+' Gil（非已售收入、未扣成本）。船隊估值：'+byShip.map((v,i)=>(i+1)+' 號 '+v.toLocaleString()).join('／')+' Gil。'+(unpriced.size?' 未查價 '+unpriced.size+' 種，未計入估值。':'');
  $('ledger-rows').innerHTML='<table><tr><th>日期</th><th>艇</th><th>掉落</th><th>價值</th></tr>'+lines.reverse().join('')+'</table>';
 }
 $('voyage-add-item').onclick=()=>{loot.push({name:'',qty:1});render()};
@@ -38,6 +43,7 @@ $('ledger-details').addEventListener('toggle',()=>{if(!$('ledger-details').open)
  monthly();
 });
 $('ledger-month').onchange=monthly;
+window.addEventListener('submarine-prices-updated',()=>{if($('ledger-details').open)monthly()});
 $('ledger-price-save').onclick=()=>{
  const name=$('ledger-price-name').value.trim(),p=Number($('ledger-price-value').value);
  if(!name||!Number.isSafeInteger(p)||p<0){alert('物品名稱及價格格式不符');return}
