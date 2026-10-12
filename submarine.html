@@ -12,7 +12,7 @@
     <div>
       <a class="back" href="index.html">← FF14 Personal Workspace</a>
       <h1>⚓ 潛水艇養成計畫</h1>
-      <p>從第一艘 Rank 1 開始，逐步開圖、登記四艘，記錄燃料與修理材料。</p>
+      
     </div>
     <div class="toolbar">
       <button id="export-data" type="button">匯出完整備份</button>
@@ -23,7 +23,7 @@
   <main>
     <section class="panel">
       <h2>養成目標與估算</h2>
-      <p class="hint">目標先設為 Rank 85，作為你先前規劃的金策門檻；計算器會以每艘船當下可跑的最高 EXP／時間航線為優先。Rank 85 後可切換 3124 跑 O→J 金策，但那不是最快練等線。</p>
+      
       <div class="stock-grid">
         <label>青燐水燃料庫存 <input id="fuel-stock" type="number" min="0" step="1"></label>
         <label>魔導機械修理材料庫存 <input id="repair-stock" type="number" min="0" step="1"></label>
@@ -33,17 +33,17 @@
         <label>0003 鯨級艦橋數量 <input id="parts-0003" type="number" min="0" step="1"></label>
       </div>
       <div id="estimate" class="estimate-grid"></div>
-      <p class="hint">計算器依實際航線停靠點計燃料與回航時間。EXP 預估先用海域基礎值；若你在紀錄中輸入該航線的實際 EXP，之後會優先用你的實測平均校正。</p>
+      
     </section>
 
     <section class="panel">
-      <div class="section-title"><div><h2>船隊進度</h2><p class="hint">Rank 20 的 J、Rank 30 的 O、Rank 40 的 T 可依序解鎖第 2、3、4 艘登記名額。在「已登記」左邊按「編輯名稱」即可改名，儲存後會同步至派船與返航結算；留空則恢復預設編號。可勾選已登記艘數；若有待開前置點，計算器會動態挑一艘可跑到該點的船開圖，其餘船優先練等。</p></div></div>
+      <div class="section-title"><div><h2>船隊進度</h2></div></div>
       <div id="fleet" class="fleet-grid"></div>
     </section>
 
     <section class="panel">
       <h2>當前派船計算器</h2>
-      <p class="hint">每天返航後更新四艘的 Rank、EXP 與海圖，再按計算。依實際可收／派船時間窗口計算下次收船時機（例如 19:00 出航的 26 小時航線，可以明天 21:00 收船）。系統依你輸入的 0003 套數，跨船比較可行的 1111／1121／1123／3123 配置，將有限配件優先分配給能增加整隊 OJ 營運船日、縮短最後畢業時間的船。需要開圖時，仍優先安排最多兩艘符合條件的船；航行中的配件會被保留。若已達 Rank 85 的船還裝著 0003，必須先實際換成 3124 並更新紀錄後，才可借給其他船。這是逐趟前瞻估算，不保證長期全局最佳。</p>
+      
       <div class="calc-controls">
         <label>回航時間上限
           <select id="calc-hours"><option value="24">24 小時</option><option value="36">36 小時</option><option value="48">48 小時</option><option value="50">50 小時</option><option value="52">52 小時</option><option value="72" selected>72 小時（完整比較）</option></select>
@@ -54,7 +54,7 @@
         <label>每天可收船結束 <input id="pickup-end" type="time" value="22:00"></label>
         <label>預計本次派船時間 <input id="calc-departure-time" type="time" value="19:00"></label>
         <button id="calc-routes" type="button">計算全艦隊配件與派船建議</button>
-        <p class="hint calc-hours-help">航程上限只決定參與比較的候選路線，不代表一定派最長航程。以實際可收船窗口計算 EXP／等待週期：今天 19:00 出航 50 小時，後天 21:00 即可再派；若返航時間超過 22:00，則會計入等到下次上線的空檔。</p>
+        
       </div>
       <div id="ship-builds" class="build-grid"></div>
       <div id="calc-result" class="result">載入海域資料後即可計算；開放點預設只有溺沒海 A、B。</div>
@@ -65,7 +65,7 @@
       <div class="section-title">
         <div>
           <h2>⚓ 返航結算</h2>
-          <p class="hint">收船後填一次即可同步更新船隊 Rank／本 Rank EXP、出航紀錄、庫存和新開航點。上方「船隊進度」仍可隨時手動修改。</p>
+          
         </div>
       </div>
       <div class="settlement-form" id="settle-form">
@@ -84,10 +84,10 @@
         </div>
         <label>返航後 Rank <input id="settle-rank" type="number" min="1" max="145" step="1" required></label>
         <label>返航後本 Rank EXP <input id="settle-exp" type="number" min="0" step="1" required></label>
-        <label>本趟獲得 EXP（選填）<input id="settle-gain" type="number" min="0" step="1" placeholder="用來記錄航線實測效率"></label>
-        <label>本趟消耗燃料 <input id="settle-fuel" type="number" min="0" step="1" placeholder="依航線自動估算，可修改"><small id="settle-fuel-info" class="hint">輸入航線後自動估算燃料。</small></label>
-        <label>本趟消耗修理材料 <input id="settle-repair" type="number" min="0" step="1" placeholder="未填視為 0"></label>
-        <label class="settle-sector-field">這趟新開的航點（沒有就留空）
+        <label>本趟 EXP（選填）<input id="settle-gain" type="number" min="0" step="1" placeholder="用來記錄航線實測效率"></label>
+        <label>消耗燃料 <input id="settle-fuel" type="number" min="0" step="1" placeholder="依航線自動估算，可修改"><small id="settle-fuel-info" class="hint">輸入航線後自動估算燃料。</small></label>
+        <label>消耗修理材料 <input id="settle-repair" type="number" min="0" step="1" placeholder="未填視為 0"></label>
+        <label class="settle-sector-field">新開航點（選填）
           <span class="settle-sector-picker">
             <select id="settle-sector-picker" aria-label="選擇新開的航點"><option value="">載入航點中…</option></select>
             <button id="settle-sector-add" type="button">加入航點</button>
@@ -95,8 +95,8 @@
         </label>
         <div class="settle-chips" id="settle-sector-chips" aria-live="polite">本趟沒有新增航點。</div>
         <div class="settle-loot-section">
-          <h3>本趟打撈物品（選填）</h3>
-          <p class="hint">依上方航線顯示可能掉落物；直接選物品與實際數量。名稱使用灰機 Wiki 簡轉繁資料，也可手動新增。</p>
+          <h3>打撈物品</h3>
+          
           <div class="row">
             <label>掉落物 <select id="loot-select-item"><option value="">請先選擇航點</option></select></label>
             <label>實際數量 <input id="loot-selected-qty" type="number" min="1" step="1" value="1"></label>
@@ -116,11 +116,11 @@
         <button id="settle-save" class="primary-action" type="button">確認返航並同步更新</button>
         <button id="settle-reset" type="button">清空這次結算</button>
       </div>
-      <p class="hint">請確認返航後 Rank／本 Rank EXP 與實際掉落數量；不會再把「本趟獲得 EXP」重複加上去。物資只會在按下確認時扣除一次。歷史出航紀錄（包含舊版本）統一保留在本區下方，無需重複登記。</p>
+      
       <div class="settle-status" id="settle-status" role="status" aria-live="polite"></div>
       <details id="ledger-details" class="settlement-history">
-        <summary>收益帳本／每月掉落估值（展開才計算）</summary>
-        <p class="hint">估值依手動設定單價計算，不代表實際出售收入；未設定價格視為 0，不影響練等建議。</p>
+        <summary>收益帳本／月估值</summary>
+        
         <label>月份 <input id="ledger-month" type="month"></label>
         <div id="ledger-summary" class="result"></div>
         <div class="table-wrap" id="ledger-rows"></div>
@@ -132,7 +132,7 @@
         <p id="ledger-price-status" class="hint"></p>
         <div class="market-prices">
           <h3>材料市價（Universalis）</h3>
-          <p class="hint">換金用的普通／上等沉船飾品會自動以 NPC 固定售價計算，不需要查市場。其他材料需先對應物品 ID 才會查價；未對應或查不到的不計入估值。舊有手動定價會優先於市場行情。</p>
+          
           <div class="row"><label>查價伺服器
             <select id="market-world">
               <option value="陸行鳥">陸行鳥資料中心</option><option value="4028">伊弗利特</option>
@@ -144,11 +144,11 @@
           </div>
           <p id="market-status" class="hint" role="status"></p>
           <div id="market-items" class="market-items"></div>
-          <p class="hint">NPC 價格：一般戒指 8,000、手鐲 9,000、耳飾 10,000、項鍊 13,000；上等分別為 27,000、28,500、30,000、34,500 Gil／件。市場行情只在按更新時連線查詢，不會拖慢原本的派船計算。</p>
+          
         </div>
       </details>
       <details class="settlement-history">
-        <summary>查看全部出航／返航歷史（包含舊紀錄）</summary>
+        <summary>出航紀錄</summary>
         <div id="log-summary" class="result"></div>
         <div class="table-wrap" id="log-table"></div>
       </details>
@@ -162,7 +162,7 @@
 
     <section class="panel">
       <h2>建議練等航線參考</h2>
-      <p class="hint">下面保留常見 Rank 區間參考；實際派船請以上方計算器為準。</p>
+      
       <div class="table-wrap"><table>
         <thead><tr><th>Rank</th><th>海域</th><th>建議航線</th><th>備註</th></tr></thead>
         <tbody id="route-table"></tbody>
@@ -183,7 +183,7 @@
   </main>
   <script src="submarine.js?v=20261012-2"></script>
   <script src="submarine-calculator.js?v=20261011-8"></script>
-  <script src="submarine-settlement.js?v=20261012-2"></script>
+  <script src="submarine-settlement.js?v=20261012-10"></script>
   <script defer src="submarine-ledger.js?v=20261012-9"></script>
   <script defer src="submarine-drop-select.js?v=20261012-8"></script>
   <script defer src="submarine-prices.js?v=20261012-7"></script>
