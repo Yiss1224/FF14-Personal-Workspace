@@ -20,21 +20,11 @@ function names(){
  return [...all].filter(n=>!Object.prototype.hasOwnProperty.call(npc,n)).sort((a,b)=>a.localeCompare(b,'zh-Hant'));
 }
 function redraw(){
- const s=load(),ids={...catalogue,...(s.lootItemIds||{})},items=names();
+ const items=names();
  $('market-items').innerHTML=items.length?items.map(n=>{
-  const p=lookup(n),id=ids[n]||'';
-  return '<div class="market-item"><span>'+esc(n)+'</span><input type="number" min="1" step="1" data-market-id="'+esc(n)+'" value="'+id+'" placeholder="物品 ID" aria-label="Universalis 物品 ID"><small>'+esc(p?p.price.toLocaleString()+' Gil／'+p.source:'未查價')+'</small></div>'
- }).join(''):'<p class="hint">返航登記材料後，這裡會出現待對應的物品名稱。</p>';
- $('market-items').querySelectorAll('[data-market-id]').forEach(el=>el.onchange=()=>{
-  const id=Number(el.value),state=load(),n=el.dataset.marketId;
-  state.lootItemIds=state.lootItemIds||{};
-  if(el.value.trim()==='')delete state.lootItemIds[n];
-  else if(Number.isSafeInteger(id)&&id>0)state.lootItemIds[n]=id;
-  else {el.value=state.lootItemIds[n]||'';return}
-  localStorage.setItem(KEY,JSON.stringify(state));delete live[n];
-  window.dispatchEvent(new Event('submarine-prices-updated'));
-  redraw();
- });
+  const p=lookup(n);
+  return '<div class="market-item"><span>'+esc(n)+'</span><small>'+esc(p?p.price.toLocaleString()+' Gil／'+p.source:'未查價')+'</small></div>';
+ }).join(''):'<p class="hint">返航登記材料後，這裡會出現可查價的物品。</p>';
 }
 async function refresh(){
  if(pending)return;pending=true;$('market-refresh').disabled=true;
