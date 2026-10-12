@@ -68,6 +68,12 @@
           <p class="hint">收船後填一次即可同步更新船隊 Rank／本 Rank EXP、出航紀錄、庫存和新開航點。上方「船隊進度」仍可隨時手動修改。</p>
         </div>
       </div>
+      <details class="voyage-paste"><summary>貼上返航文字，自動預填（測試版）</summary>
+        <p class="hint">辨識結果請自行核對；未辨識的原文會保留顯示，並不會直接儲存。</p>
+        <textarea id="voyage-raw-text" rows="5" placeholder="貼上遊戲內航行紀錄"></textarea>
+        <div class="row"><button id="voyage-parse" type="button">辨識並預填</button><span id="voyage-parse-status"></span></div>
+        <pre id="voyage-unmatched"></pre>
+      </details>
       <div class="settlement-form" id="settle-form">
         <label>返航日期 <input id="settle-date" type="date" required></label>
         <label>潛水艇
