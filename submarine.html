@@ -78,8 +78,8 @@
         </label>
         <div class="settle-route-select">
           <label>航線海圖 <select id="loot-map"><option value="1">溺沒海</option><option value="2">灰海</option><option value="3">翠浪海</option></select></label>
-          <label>航線代碼 <input id="loot-route-input" type="text" maxlength="30" placeholder="例如 ABE、OJ" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
-          <div class="settle-route-summary" id="loot-points" aria-live="polite">輸入航點代碼，例如 ABE、OJ</div>
+          <label>航線代碼 <input id="loot-route-input" type="text" maxlength="30" placeholder="ABE、OJ 或 A,AA,AB" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+          <div class="settle-route-summary" id="loot-points" aria-live="polite">輸入 ABE、OJ；雙字母航點請用 A,AA,AB</div>
           <input id="settle-route" type="hidden" value="">
         </div>
         <label>返航後 Rank <input id="settle-rank" type="number" min="1" max="145" step="1" required></label>
@@ -167,6 +167,6 @@
   <script src="submarine-calculator.js?v=20261011-8"></script>
   <script src="submarine-settlement.js?v=20261012-2"></script>
   <script defer src="submarine-ledger.js?v=20261012-4"></script>
-  <script defer src="submarine-drop-select.js?v=20261012-4"></script>
+  <script defer src="submarine-drop-select.js?v=20261012-5"></script>
 </body>
 </html>
