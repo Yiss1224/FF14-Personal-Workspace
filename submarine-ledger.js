@@ -53,7 +53,7 @@ $('voyage-parse').onclick=()=>{
  $('voyage-unmatched').textContent=x.unknown.join('\n');
 };
 $('voyage-add-item').onclick=()=>{loot.push({name:'',qty:1});render()};
-window.SubmarineLootDraft={getItems:values,clear};
+window.SubmarineLootDraft={getItems:values,clear,addItem:(name,qty)=>{const old=loot.find(x=>x.name===name);if(old)old.qty=Number(old.qty)+qty;else loot.push({name,qty});render()}};
 window.addEventListener('submarine-settlement-saved',()=>{clear();if($('ledger-details').open)monthly()});
 window.addEventListener('submarine-settlement-reset',clear);
 window.addEventListener('submarine-data-imported',()=>{clear();if($('ledger-details').open)monthly()});
