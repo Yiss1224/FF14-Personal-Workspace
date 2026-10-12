@@ -3,7 +3,7 @@
 const $=id=>document.getElementById(id);
 const labels={1:'溺沒海',2:'灰海',3:'翠浪海'};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let data=null,loading=null,points=[];
+let data=null,loading=null,points=[],fuelData=null,lastAutoFuel=null;
 function parseRoute(value,known){
  const raw=String(value||'').trim().toUpperCase();
  if(!raw)return {points:[],error:''};
@@ -22,6 +22,17 @@ function update(){
  $('settle-route').value=points.length?labels[map]+' '+points.join(' → '):'';
  $('loot-points').textContent=!data?'載入航點資料中…':!raw.trim()?'輸入 ABE、OJ；雙字母航點用 A,AA,AB':!valid?result.error:'已選航線：'+points.join(' → ');
  $('loot-route-input').setCustomValidity(!data?'航點資料載入中':result.error);
+ const field=$('settle-fuel'),fuelPoints=points.map(p=>fuelData?.[map]?.[p]);
+ const ready=points.length>0&&fuelPoints.every(n=>Number.isSafeInteger(n)&&n>=0);
+ if(ready){
+  const fuel=fuelPoints.reduce((a,n)=>a+n,0);
+  field.value=String(fuel);lastAutoFuel=fuel;
+  $('settle-fuel-info').textContent='航線預估消耗 '+fuel+' 罐（可手動修正）';
+ }else{
+  if(lastAutoFuel!==null&&Number(field.value)===lastAutoFuel)field.value='';
+  lastAutoFuel=null;
+  $('settle-fuel-info').textContent=points.length?'燃料資料不足，請手動輸入。':'輸入有效航線後自動估算燃料。';
+ }
  const names=new Set();
  for(const p of points)for(const tier of known[p]||[])for(const item of tier)names.add(item);
  const sorted=[...names].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
@@ -37,6 +48,14 @@ async function load(){
  });
  return loading;
 }
+fetch('submarine-route-data.json').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(result=>{
+ fuelData={};
+ for(const sector of result.sectors||[]){
+  const map=String(sector.map),letter=String(sector.letter).toUpperCase();
+  (fuelData[map]??={})[letter]=Number(sector.fuel);
+ }
+ update();
+}).catch(()=>{$('settle-fuel-info').textContent='燃料資料載入失敗，請手動輸入。'});
 $('loot-map').onchange=update;
 $('loot-route-input').oninput=update;
 $('loot-route-input').onchange=()=>{$('loot-route-input').value=$('loot-route-input').value.trim().toUpperCase();update()};
@@ -50,7 +69,7 @@ window.SubmarineRouteEntry={validate:()=>{
  update();const input=$('loot-route-input');
  if(input.value.trim()&&!$('settle-route').value){input.reportValidity?.();throw Error('航線代碼無效，請先修正海圖或航點。')}
  }};
-function clear(){$('loot-route-input').value='';update();$('loot-select-status').textContent=''}
+function clear(){$('loot-route-input').value='';lastAutoFuel=null;update();$('loot-select-status').textContent=''}
 for(const name of ['submarine-settlement-saved','submarine-settlement-reset','submarine-data-imported'])window.addEventListener(name,clear);
 load();
 })();
