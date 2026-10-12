@@ -39,10 +39,10 @@ function routePoints(){
 async function init(){
  if(started)return;started=true;
  try{
-  const res=await fetch('submarine-drop-data.json?v=20261012-1',{cache:'force-cache'});
+  const res=await fetch('submarine-drop-data.json?v=20261012-2',{cache:'force-cache'});
   if(!res.ok)throw Error('HTTP '+res.status);
   data=await res.json();options();render();
-  $('loot-select-status').textContent='已載入 3 張海圖的部分掉落清單。溺沒海目前收錄 A–O；台服名稱請以遊戲為準。';
+  $('loot-select-status').textContent='已載入 3 張海圖（共 65 個航點）的 Wiki 掉落清單。台服名稱請以遊戲為準；部分航點的 Wiki 資料可能為空。';
  }catch(e){$('loot-select-status').textContent='無法載入掉落資料：'+e.message+'。仍可手動新增物品。';}
 }
 $('loot-helper').addEventListener('toggle',()=>{if($('loot-helper').open)init()});
