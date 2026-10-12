@@ -14,7 +14,7 @@ function lookup(name){
  const found=live[name];return found&&Number.isFinite(found.price)?found:null;
 }
 function names(){
- const s=load(),all=new Set();
+ const s=load(),all=new Set(Object.keys(catalogue));
  for(const l of s.logs||[])for(const x of l.loot||[])if(x.name)all.add(x.name);
  for(const n of Object.keys(s.lootItemIds||{}))all.add(n);
  return [...all].filter(n=>!Object.prototype.hasOwnProperty.call(npc,n)).sort((a,b)=>a.localeCompare(b,'zh-Hant'));
