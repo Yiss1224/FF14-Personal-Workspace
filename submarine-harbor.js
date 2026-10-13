@@ -164,7 +164,7 @@
     {type:'cart',weight:24,duration:14000},
     {type:'bubbles',weight:18,duration:7500},
     {type:'cat',weight:6,duration:11000},
-    {type:'tit',weight:5,duration:13500}
+    {type:'tit',weight:25,duration:13500}
   ];
   const shapes={
     gull:'<span class="gull-wing wing-left"></span><span class="gull-wing wing-right"></span>',
@@ -177,7 +177,7 @@
   let nextScene=null,cleanup=null;
   const rand=(lo,hi)=>lo+Math.random()*(hi-lo);
   function choose(){
-    const n=rand(0,105);let total=0;
+    const n=rand(0,125);let total=0;
     for(const scene of scenes){total+=scene.weight;if(n<total)return scene;}
     return scenes[0];
   }
@@ -212,12 +212,12 @@
       ambient.replaceChildren();cleanup=null;
     },scene.duration+150);
     // A moment of calm between events is deliberate.
-    schedule(scene.duration+rand(18000,52000));
+    schedule(scene.duration+rand(12000,28000));
   }
   function restartSceneLoop(){
     resetSceneTimers();
     if(ambient)ambient.replaceChildren();
-    if(!reduced()&&!document.hidden)schedule(rand(9000,22000));
+    if(!reduced()&&!document.hidden)schedule(rand(4000,9000));
   }
   function refresh(){
     render();
