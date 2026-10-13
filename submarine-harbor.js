@@ -25,7 +25,7 @@
   ).join('');
   const boats=[...fleetEl.querySelectorAll('[data-harbor-ship]')];
   const running=Array.from({length:4},()=>null);
-  let viewportWidth=0,hoveredIndex=-1;
+  let viewportWidth=0,hoveredIndex=-1,tooltipFrame=null;
   const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[ch]));
@@ -35,12 +35,19 @@
     return (days?days+' 天 ':'')+(hours||days?hours+' 小時 ':'')+mins+' 分鐘';
   }
   function positionTooltip(i){
-    if(!tooltip||i<0)return;
+    if(!tooltip||i<0||!boats[i])return;
     const r=boats[i].getBoundingClientRect();
     const width=window.innerWidth||document.documentElement.clientWidth||1200;
-    const mid=Math.max(115,Math.min(width-115,r.left+r.width/2));
+    const half=Math.min(tooltip.offsetWidth/2,(width-20)/2);
+    const mid=Math.max(half+10,Math.min(width-half-10,r.left+r.width/2));
     tooltip.style.left=mid+'px';
-    tooltip.style.top=Math.max(8,r.top-10)+'px';
+    tooltip.style.top=Math.max(tooltip.offsetHeight+8,r.top-10)+'px';
+  }
+  function followTooltip(){
+    tooltipFrame=null;
+    if(hoveredIndex<0||!tooltip||tooltip.hidden)return;
+    positionTooltip(hoveredIndex);
+    tooltipFrame=window.requestAnimationFrame(followTooltip);
   }
   function showTooltip(i){
     if(!tooltip||boats[i].hidden)return;
@@ -62,10 +69,12 @@
       '<dt>預計返航 ETA</dt><dd>'+esc(valid?fmt(eta):'—')+'</dd></dl>';
     tooltip.hidden=false;
     positionTooltip(i);
+    if(tooltipFrame===null)tooltipFrame=window.requestAnimationFrame(followTooltip);
   }
   function hideTooltip(i){
     if(hoveredIndex!==i||!tooltip)return;
     hoveredIndex=-1;tooltip.hidden=true;
+    if(tooltipFrame!==null){window.cancelAnimationFrame(tooltipFrame);tooltipFrame=null;}
   }
   boats.forEach((boat,i)=>{
     boat.addEventListener('mouseenter',()=>showTooltip(i));
