@@ -641,3 +641,52 @@ body{padding-bottom:85px}
 @media(prefers-reduced-motion:reduce){
   .cat-tail,.jelly-tentacles i{animation:none!important}
 }
+
+
+/* Whole-scene pixel pass: crisp blocks and stepped timing across every harbor motion. */
+#mini-harbor,#mini-harbor *{image-rendering:pixelated}
+.harbor-sea{background:linear-gradient(180deg,#32839a 0 12%,#24728b 12% 34%,#155c77 34% 70%,#0e455f 70% 100%)}
+.harbor-sea:before{opacity:.8}
+.harbor-sea:after{background:repeating-linear-gradient(90deg,transparent 0 30px,#b9edf044 30px 34px,transparent 34px 76px)}
+.harbor-quay{box-shadow:0 3px 0 #314d53,0 6px 0 #263f45}
+.harbor-crane-mast,.harbor-crane-jib,.harbor-crane-cab,.harbor-crane-counterweight,
+.harbor-crane-trolley,.harbor-crane-load,.harbor-crane-hook,.harbor-crane-wheel,
+.harbor-crate,.harbor-lamp:before,.harbor-lamp:after,.harbor-goal:before,
+.harbor-slip-wall,.harbor-slip-foreground,.harbor-worker .helmet,.harbor-worker .vest,
+.harbor-worker .legs,.harbor-sub-hull,.harbor-sub-fin,.harbor-conning,.harbor-periscope,
+.harbor-sub-window,.harbor-sub-flag span,.cart-box,.cart-wheel,.teleport-head,.teleport-torso{
+  border-radius:0!important
+}
+.harbor-crane-mast,.harbor-crane-jib{box-shadow:2px 2px 0 #294955}
+.harbor-crane-cab{box-shadow:2px 2px 0 #274857}
+.harbor-crane-wheel{border-width:3px}
+.harbor-crane-load{box-shadow:inset 0 2px #e0b983,2px 2px 0 #193d4e66}
+.harbor-crate{box-shadow:2px 2px 0 #543f35}
+.harbor-submarine{filter:drop-shadow(2px 2px 0 #092f4766)}
+.harbor-sub-hull{filter:drop-shadow(1px 2px 0 #0d3649)}
+.harbor-submarine .harbor-sprite{animation-timing-function:steps(4,end)}
+.harbor-sub-window{box-shadow:1px 1px 0 #385e68}
+.harbor-submarine.is-sailing .harbor-sub-hull{box-shadow:0 2px 0 #e3f9f670,1px 1px 0 #173d4e}
+.harbor-lamp-glow{border-radius:0;filter:none;
+  background:linear-gradient(90deg,transparent 0 28%,#ffd98322 28% 72%,transparent 72%),
+    linear-gradient(180deg,transparent 0 18%,#ffd98335 18% 70%,transparent 70%);
+  box-shadow:0 0 0 2px #ffd98312,0 0 0 5px #ffd9830a}
+.harbor-night .harbor-lamp:after{box-shadow:0 0 0 2px #ffdb89aa,0 0 0 4px #ffdb8944}
+.harbor-night .harbor-sub-window{box-shadow:0 0 0 2px #f6d18f88}
+.harbor-event{filter:drop-shadow(1px 2px 0 #17394c66)}
+.harbor-event-gull,.harbor-event-fish,.harbor-event-cart,.harbor-event-cat,
+.harbor-event-tit,.harbor-event-seal,.harbor-event-crab,.harbor-event-jelly,
+.harbor-event-catnap,.harbor-event-meteor,.harbor-event-paperboat,.harbor-event-interaction,
+.harbor-event-teleport{animation-timing-function:steps(10,end)!important}
+.harbor-event-gull .gull-wing,.tit-wing{animation-timing-function:steps(3,end)!important}
+.harbor-event-fish{filter:none}
+.bubble{border-radius:0;box-shadow:inset 1px 1px 0 #efffffaa,1px 1px 0 #72c8d255}
+.harbor-event-bubbles .bubble{animation-timing-function:steps(5,end)}
+.seal-ripple{border-radius:0}
+.jelly-tentacles i{animation-timing-function:steps(3,end)}
+.meteor-star,.teleport-rays,.teleport-particles{image-rendering:pixelated}
+.harbor-lamp-glow,.teleport-rays,.harbor-night .harbor-lamp:after{animation-timing-function:steps(4,end)}
+@keyframes harbor-wave{from{background-position:0 0}to{background-position:128px 0}}
+@media(prefers-reduced-motion:reduce){
+  #mini-harbor *,#mini-harbor *:before,#mini-harbor *:after{animation:none!important;transition:none!important}
+}
