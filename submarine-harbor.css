@@ -409,7 +409,7 @@ body{padding-bottom:85px}
    This foreground is stacked ABOVE the submarine sprites, making the lower
    hull look physically tucked inside its slip; water and timing stay intact. */
 .harbor-slip-foreground{
-  position:absolute;bottom:25px;width:32px;height:12px;
+  position:absolute;bottom:25px;width:18px;height:12px;
   pointer-events:none!important;z-index:2;
   background:repeating-linear-gradient(90deg,#b48c62 0 13px,#caa778 14px 16px,#a77d55 17px 30px);
   border-top:3px solid #ebc996;border-bottom:3px solid #74523e;
@@ -428,7 +428,7 @@ body{padding-bottom:85px}
   .harbor-slip-foreground{bottom:19px;height:10px;border-top-width:2px;border-bottom-width:2px}
 }
 @media(max-width:420px){
-  .harbor-slip-foreground{width:24px;border-left-width:2px}
+  .harbor-slip-foreground{width:14px;border-left-width:2px}
 }
 
 /* Departures dive clear of the finger piers before heading out to sea. */
