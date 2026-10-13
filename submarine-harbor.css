@@ -211,3 +211,23 @@ body{padding-bottom:85px}
   .harbor-boat{transition:none!important;will-change:auto}
   .harbor-lamp-glow{animation:none}
 }
+
+/* Tiny details to make extremely slow, real-time voyages feel alive at a glance. */
+.harbor-boat.is-sailing .harbor-sprite:after{animation:harbor-wake-pulse 2.8s ease-out infinite}
+.harbor-boat-flag span{transform-origin:left center;animation:harbor-flag-flutter 3.5s ease-in-out infinite alternate}
+@keyframes harbor-wake-pulse{
+  0%{opacity:.25;transform:scaleX(.5)}
+  55%{opacity:.8;transform:scaleX(1.35)}
+  100%{opacity:.18;transform:scaleX(1.85)}
+}
+@keyframes harbor-flag-flutter{to{transform:skewY(-7deg) scaleX(.94)}}
+@media(max-width:520px){
+  .harbor-boat{width:23px;height:31px}
+  .harbor-cabin{height:8px;bottom:12px}
+  .harbor-hull{height:12px}
+  .harbor-periscope{bottom:19px}
+  .harbor-boat-flag{bottom:23px}
+}
+@media(prefers-reduced-motion:reduce){
+  .harbor-boat-flag span,.harbor-boat.is-sailing .harbor-sprite:after{animation:none!important}
+}
