@@ -734,7 +734,7 @@ body{padding-bottom:85px}
   30%,35%{transform:rotate(360deg)}
   42%,48%{transform:rotate(540deg)}
   54%,60%{transform:rotate(720deg)}
-  70%,100%{transform:rotate(900deg)}
+  70%,100%{transform:rotate(720deg)}
 }
 @keyframes harbor-crane-wheel-work{
   0%,12%{transform:rotate(0)}
