@@ -30,3 +30,10 @@ body{padding-bottom:125px}
 @media(max-width:700px){.harbor-lane{grid-template-columns:110px 1fr;gap:6px}.harbor-body{padding:7px}.harbor-lane-title strong{font-size:11px}.harbor-lane-title small{font-size:9px}#mini-harbor{bottom:5px;width:calc(100vw - 12px)}}
 @media(max-width:500px){body{padding-bottom:165px}.harbor-lane{display:block}.harbor-lane-title{display:flex;align-items:center;justify-content:space-between;gap:5px}.harbor-waterway{height:24px}.harbor-boat{bottom:3px}.harbor-boat.sailing{animation:none}.harbor-body{max-height:230px}}
 @media(prefers-reduced-motion:reduce){.harbor-worker,.harbor-boat.sailing{animation:none}.harbor-boat{transition:none}}
+
+/* Departure action lives in each calculated route card. */
+.voyage-depart-actions{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border-top:1px solid var(--ui-border,#dce6ec);padding-top:12px;margin-top:14px}
+.voyage-depart-actions .route-meta{flex:1 1 210px}
+.voyage-depart-button{background:#147a7c;border-color:#147a7c;color:#fff;font-size:13px;padding:10px 18px;min-width:126px;font-weight:760}
+.voyage-depart-button:hover{background:#116264;border-color:#116264;color:#fff}
+@media(max-width:520px){.voyage-depart-button{width:100%}}
