@@ -164,7 +164,14 @@
     {type:'cart',weight:24,duration:14000},
     {type:'bubbles',weight:18,duration:7500},
     {type:'cat',weight:6,duration:11000},
-    {type:'tit',weight:25,duration:13500}
+    {type:'tit',weight:25,duration:13500},
+    {type:'seal',weight:15,duration:9000},
+    {type:'crab',weight:15,duration:9500},
+    {type:'jelly',weight:12,duration:11000,night:true},
+    {type:'catnap',weight:14,duration:13000},
+    {type:'meteor',weight:5,duration:4300,night:true},
+    {type:'paperboat',weight:12,duration:12500},
+    {type:'interaction',weight:12,duration:12000}
   ];
   const shapes={
     gull:'<span class="gull-wing wing-left"></span><span class="gull-wing wing-right"></span>',
@@ -172,14 +179,25 @@
     cart:'<span class="cart-box"></span><span class="cart-wheel wheel-a"></span><span class="cart-wheel wheel-b"></span>',
     bubbles:'<span class="bubble b1"></span><span class="bubble b2"></span><span class="bubble b3"></span>',
     cat:'<span class="cat-ear left"></span><span class="cat-ear right"></span><span class="cat-face"></span><span class="cat-tail"></span>',
-    tit:'<span class="tit-tail"></span><span class="tit-body"><span class="tit-eye"></span></span><span class="tit-wing"></span>'
+    tit:'<span class="tit-tail"></span><span class="tit-body"><span class="tit-eye"></span></span><span class="tit-wing"></span>',
+    seal:'<span class="seal-head"><span class="seal-eyes"></span><span class="seal-nose"></span></span><span class="seal-ripple"></span>',
+    crab:'<span class="crab-claw left"></span><span class="crab-body"><span class="crab-eye left"></span><span class="crab-eye right"></span></span><span class="crab-claw right"></span>',
+    jelly:'<span class="jelly-bell"></span><span class="jelly-tentacles"></span>',
+    catnap:'<span class="nap-cat"><span class="nap-ear"></span><span class="nap-face"></span><span class="nap-tail"></span></span>',
+    meteor:'<span class="meteor-star"></span>',
+    paperboat:'<span class="paper-boat-sail"></span><span class="paper-boat-hull"></span>',
+    interaction:'<span class="interaction-bird"><span class="tit-tail"></span><span class="tit-body"><span class="tit-eye"></span></span><span class="tit-wing"></span></span><span class="interaction-worker"><span class="helmet"></span><span class="vest"></span><span class="legs"></span></span>'
   };
   let nextScene=null,cleanup=null;
   const rand=(lo,hi)=>lo+Math.random()*(hi-lo);
   function choose(){
-    const n=rand(0,125);let total=0;
-    for(const scene of scenes){total+=scene.weight;if(n<total)return scene;}
-    return scenes[0];
+    // Nighttime-only scenes follow the visitor's local clock.
+    const hour=new Date().getHours(),night=hour>=18||hour<6;
+    const available=scenes.filter(scene=>!scene.night||night);
+    const totalWeight=available.reduce((sum,scene)=>sum+scene.weight,0);
+    let n=rand(0,totalWeight);
+    for(const scene of available){n-=scene.weight;if(n<0)return scene;}
+    return available[available.length-1];
   }
   function resetSceneTimers(){
     if(nextScene!==null)window.clearTimeout(nextScene);
@@ -199,6 +217,10 @@
     node.setAttribute('aria-hidden','true');
     node.style.setProperty('--event-duration',scene.duration+'ms');
     node.style.setProperty('--event-x',rand(40,83).toFixed(1)+'%');
+    if(scene.type==='seal'||scene.type==='jelly'||scene.type==='paperboat')
+      node.style.setProperty('--event-x',rand(37,83).toFixed(1)+'%');
+    if(scene.type==='crab'||scene.type==='catnap'||scene.type==='interaction')
+      node.style.setProperty('--event-x',rand(8,23).toFixed(1)+'%');
     if(scene.type==='tit'){
       // Two safe perches: upper crane edge or harbor lamp; stay inside scene.
       const perch=Math.random()<.5?{x:94,y:85}:{x:Math.max(70,dock.clientWidth*.06),y:91};
