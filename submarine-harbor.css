@@ -16,24 +16,17 @@
 .harbor-sea:after{content:"";position:absolute;left:30%;right:0;top:18px;height:20px;
   background:repeating-linear-gradient(102deg,transparent 0 75px,#ade6ed4d 77px 91px,transparent 96px 160px);
   opacity:.3;animation:harbor-shimmer 14s ease-in-out infinite alternate}
-.harbor-quay{position:absolute;left:0;width:31%;bottom:53px;height:14px;z-index:2;
+.harbor-quay{position:absolute;left:0;width:31.75%;bottom:53px;height:14px;z-index:2;
   background:repeating-linear-gradient(90deg,#b7946a 0 22px,#a07e59 22px 24px,#b7946a 24px 46px);
   border-top:3px solid #d4b38b;border-bottom:4px solid #654d41;
   box-shadow:0 3px 0 #314d53}
 .harbor-quay:after{content:"";position:absolute;left:0;right:0;top:-3px;height:2px;
   background:#f1d5a4;opacity:.7}
-/* Four narrow finger piers project from the quay into the same water.
-   Each berth sits just to the LEFT of its matching submarine, leaving the
-   neighboring berth clear. The fleet's existing starting coordinates stay put. */
-.harbor-berth{position:absolute;bottom:39px;width:clamp(13px,1.3vw,24px);height:24px;z-index:3;
-  transform:translateX(-50%);border-left:2px solid #735943;border-right:2px solid #735943;
-  border-bottom:5px solid #9e7c55;background:repeating-linear-gradient(90deg,#a48865 0 6px,#c19d6b 7px 12px);
-  box-shadow:0 2px 0 #254a57}
-.harbor-berth:before,.harbor-berth:after{content:"";position:absolute;bottom:-9px;width:5px;height:9px;background:#725642;border-radius:1px}
-.harbor-berth:before{left:0}.harbor-berth:after{right:0}
-.harbor-berth-num{position:absolute;bottom:15px;left:50%;transform:translateX(-50%);
-  display:grid;place-items:center;width:16px;height:16px;border:1px solid #e0c390;border-radius:3px;
-  background:#4f6b67;color:#f7ead0;font-size:10px;font-weight:800;line-height:1}
+
+
+.harbor-berth:before,
+
+
 .harbor-yard-props{position:absolute;left:0;bottom:66px;width:31%;height:35px;z-index:4}
 .harbor-crate{position:absolute;bottom:0;width:17px;height:15px;border:2px solid #78583e;
   background:repeating-linear-gradient(45deg,#bd8b51 0 5px,#d5a66c 6px 9px);border-radius:1px}
@@ -145,7 +138,7 @@ body{padding-bottom:85px}
  .harbor-sea{height:42px}
  .harbor-quay{bottom:44px;height:12px}
  .harbor-yard-props{bottom:56px}
- .harbor-berth{bottom:30px;height:15px}
+ 
  .harbor-goal{bottom:35px}
  .harbor-submarine{bottom:var(--boat-bottom-mobile,30px)}
  .harbor-crane{transform:scale(.8);transform-origin:left bottom}
@@ -154,7 +147,7 @@ body{padding-bottom:85px}
 }
 @media(max-width:420px){
  .harbor-yard-props{width:40%}.harbor-quay{width:34%}
- .harbor-berth{width:20px}
+ 
  .harbor-worker.second{display:none}
  .harbor-crate.c{display:none}
 }
@@ -368,7 +361,7 @@ body{padding-bottom:85px}
   .harbor-sub-flag{bottom:22px}
 }
 @media(max-width:420px){
-  .harbor-berth{width:16px}
+  
   .harbor-submarine{width:20px}
   .harbor-tooltip{min-width:210px}
 }
@@ -392,14 +385,23 @@ body{padding-bottom:85px}
 .harbor-sea,.harbor-quay,.harbor-yard-props,.harbor-crane,.harbor-crane *,
 .harbor-worker,.harbor-ambient,.harbor-goal{pointer-events:none!important}
 
-/* Berth alignment: 7/13.5/20/26.5% piers alongside
-   9/15.5/22/28.5% submarine centers; do not grow into next slot. */
-.harbor-berth-num{bottom:18px}
+
+/* Finger-pier harbor based on the owner's four-slip sketch:
+   a single horizontal quay across the top, five vertical dividers down into the
+   water, one submarine in each OPEN water slot. Ship starts remain unchanged. */
+.harbor-slips{position:absolute;inset:0;z-index:3;pointer-events:none!important}
+.harbor-slip-wall{position:absolute;bottom:22px;height:40px;width:clamp(3px,.32vw,6px);
+  transform:translateX(-50%);pointer-events:none!important;
+  background:linear-gradient(90deg,#805f46 0 30%,#d8b68a 31% 64%,#86634a 65% 100%);
+  border:1px solid #765844;border-radius:1px 1px 2px 2px;
+  box-shadow:1px 2px 1px #10384b88}
+.harbor-slip-wall:before{content:"";position:absolute;top:1px;left:-3px;right:-3px;height:4px;
+  background:#debb86;border-top:1px solid #f1d3a6;border-bottom:1px solid #88684d}
+.harbor-slip-wall:after{content:"";position:absolute;bottom:-3px;left:-3px;right:-3px;height:5px;
+  background:#987554;border:1px solid #75553d;border-radius:1px}
 @media(max-width:700px){
- .harbor-berth{height:20px;bottom:31px;width:13px;border-left-width:2px;border-right-width:2px}
- .harbor-berth-num{bottom:15px}
+ .harbor-quay{width:31.75%}
+ .harbor-slip-wall{height:32px;bottom:19px;width:3px}
+ .harbor-slip-wall:before,.harbor-slip-wall:after{left:-1px;right:-1px}
 }
-@media(max-width:420px){
- .harbor-berth{width:10px}
- .harbor-berth-num{width:13px;height:13px;font-size:9px}
-}
+@media(max-width:420px){.harbor-slip-wall{width:2px}}
