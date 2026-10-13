@@ -388,7 +388,7 @@ body{padding-bottom:85px}
 /* Finger-pier harbor based on the owner's four-slip sketch:
    a single horizontal quay across the top, five vertical dividers down into the
    water, one submarine in each OPEN water slot. Ship starts remain unchanged. */
-.harbor-slips{position:absolute;inset:0;z-index:3;pointer-events:none!important}
+.harbor-slips{position:absolute;inset:0;z-index:8;pointer-events:none!important}
 .harbor-slip-wall{position:absolute;bottom:22px;height:40px;width:clamp(3px,.32vw,6px);
   transform:translateX(-50%);pointer-events:none!important;
   background:linear-gradient(90deg,#805f46 0 30%,#d8b68a 31% 64%,#86634a 65% 100%);
@@ -404,3 +404,29 @@ body{padding-bottom:85px}
  .harbor-slip-wall:before,.harbor-slip-wall:after{left:-1px;right:-1px}
 }
 @media(max-width:420px){.harbor-slip-wall{width:2px}}
+
+/* L-shaped berths: a foreground lip attached to each vertical finger pier.
+   This foreground is stacked ABOVE the submarine sprites, making the lower
+   hull look physically tucked inside its slip; water and timing stay intact. */
+.harbor-slip-foreground{
+  position:absolute;bottom:25px;width:5.4%;height:12px;
+  pointer-events:none!important;z-index:2;
+  background:repeating-linear-gradient(90deg,#b48c62 0 13px,#caa778 14px 16px,#a77d55 17px 30px);
+  border-top:3px solid #ebc996;border-bottom:3px solid #74523e;
+  border-left:3px solid #825c41;
+  border-radius:2px 1px 1px 2px;
+  box-shadow:0 3px 0 #284b5680,0 -1px 0 #f7dda980;
+}
+.harbor-slip-foreground:before{
+  content:"";position:absolute;left:1px;right:1px;top:2px;height:2px;
+  background:#714f3b66;
+}
+.harbor-slip-wall,.harbor-slip-foreground{
+  pointer-events:none!important;
+}
+@media(max-width:700px){
+  .harbor-slip-foreground{bottom:19px;height:10px;border-top-width:2px;border-bottom-width:2px}
+}
+@media(max-width:420px){
+  .harbor-slip-foreground{width:5.4%;border-left-width:2px}
+}
