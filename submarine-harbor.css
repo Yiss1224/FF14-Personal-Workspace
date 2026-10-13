@@ -690,3 +690,18 @@ body{padding-bottom:85px}
 @media(prefers-reduced-motion:reduce){
   #mini-harbor *,#mini-harbor *:before,#mini-harbor *:after{animation:none!important;transition:none!important}
 }
+
+/* Stepped timing for the fixed props and every nested decorative loop as well. */
+.harbor-sea:before,.harbor-sea:after,
+.harbor-crane-trolley,.harbor-crane-trolley:after,.harbor-crane-cable,.harbor-crane-load,
+.harbor-crane-wheel,.harbor-worker,.harbor-submarine .harbor-sprite,
+.harbor-submarine.is-sailing .harbor-sprite:after,.harbor-sub-flag span,
+.harbor-night .harbor-lamp-glow,.gull-wing,.bubble,.cat-tail,.seal-ripple,
+.harbor-event-jelly .jelly-tentacles i,.nap-tail,.interaction-bird,
+.interaction-bird .tit-wing,.teleport-character,.teleport-rays,
+.teleport-rays:after,.teleport-particles{
+  animation-timing-function:steps(6,end)!important
+}
+.harbor-crane-trolley:after,.harbor-crane-wheel,.teleport-rays:after{
+  animation-timing-function:steps(8,end)!important
+}
