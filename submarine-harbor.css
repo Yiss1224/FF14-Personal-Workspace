@@ -707,65 +707,6 @@ body{padding-bottom:85px}
 }
 
 
-/* Crane work cycle: pick up → hoist → travel → lower → short reposition → return. */
-.harbor-crane-trolley{animation:harbor-crane-travel 70s steps(18,end) infinite}
-.harbor-crane-cable{animation:harbor-crane-lift 70s steps(12,end) infinite}
-.harbor-crane-trolley:after{animation:harbor-crane-pulley 70s steps(14,end) infinite}
-.harbor-crane-wheel{animation:harbor-crane-wheel-work 70s steps(12,end) infinite}
-.harbor-crane-load{animation:harbor-crane-sway 70s steps(8,end) infinite}
-
-@keyframes harbor-crane-travel{
-  0%,12%{left:14px}
-  24%,42%{left:89px}
-  48%,60%{left:60px}
-  70%,100%{left:14px}
-}
-@keyframes harbor-crane-lift{
-  0%,5%{height:66px}
-  12%,24%{height:25px}
-  30%,35%{height:66px}
-  42%,48%{height:25px}
-  54%,60%{height:66px}
-  70%,100%{height:66px}
-}
-@keyframes harbor-crane-pulley{
-  0%,4%{transform:rotate(0)}
-  12%,24%{transform:rotate(180deg)}
-  30%,35%{transform:rotate(360deg)}
-  42%,48%{transform:rotate(540deg)}
-  54%,60%{transform:rotate(720deg)}
-  70%,100%{transform:rotate(720deg)}
-}
-@keyframes harbor-crane-wheel-work{
-  0%,12%{transform:rotate(0)}
-  24%,42%{transform:rotate(270deg)}
-  48%,60%{transform:rotate(420deg)}
-  70%,100%{transform:rotate(600deg)}
-}
-@keyframes harbor-crane-sway{
-  0%,12%,24%,30%,35%,42%,48%,54%,60%,70%,100%{transform:rotate(0)}
-  14%{transform:rotate(-3deg)}
-  16%{transform:rotate(2deg)}
-  18%,20%{transform:rotate(-1deg)}
-  22%{transform:rotate(0)}
-  25%{transform:rotate(3deg)}
-  27%{transform:rotate(-2deg)}
-  29%{transform:rotate(1deg)}
-  36%{transform:rotate(-2deg)}
-  38%{transform:rotate(2deg)}
-  40%{transform:rotate(-1deg)}
-  43%{transform:rotate(2deg)}
-  45%{transform:rotate(-2deg)}
-  47%{transform:rotate(0)}
-  49%{transform:rotate(-2deg)}
-  51%{transform:rotate(2deg)}
-  53%{transform:rotate(0)}
-  55%{transform:rotate(2deg)}
-  57%{transform:rotate(-2deg)}
-  59%{transform:rotate(0)}
-}
-
-
 /* Performance trim: remove per-frame raster filters and keep one compositor hint per scene. */
 .harbor-event{filter:none!important;will-change:auto;contain:layout style}
 .harbor-event *,.harbor-event *:before,.harbor-event *:after{filter:none!important}
@@ -785,13 +726,19 @@ body{padding-bottom:85px}
 .harbor-tooltip{backdrop-filter:none;-webkit-backdrop-filter:none}
 
 
-/* Keep pixel-shaped art, but use continuous motion for machinery and workers. */
-.harbor-crane-trolley,.harbor-crane-cable,.harbor-crane-load{
+
+
+/* Restore the original, lightweight crane loops with smooth interpolation. */
+.harbor-crane-trolley{animation:harbor-crane-travel 24s ease-in-out infinite}
+.harbor-crane-cable{animation:harbor-crane-lift 24s ease-in-out infinite}
+.harbor-crane-trolley:after{animation:harbor-crane-pulley 1.5s linear infinite}
+.harbor-crane-wheel{animation:harbor-crane-pulley 13s linear infinite}
+.harbor-crane-load{animation:harbor-crane-sway 4s ease-in-out infinite alternate}
+.harbor-worker{animation:harbor-worker-move 13s ease-in-out infinite alternate}
+.harbor-worker.second{animation-duration:17s;animation-delay:-5s}
+.harbor-crane-trolley,.harbor-crane-cable,.harbor-crane-load,.harbor-worker{
   animation-timing-function:ease-in-out!important
 }
 .harbor-crane-trolley:after,.harbor-crane-wheel{
   animation-timing-function:linear!important
-}
-.harbor-worker,.harbor-worker.second{
-  animation-timing-function:ease-in-out!important
 }
