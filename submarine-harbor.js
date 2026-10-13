@@ -8,22 +8,72 @@
   const fleetEl=document.getElementById('harbor-fleet');
   const liveStatus=document.getElementById('harbor-clock');
   const ambient=document.getElementById('harbor-ambient');
-  const starts=[8,14,20,26],finish=89;
+  const tooltip=document.getElementById('harbor-tooltip');
+  const starts=[9,15.5,22,28.5],finish=89; // moored to the right of each berth, not over its pier
   const motion=window.matchMedia?window.matchMedia('(prefers-reduced-motion: reduce)'):null;
   const reduced=()=>Boolean(motion&&motion.matches);
   function read(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch{return {}}}
   function fmt(ms){return new Date(ms).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})}
   fleetEl.innerHTML=starts.map((start,i)=>
-    '<div class="harbor-boat" data-harbor-ship="'+i+'" style="left:'+start+
-    '%;--boat-bottom:'+(37+(i%2)*3)+'px;--boat-bottom-mobile:'+
-    (29+(i%2)*2)+'px" aria-hidden="true">'+
-      '<div class="harbor-sprite"><span class="harbor-hull"></span><span class="harbor-cabin"></span>'+
-        '<span class="harbor-periscope"></span><span class="harbor-window"></span>'+
-        '<span class="harbor-boat-flag"><span>'+(i+1)+'</span></span></div></div>'
+    '<div class="harbor-submarine" data-harbor-ship="'+i+'" style="left:'+start+
+    '%;--boat-bottom:'+(27+(i%2)*2)+'px;--boat-bottom-mobile:'+
+    (22+(i%2)*2)+'px" tabindex="0" aria-label="潛水艇 '+(i+1)+'，查看航行資訊">'+
+      '<div class="harbor-sprite"><span class="harbor-sub-hull"></span><span class="harbor-sub-fin"></span>'+
+        '<span class="harbor-conning"></span><span class="harbor-periscope"></span>'+
+        '<span class="harbor-sub-window w1"></span><span class="harbor-sub-window w2"></span>'+
+        '<span class="harbor-sub-flag"><span>'+(i+1)+'</span></span></div></div>'
   ).join('');
   const boats=[...fleetEl.querySelectorAll('[data-harbor-ship]')];
   const running=Array.from({length:4},()=>null);
-  let viewportWidth=0;
+  let viewportWidth=0,hoveredIndex=-1;
+  const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[ch]));
+  function remaining(ms){
+    const minutes=Math.max(0,Math.ceil(ms/60000));
+    const days=Math.floor(minutes/1440),hours=Math.floor((minutes%1440)/60),mins=minutes%60;
+    return (days?days+' 天 ':'')+(hours||days?hours+' 小時 ':'')+mins+' 分鐘';
+  }
+  function positionTooltip(i){
+    if(!tooltip||i<0)return;
+    const r=boats[i].getBoundingClientRect();
+    const width=window.innerWidth||document.documentElement.clientWidth||1200;
+    const mid=Math.max(115,Math.min(width-115,r.left+r.width/2));
+    tooltip.style.left=mid+'px';
+    tooltip.style.top=Math.max(8,r.top-10)+'px';
+  }
+  function showTooltip(i){
+    if(!tooltip||boats[i].hidden)return;
+    hoveredIndex=i;
+    const ships=read().ships||[],ship=ships[i]||{},v=ship.voyage;
+    const departed=Number(v?.departedAt),eta=Number(v?.etaAt);
+    const valid=Boolean(ship.voyaging&&v&&Number.isFinite(departed)&&departed>0&&
+      Number.isFinite(eta)&&eta>departed);
+    const now=Date.now(),active=Boolean(ship.voyaging);
+    const name=typeof ship.name==='string'&&ship.name.trim()?ship.name.trim():'潛水艇 '+(i+1);
+    const route=active&&valid&&typeof v.route==='string'&&v.route.trim()?v.route.trim():'—';
+    const status=!ship.registered&&!active?'泊位尚未啟用':
+      !active?'停泊待命':!valid?'航行中・尚無航時紀錄':
+      now>=eta?'預計返航時間已到・待結算':now<(depart+eta)/2?'出航中':'返航中';
+    tooltip.innerHTML='<strong>⚓ '+esc(name)+'</strong>'+
+      '<dl><dt>目前狀態</dt><dd>'+esc(status)+'</dd>'+
+      '<dt>航線／目的地</dt><dd>'+esc(active?route:'尚未出航')+'</dd>'+
+      '<dt>剩餘時間</dt><dd>'+esc(valid?remaining(eta-now):'—')+'</dd>'+
+      '<dt>預計返航 ETA</dt><dd>'+esc(valid?fmt(eta):'—')+'</dd></dl>';
+    tooltip.hidden=false;
+    positionTooltip(i);
+  }
+  function hideTooltip(i){
+    if(hoveredIndex!==i||!tooltip)return;
+    hoveredIndex=-1;tooltip.hidden=true;
+  }
+  boats.forEach((boat,i)=>{
+    boat.addEventListener('mouseenter',()=>showTooltip(i));
+    boat.addEventListener('mousemove',()=>positionTooltip(i));
+    boat.addEventListener('mouseleave',()=>hideTooltip(i));
+    boat.addEventListener('focus',()=>showTooltip(i));
+    boat.addEventListener('blur',()=>hideTooltip(i));
+  });
   function stop(i){
     const previous=running[i];
     if(previous&&previous.animation)previous.animation.cancel();
@@ -78,6 +128,7 @@
       boat.classList.toggle('is-awaiting',valid&&ratio>=1);
       if(!valid||ratio>=1||boat.hidden)stop(i);
       else animateBoat(i,depart,eta,now,progress);
+      if(hoveredIndex===i)showTooltip(i);
       const label=typeof ship.name==='string'&&ship.name.trim()?ship.name.trim():'潛水艇 '+(i+1);
       const status=!registered&&!active?'泊位空置':!active?'停泊中':
         !valid?'航行中，未記錄時間':ratio>=1?'預計已返航，待結算':'預計 '+fmt(eta)+' 返航';
@@ -152,7 +203,11 @@
    'submarine-settlement-saved','submarine-data-imported',
    'submarine-voyage-started'].forEach(event=>window.addEventListener(event,refresh));
   window.addEventListener('storage',event=>{if(event.key===KEY)refresh();});
-  window.addEventListener('visibilitychange',()=>{render();restartSceneLoop();});
+  window.addEventListener('visibilitychange',()=>{
+    if(document.hidden&&tooltip){hoveredIndex=-1;tooltip.hidden=true;}
+    render();restartSceneLoop();
+  });
+  window.addEventListener('scroll',()=>{if(hoveredIndex>=0)positionTooltip(hoveredIndex);},{passive:true});
   window.addEventListener('resize',()=>{
     const width=dock.getBoundingClientRect().width;
     if(Math.abs(width-viewportWidth)>1){viewportWidth=width;render();}
