@@ -764,3 +764,22 @@ body{padding-bottom:85px}
   57%{transform:rotate(-2deg)}
   59%{transform:rotate(0)}
 }
+
+
+/* Performance trim: remove per-frame raster filters and keep one compositor hint per scene. */
+.harbor-event{filter:none!important;will-change:auto;contain:layout style}
+.harbor-event *,.harbor-event *:before,.harbor-event *:after{filter:none!important}
+.harbor-submarine,.harbor-submarine .harbor-sprite,.harbor-sub-hull,.harbor-goal,
+.harbor-crane,.harbor-crane *,.harbor-worker{filter:none!important}
+.harbor-submarine,.harbor-submarine .harbor-sprite,.harbor-crane-load,
+.harbor-crane-trolley,.harbor-crane-cable,.harbor-worker{will-change:auto}
+.harbor-night .harbor-crane-cab{box-shadow:2px 2px 0 #274857}
+.harbor-night .harbor-crane-load{filter:none}
+.harbor-night .harbor-sub-window{box-shadow:0 0 0 2px #f6d18f88}
+.harbor-night .harbor-lamp:after{box-shadow:0 0 0 2px #ffdb89aa}
+.harbor-event-meteor .meteor-star{box-shadow:0 0 0 2px #ffe9a277}
+.teleport-rays{box-shadow:0 0 0 2px #97edff44}
+.teleport-rays:after{animation:none!important}
+.jelly-tentacles i{animation-duration:1.8s!important}
+.harbor-event .jelly-tentacles i{box-shadow:none}
+.harbor-tooltip{backdrop-filter:none;-webkit-backdrop-filter:none}
