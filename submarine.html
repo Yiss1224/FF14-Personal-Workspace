@@ -7,7 +7,7 @@
   <title>FF14 潛水艇養成計畫</title>
   <link rel="stylesheet" href="submarine.css?v=20261012-3">
   <link rel="stylesheet" href="submarine-ui.css?v=20261013-1">
-  <link rel="stylesheet" href="submarine-harbor.css?v=20261013-1">
+  <link rel="stylesheet" href="submarine-harbor.css?v=20261013-2">
 </head>
 <body>
   <header>
@@ -199,9 +199,23 @@
       <p class="hint">資料儲存在此瀏覽器；建議定期匯出完整備份。路線與時間為估算，實際以遊戲為準。</p>
     </details>
   </main>
-  <aside id="mini-harbor" aria-label="動態潛水艇碼頭">
-    <div class="harbor-bar"><div><strong>⚓ 毛線球海運 · 迷你碼頭</strong><small id="harbor-clock">港口待命</small></div><button id="harbor-fold" type="button" aria-expanded="true" aria-controls="harbor-inner">收合 ▾</button></div>
-    <div id="harbor-inner" class="harbor-body"><div class="harbor-intro">只有按下推薦航線下方的「確認出航」才會啟動實際航時計時。</div><div id="harbor-fleet"></div><div class="harbor-yard" aria-hidden="true"><span class="harbor-crates"></span><span class="harbor-worker"></span><span class="harbor-worker second"></span></div></div>
+  <!-- Ambient shoreline: one shallow sea with four berths; no separate panel. -->
+  <aside id="mini-harbor" aria-label="毛線球海運動態碼頭">
+    <div class="harbor-sea" aria-hidden="true"></div>
+    <div class="harbor-quay" aria-hidden="true"></div>
+    <div class="harbor-yard-props" aria-hidden="true">
+      <span class="harbor-crane"><span class="harbor-crane-rope"></span></span>
+      <span class="harbor-crate a"></span><span class="harbor-crate b"></span><span class="harbor-crate c"></span>
+      <span class="harbor-worker"><span class="helmet"></span><span class="vest"></span><span class="legs"></span></span>
+      <span class="harbor-worker second"><span class="helmet"></span><span class="vest"></span><span class="legs"></span></span>
+    </div>
+    <span class="harbor-berth" style="left:8%" aria-hidden="true"><span class="harbor-berth-num">1</span></span>
+    <span class="harbor-berth" style="left:14%" aria-hidden="true"><span class="harbor-berth-num">2</span></span>
+    <span class="harbor-berth" style="left:20%" aria-hidden="true"><span class="harbor-berth-num">3</span></span>
+    <span class="harbor-berth" style="left:26%" aria-hidden="true"><span class="harbor-berth-num">4</span></span>
+    <div class="harbor-goal" aria-hidden="true"><span class="harbor-goal-mark"></span></div>
+    <div id="harbor-fleet" class="harbor-fleet" aria-hidden="true"></div>
+    <span id="harbor-clock" class="harbor-screenreader" aria-live="off"></span>
   </aside>
   <script src="submarine.js?v=20261012-2"></script>
   <script src="submarine-calculator.js?v=20261011-8"></script>
@@ -210,6 +224,6 @@
   <script defer src="submarine-drop-select.js?v=20261012-8"></script>
   <script defer src="submarine-prices.js?v=20261012-7"></script>
   <script defer src="submarine-ui.js?v=20261013-1"></script>
-  <script defer src="submarine-harbor.js?v=20261013-1"></script>
+  <script defer src="submarine-harbor.js?v=20261013-2"></script>
 </body>
 </html>
