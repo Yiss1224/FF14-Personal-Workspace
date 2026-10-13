@@ -637,3 +637,7 @@ body{padding-bottom:85px}
 .harbor-worker .helmet,.interaction-worker .helmet{border-radius:2px 2px 1px 1px;box-shadow:inset 0 2px #f6d699,1px 1px 0 #835f43}
 .harbor-worker .vest,.interaction-worker .vest{box-shadow:inset 2px 0 #f1ac64,inset -2px 0 #a6523a}
 .paper-boat-hull,.harbor-event-teleport,.harbor-event-cat,.harbor-event-catnap{filter:drop-shadow(1px 2px 0 #17394c66)}
+
+@media(prefers-reduced-motion:reduce){
+  .cat-tail,.jelly-tentacles i{animation:none!important}
+}
