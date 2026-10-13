@@ -163,19 +163,21 @@
     {type:'fish',weight:24,duration:6500},
     {type:'cart',weight:24,duration:14000},
     {type:'bubbles',weight:18,duration:7500},
-    {type:'cat',weight:6,duration:11000}
+    {type:'cat',weight:6,duration:11000},
+    {type:'tit',weight:5,duration:13500}
   ];
   const shapes={
     gull:'<span class="gull-wing wing-left"></span><span class="gull-wing wing-right"></span>',
     fish:'<span class="fish-body"></span><span class="fish-tail"></span>',
     cart:'<span class="cart-box"></span><span class="cart-wheel wheel-a"></span><span class="cart-wheel wheel-b"></span>',
     bubbles:'<span class="bubble b1"></span><span class="bubble b2"></span><span class="bubble b3"></span>',
-    cat:'<span class="cat-ear left"></span><span class="cat-ear right"></span><span class="cat-face"></span><span class="cat-tail"></span>'
+    cat:'<span class="cat-ear left"></span><span class="cat-ear right"></span><span class="cat-face"></span><span class="cat-tail"></span>',
+    tit:'<span class="tit-tail"></span><span class="tit-body"><span class="tit-eye"></span></span><span class="tit-wing"></span>'
   };
   let nextScene=null,cleanup=null;
   const rand=(lo,hi)=>lo+Math.random()*(hi-lo);
   function choose(){
-    const n=rand(0,100);let total=0;
+    const n=rand(0,105);let total=0;
     for(const scene of scenes){total+=scene.weight;if(n<total)return scene;}
     return scenes[0];
   }
@@ -197,6 +199,13 @@
     node.setAttribute('aria-hidden','true');
     node.style.setProperty('--event-duration',scene.duration+'ms');
     node.style.setProperty('--event-x',rand(40,83).toFixed(1)+'%');
+    if(scene.type==='tit'){
+      // Two safe perches: upper crane edge or harbor lamp; stay inside scene.
+      const perch=Math.random()<.5?{x:94,y:85}:{x:Math.max(70,dock.clientWidth*.06),y:91};
+      node.style.setProperty('--tit-x',perch.x.toFixed(0)+'px');
+      node.style.setProperty('--tit-y',perch.y.toFixed(0)+'px');
+      node.style.setProperty('--tit-out',Math.min(dock.clientWidth-25,perch.x+165).toFixed(0)+'px');
+    }
     node.innerHTML=shapes[scene.type];
     ambient.replaceChildren(node);
     cleanup=window.setTimeout(()=>{
