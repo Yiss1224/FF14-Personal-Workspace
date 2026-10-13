@@ -80,33 +80,47 @@
     running[i]=null;
     boats[i].style.transform='translateX(-50%)';
   }
-  // Native Web Animations keep each boat moving continuously without repeatedly rewriting layouts.
-  function animateBoat(i,depart,eta,now,progress){
-    const boat=boats[i],width=dock.getBoundingClientRect().width;
+  // Swim out of the slip first; cross the finger piers only after diving below them.
+  // Time spent in the exit/entry maneuver is a tiny fraction of the real voyage.
+  function boatPosition(i,phase,width){
     const distance=width*(finish-starts[i])/100;
+    const down=44; // hull and sail clear the bottom edge of the finger piers
+    const exit=.035,enter=.965;
+    let x=0,y=0;
+    if(phase<exit){y=down*(phase/exit);}
+    else if(phase<.5){x=distance*((phase-exit)/(.5-exit));y=down;}
+    else if(phase<enter){x=distance*(1-(phase-.5)/(enter-.5));y=down;}
+    else{y=down*(1-(phase-enter)/(1-enter));}
+    return {x,y};
+  }
+  function transformAt(i,phase,width){
+    const p=boatPosition(i,phase,width);
+    return 'translate(calc(-50% + '+p.x.toFixed(2)+'px), '+p.y.toFixed(2)+'px)';
+  }
+  // WAAPI keeps the entire departure → voyage → return route on the browser timeline.
+  function animateBoat(i,depart,eta,now,ratio){
+    const boat=boats[i],width=dock.getBoundingClientRect().width;
     const key=depart+':'+eta+':'+Math.round(width);
     if(!reduced()&&typeof boat.animate==='function'&&width>0){
       if(!running[i]||running[i].key!==key){
         stop(i);
         boat.style.left=starts[i]+'%';
-        const frames=[
-          {transform:'translateX(-50%)',offset:0},
-          {transform:'translateX(calc(-50% + '+distance+'px))',offset:.5},
-          {transform:'translateX(-50%)',offset:1}
-        ];
+        const phases=[0,.035,.5,.965,1];
+        const frames=phases.map(phase=>({
+          transform:transformAt(i,phase,width),offset:phase
+        }));
         const animation=boat.animate(frames,{duration:eta-depart,easing:'linear',fill:'both'});
         animation.currentTime=Math.max(0,Math.min(now-depart,eta-depart));
         running[i]={key,animation};
       }else{
-        // Re-sync only if needed after background throttling, not on every render.
-        const a=running[i].animation,offset=Math.abs((a.currentTime||0)-(now-depart));
-        if(offset>3000)a.currentTime=Math.max(0,Math.min(now-depart,eta-depart));
+        const animation=running[i].animation;
+        if(Math.abs((animation.currentTime||0)-(now-depart))>3000)
+          animation.currentTime=Math.max(0,Math.min(now-depart,eta-depart));
       }
     }else{
       if(running[i])stop(i);
       boat.style.left=starts[i]+'%';
-      const delta=(distance*progress).toFixed(2);
-      boat.style.transform='translateX(calc(-50% + '+delta+'px))';
+      boat.style.transform=transformAt(i,ratio,width);
     }
   }
   function render(){
@@ -127,7 +141,7 @@
       boat.classList.toggle('is-returning',valid&&ratio>.5&&ratio<1);
       boat.classList.toggle('is-awaiting',valid&&ratio>=1);
       if(!valid||ratio>=1||boat.hidden)stop(i);
-      else animateBoat(i,depart,eta,now,progress);
+      else animateBoat(i,depart,eta,now,ratio);
       if(hoveredIndex===i)showTooltip(i);
       const label=typeof ship.name==='string'&&ship.name.trim()?ship.name.trim():'潛水艇 '+(i+1);
       const status=!registered&&!active?'泊位空置':!active?'停泊中':
