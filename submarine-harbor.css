@@ -433,3 +433,32 @@ body{padding-bottom:85px}
 
 /* Departures dive clear of the finger piers before heading out to sea. */
 .harbor-submarine{transition:none}
+
+/* Long-tailed tit: an occasional visitor that zigzags in, perches, then darts off. */
+.harbor-event-tit{left:0;top:0;width:19px;height:19px;z-index:9;
+  animation:harbor-tit-route var(--event-duration,13500ms) linear both;
+  filter:drop-shadow(0 1px 1px #16394b88)}
+.tit-body{position:absolute;left:4px;top:3px;width:13px;height:12px;border-radius:55% 55% 55% 50%;
+  background:radial-gradient(circle at 40% 42%,#fff 0 45%,#dde1e3 72%,#a4adb6 100%);
+  border:1px solid #c3c8ce}
+.tit-eye{position:absolute;right:2px;top:3px;width:2px;height:2px;background:#26323e;border-radius:50%}
+.tit-tail{position:absolute;left:-7px;top:8px;width:16px;height:3px;background:#687584;
+  border-radius:70% 0 0 70%;transform:rotate(-20deg);transform-origin:right center}
+.tit-wing{position:absolute;left:5px;top:4px;width:8px;height:6px;border-top:3px solid #909aa8;
+  border-radius:75%;transform-origin:right bottom;animation:harbor-tit-flap .17s ease-in-out infinite alternate}
+@keyframes harbor-tit-flap{to{transform:rotate(-42deg)}}
+/* Last route stages hold at the perch: the wing folds, then opens for departure. */
+.harbor-event-tit .tit-wing{animation-play-state:running}
+@keyframes harbor-tit-route{
+  0%{opacity:0;transform:translate(-25px,48px) rotate(-11deg)}
+  8%{opacity:1;transform:translate(24px,24px) rotate(9deg)}
+  17%{transform:translate(53px,62px) rotate(-10deg)}
+  27%{transform:translate(70px,32px) rotate(8deg)}
+  37%{transform:translate(calc(var(--tit-x) - 15px),calc(var(--tit-y) - 21px)) rotate(-6deg)}
+  46%,68%{opacity:1;transform:translate(var(--tit-x),var(--tit-y)) rotate(0deg)}
+  75%{transform:translate(calc(var(--tit-x) + 22px),calc(var(--tit-y) - 27px)) rotate(-14deg)}
+  87%{transform:translate(calc(var(--tit-out) - 35px),39px) rotate(9deg)}
+  100%{opacity:0;transform:translate(var(--tit-out),-26px) rotate(-11deg)}
+}
+@media(max-width:700px){.harbor-event-tit{transform-origin:center center}}
+@media(prefers-reduced-motion:reduce){.harbor-event-tit,.tit-wing{animation:none!important}}
