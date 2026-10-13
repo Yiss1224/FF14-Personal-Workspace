@@ -7,6 +7,7 @@
   <title>FF14 潛水艇養成計畫</title>
   <link rel="stylesheet" href="submarine.css?v=20261012-3">
   <link rel="stylesheet" href="submarine-ui.css?v=20261013-1">
+  <link rel="stylesheet" href="submarine-harbor.css?v=20261013-1">
 </head>
 <body>
   <header>
@@ -198,6 +199,10 @@
       <p class="hint">資料儲存在此瀏覽器；建議定期匯出完整備份。路線與時間為估算，實際以遊戲為準。</p>
     </details>
   </main>
+  <aside id="mini-harbor" aria-label="動態潛水艇碼頭">
+    <div class="harbor-bar"><div><strong>⚓ 毛線球海運 · 迷你碼頭</strong><small id="harbor-clock">港口待命</small></div><button id="harbor-fold" type="button" aria-expanded="true" aria-controls="harbor-inner">收合 ▾</button></div>
+    <div id="harbor-inner" class="harbor-body"><div class="harbor-intro">只有按下推薦航線下方的「確認出航」才會啟動實際航時計時。</div><div id="harbor-fleet"></div><div class="harbor-yard" aria-hidden="true"><span class="harbor-crates"></span><span class="harbor-worker"></span><span class="harbor-worker second"></span></div></div>
+  </aside>
   <script src="submarine.js?v=20261012-2"></script>
   <script src="submarine-calculator.js?v=20261011-8"></script>
   <script src="submarine-settlement.js?v=20261012-10"></script>
@@ -205,5 +210,6 @@
   <script defer src="submarine-drop-select.js?v=20261012-8"></script>
   <script defer src="submarine-prices.js?v=20261012-7"></script>
   <script defer src="submarine-ui.js?v=20261013-1"></script>
+  <script defer src="submarine-harbor.js?v=20261013-1"></script>
 </body>
 </html>
