@@ -171,7 +171,8 @@
     {type:'catnap',weight:14,duration:13000},
     {type:'meteor',weight:5,duration:4300,night:true},
     {type:'paperboat',weight:12,duration:12500},
-    {type:'interaction',weight:12,duration:12000}
+    {type:'interaction',weight:12,duration:12000},
+    {type:'teleport',weight:9,duration:9500}
   ];
   const shapes={
     gull:'<span class="gull-wing wing-left"></span><span class="gull-wing wing-right"></span>',
@@ -186,7 +187,8 @@
     catnap:'<span class="nap-cat"><span class="nap-ear"></span><span class="nap-face"></span><span class="nap-tail"></span></span>',
     meteor:'<span class="meteor-star"></span>',
     paperboat:'<span class="paper-boat-sail"></span><span class="paper-boat-hull"></span>',
-    interaction:'<span class="interaction-bird"><span class="tit-tail"></span><span class="tit-body"><span class="tit-eye"></span></span><span class="tit-wing"></span></span><span class="interaction-worker"><span class="helmet"></span><span class="vest"></span><span class="legs"></span></span>'
+    interaction:'<span class="interaction-bird"><span class="tit-tail"></span><span class="tit-body"><span class="tit-eye"></span></span><span class="tit-wing"></span></span><span class="interaction-worker"><span class="helmet"></span><span class="vest"></span><span class="legs"></span></span>',
+    teleport:'<span class="teleport-rays"></span><span class="teleport-character"><span class="teleport-head"></span><span class="teleport-torso"></span><span class="teleport-feet"></span></span><span class="teleport-particles"></span>'
   };
   let nextScene=null,cleanup=null;
   const rand=(lo,hi)=>lo+Math.random()*(hi-lo);
@@ -219,7 +221,7 @@
     node.style.setProperty('--event-x',rand(40,83).toFixed(1)+'%');
     if(scene.type==='seal'||scene.type==='jelly'||scene.type==='paperboat')
       node.style.setProperty('--event-x',rand(37,83).toFixed(1)+'%');
-    if(scene.type==='crab'||scene.type==='catnap'||scene.type==='interaction')
+    if(scene.type==='crab'||scene.type==='catnap'||scene.type==='interaction'||scene.type==='teleport')
       node.style.setProperty('--event-x',rand(8,23).toFixed(1)+'%');
     if(scene.type==='tit'){
       // Two safe perches: upper crane edge or harbor lamp; stay inside scene.
