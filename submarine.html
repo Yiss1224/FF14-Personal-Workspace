@@ -6,12 +6,15 @@
   <meta name="color-scheme" content="light dark">
   <title>FF14 潛水艇養成計畫</title>
   <link rel="stylesheet" href="submarine.css?v=20261012-3">
+  <link rel="stylesheet" href="submarine-ui.css?v=20261013-1">
 </head>
 <body>
   <header>
-    <div>
+    <div class="header-copy">
       <a class="back" href="index.html">← FF14 Personal Workspace</a>
+      <span class="eyebrow">FREE COMPANY · SUBMERSIBLE COMMAND</span>
       <h1>⚓ 潛水艇養成計畫</h1>
+      <p class="hero-subtitle">船隊狀態、探索航線與回航紀錄，都在這座艦橋管理。</p>
       
     </div>
     <div class="toolbar">
@@ -20,9 +23,23 @@
       <input id="import-data" type="file" accept="application/json,.json" hidden>
     </div>
   </header>
+  <nav class="bridge-nav-wrap" aria-label="潛水艇功能快速導覽"><div class="bridge-nav">
+    <a href="#overview-panel">物資概況</a>
+    <a href="#fleet-panel">船隊進度</a>
+    <a href="#calculator-panel">派船計算</a>
+    <a href="#return-settlement">返航結算</a>
+    <a href="#sector-panel">海圖解鎖</a>
+    <a href="#routes-panel">練等參考</a>
+  </div></nav>
   <main>
-    <section class="panel">
-      <h2>養成目標與估算</h2>
+    <section class="ops-overview" aria-label="船隊即時概況">
+      <div class="ops-metric"><span class="ops-metric-label">已登記潛水艇</span><strong class="ops-metric-value" id="ui-active-ships">—</strong><span class="ops-metric-note">艦隊啟用狀態</span></div>
+      <div class="ops-metric"><span class="ops-metric-label">最高船隻等級</span><strong class="ops-metric-value" id="ui-max-rank">—</strong><span class="ops-metric-note">依已儲存 Rank</span></div>
+      <div class="ops-metric"><span class="ops-metric-label">累計出航紀錄</span><strong class="ops-metric-value" id="ui-voyages">—</strong><span class="ops-metric-note">已登記航次</span></div>
+      <div class="ops-metric"><span class="ops-metric-label">可用青燐水燃料</span><strong class="ops-metric-value" id="ui-fuel">—</strong><span class="ops-metric-note">現有庫存（罐）</span></div>
+    </section>
+    <section class="panel" id="overview-panel">
+      <h2>物資與養成目標</h2>
       
       <div class="stock-grid">
         <label>青燐水燃料庫存 <input id="fuel-stock" type="number" min="0" step="1"></label>
@@ -36,12 +53,12 @@
       
     </section>
 
-    <section class="panel">
+    <section class="panel" id="fleet-panel">
       <div class="section-title"><div><h2>船隊進度</h2></div></div>
       <div id="fleet" class="fleet-grid"></div>
     </section>
 
-    <section class="panel">
+    <section class="panel" id="calculator-panel">
       <h2>當前派船計算器</h2>
       
       <div class="calc-controls">
@@ -154,13 +171,13 @@
       </details>
     </section>
 
-    <section class="panel">
+    <section class="panel" id="sector-panel">
       <h2>已開啟海域（計算器使用）</h2>
       
       <div id="sector-unlocks" class="sector-unlocks"></div>
     </section>
 
-    <section class="panel">
+    <section class="panel" id="routes-panel">
       <h2>建議練等航線參考</h2>
       
       <div class="table-wrap"><table>
@@ -187,5 +204,6 @@
   <script defer src="submarine-ledger.js?v=20261012-9"></script>
   <script defer src="submarine-drop-select.js?v=20261012-8"></script>
   <script defer src="submarine-prices.js?v=20261012-7"></script>
+  <script defer src="submarine-ui.js?v=20261013-1"></script>
 </body>
 </html>
