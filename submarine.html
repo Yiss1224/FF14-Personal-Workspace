@@ -7,7 +7,7 @@
   <title>FF14 潛水艇養成計畫</title>
   <link rel="stylesheet" href="submarine.css?v=20261012-3">
   <link rel="stylesheet" href="submarine-ui.css?v=20261013-1">
-  <link rel="stylesheet" href="submarine-harbor.css?v=20261013-8">
+  <link rel="stylesheet" href="submarine-harbor.css?v=20261013-9">
 </head>
 <body>
   <header>
@@ -219,10 +219,14 @@
       <span class="harbor-worker"><span class="helmet"></span><span class="vest"></span><span class="legs"></span></span>
       <span class="harbor-worker second"><span class="helmet"></span><span class="vest"></span><span class="legs"></span></span>
     </div>
-    <span class="harbor-berth" style="left:7%" aria-hidden="true"><span class="harbor-berth-num">1</span></span>
-    <span class="harbor-berth" style="left:13.5%" aria-hidden="true"><span class="harbor-berth-num">2</span></span>
-    <span class="harbor-berth" style="left:20%" aria-hidden="true"><span class="harbor-berth-num">3</span></span>
-    <span class="harbor-berth" style="left:26.5%" aria-hidden="true"><span class="harbor-berth-num">4</span></span>
+    <!-- One continuous upper dock and five divider piers form four open slips. -->
+    <div class="harbor-slips" aria-hidden="true">
+      <span class="harbor-slip-wall" style="left:5.75%"></span>
+      <span class="harbor-slip-wall" style="left:12.25%"></span>
+      <span class="harbor-slip-wall" style="left:18.75%"></span>
+      <span class="harbor-slip-wall" style="left:25.25%"></span>
+      <span class="harbor-slip-wall" style="left:31.75%"></span>
+    </div>
     <span class="harbor-lamp" style="left:6%" aria-hidden="true"><span class="harbor-lamp-glow"></span></span>
     <span class="harbor-lamp" style="left:28.5%" aria-hidden="true"><span class="harbor-lamp-glow"></span></span>
     <div class="harbor-goal" aria-hidden="true"><span class="harbor-goal-mark"></span></div>
