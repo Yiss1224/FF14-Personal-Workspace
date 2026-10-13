@@ -401,6 +401,8 @@ function calculate(){
    +(deltaRate!==null?'<span>相較目前配置 '+(deltaRate>=0?'+':'')+deltaRate+'% EXP／收船週期</span>':'')+'</div>'
    +'<div class="route-meta">至 Rank '+target+' 尚需 '+remaining.toLocaleString()+' EXP；若一直跑這條約 '+runs+' 趟（升級與開圖後會改變）。</div>'
    +(opening?'<div class="route-meta">本輪探索 '+esc(maps[progress.step.map]+' '+progress.step.letter)+' 的前置點；成功開圖後請點地圖更新。</div>':'')
+   +'<div class="voyage-depart-actions"><span class="route-meta">預計實際航行 '+esc(fmtTime(route.time))+'；完成遊戲內出航後再按下按鈕。</span>'
+   +'<button class="voyage-depart-button" type="button" data-depart-ship="'+ship.index+'">⚓ 確認出航</button></div>'
    +'</article>');
  }
  const premiumAssigned=[...selected.values()].filter(c=>['1123','3123'].includes(c.key)).length;
@@ -419,6 +421,23 @@ function calculate(){
   +(daily?'每天可收／派船窗口 '+fmtClock(windowSettings().start*60)+'～'+fmtClock(windowSettings().end*60)+'；考慮實際預計出航時間與下一次可收船時間。':'以 EXP／實際時間比較。')
   +' 智慧分配屬逐趟前瞻估算，不是保證全球最短畢業日；實際開圖 RNG、EXP 獎勵及未來航點變化仍會改變最佳選擇。</p>'
   +(registered.some(x=>shipRank(x)>80)?'<p class="hint calc-warning">航線資料目前只到海圖 3、Rank 80 的海域；Rank 81 以上使用現有海域預估。</p>':'');
+ $('calc-result').querySelectorAll('[data-depart-ship]').forEach(btn=>btn.onclick=()=>{
+  const i=Number(btn.dataset.departShip),choice=selected.get(i),current=state(),ship=current.ships?.[i];
+  if(!ship||!ship.registered||ship.voyaging||!choice){alert('船隻狀態已變更，請重新計算航線。');calculate();return;}
+  if(installed(ship)!==choice.key){alert('請先在遊戲中完成換裝，並點選「已在遊戲換裝，更新紀錄」。');return;}
+  const duration=Math.round(Number(choice.route.time));
+  if(!Number.isFinite(duration)||duration<=0){alert('航程時間無效，請重新計算。');return;}
+  const routeText=makeLabel(choice.route.path),label=shipLabel(i,ship);
+  if(!window.confirm('已在 FF14 中將「'+label+'」實際派往「'+routeText+'」嗎？\\n確認後開始計時；燃料與物資會在返航結算時扣除。'))return;
+  const now=Date.now();
+  persist(st=>{
+   if(!st.ships?.[i]||st.ships[i].voyaging)return;
+   st.ships[i].voyaging=true;
+   st.ships[i].voyage={departedAt:now,etaAt:now+duration*1000,durationSeconds:duration,route:routeText,build:choice.key,fuelEstimate:Number(choice.route.fuel)||0};
+  });
+  window.dispatchEvent(new Event('submarine-voyage-started'));
+  renderBuilds();calculate();
+ });
  $('calc-result').querySelectorAll('[data-apply-build]').forEach(btn=>btn.onclick=()=>{
   const i=Number(btn.dataset.applyBuild),next=btn.dataset.newBuild;
   if(!builds[next]||state().ships[i].voyaging)return;
