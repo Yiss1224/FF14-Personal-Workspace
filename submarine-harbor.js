@@ -54,7 +54,7 @@
     const route=active&&valid&&typeof v.route==='string'&&v.route.trim()?v.route.trim():'—';
     const status=!ship.registered&&!active?'泊位尚未啟用':
       !active?'停泊待命':!valid?'航行中・尚無航時紀錄':
-      now>=eta?'預計返航時間已到・待結算':now<(depart+eta)/2?'出航中':'返航中';
+      now>=eta?'預計返航時間已到・待結算':now<(departed+eta)/2?'出航中':'返航中';
     tooltip.innerHTML='<strong>⚓ '+esc(name)+'</strong>'+
       '<dl><dt>目前狀態</dt><dd>'+esc(status)+'</dd>'+
       '<dt>航線／目的地</dt><dd>'+esc(active?route:'尚未出航')+'</dd>'+
