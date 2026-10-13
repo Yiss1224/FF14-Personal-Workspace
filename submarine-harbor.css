@@ -783,3 +783,15 @@ body{padding-bottom:85px}
 .jelly-tentacles i{animation-duration:1.8s!important}
 .harbor-event .jelly-tentacles i{box-shadow:none}
 .harbor-tooltip{backdrop-filter:none;-webkit-backdrop-filter:none}
+
+
+/* Keep pixel-shaped art, but use continuous motion for machinery and workers. */
+.harbor-crane-trolley,.harbor-crane-cable,.harbor-crane-load{
+  animation-timing-function:ease-in-out!important
+}
+.harbor-crane-trolley:after,.harbor-crane-wheel{
+  animation-timing-function:linear!important
+}
+.harbor-worker,.harbor-worker.second{
+  animation-timing-function:ease-in-out!important
+}
