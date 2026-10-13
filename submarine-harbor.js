@@ -164,5 +164,8 @@
   render();
   viewportWidth=dock.getBoundingClientRect().width;
   restartSceneLoop();
-  window.setInterval(()=>{if(!document.hidden)render();},1000);
+  // Native movement runs on the browser animation timeline; refresh metadata less often.
+  // Older browsers use frequent small CSS transition steps for the fallback route.
+  const nativeMotion=boats.every(boat=>typeof boat.animate==='function');
+  window.setInterval(()=>{if(!document.hidden)render();},nativeMotion?10000:1000);
 })();
