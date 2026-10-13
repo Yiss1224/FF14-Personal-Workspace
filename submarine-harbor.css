@@ -462,3 +462,49 @@ body{padding-bottom:85px}
 }
 @media(max-width:700px){.harbor-event-tit{transform-origin:center center}}
 @media(prefers-reduced-motion:reduce){.harbor-event-tit,.tit-wing{animation:none!important}}
+
+
+/* Harbor wildlife vignette additions: miniature, non-interactive, single-scene animations. */
+.harbor-event-seal{left:var(--event-x);bottom:30px;width:29px;height:25px;animation:harbor-seal-pop var(--event-duration) ease-in-out both}
+.seal-head{position:absolute;left:5px;bottom:2px;width:21px;height:20px;background:#b9c4c5;border:2px solid #e1e8e3;border-radius:58% 58% 44% 44%}
+.seal-eyes:before,.seal-eyes:after{content:"";position:absolute;top:7px;width:3px;height:3px;background:#263e45;border-radius:50%}
+.seal-eyes:before{left:4px}.seal-eyes:after{right:4px}
+.seal-nose{position:absolute;left:8px;top:11px;width:4px;height:3px;border-radius:50%;background:#52616a}
+.seal-ripple{position:absolute;bottom:0;left:0;width:31px;height:6px;border:1px solid #c4f6f1;border-radius:50%;animation:harbor-ripple 2s ease-in-out infinite alternate}
+@keyframes harbor-seal-pop{0%,100%{opacity:0;transform:translateY(25px)}15%,72%{opacity:1;transform:translateY(0)}38%{transform:translateY(-3px)}}
+@keyframes harbor-ripple{to{transform:scaleX(1.4);opacity:.25}}
+.harbor-event-crab{left:var(--event-x);bottom:68px;width:23px;height:17px;animation:harbor-crab-walk var(--event-duration) ease-in-out both}
+.crab-body{position:absolute;left:5px;bottom:2px;width:14px;height:10px;border-radius:7px 7px 3px 3px;background:#e58b69;border:1px solid #ffcfaa}
+.crab-eye{position:absolute;top:-5px;width:3px;height:5px;background:#a9564a;border-radius:2px}.crab-eye.left{left:2px}.crab-eye.right{right:2px}
+.crab-claw{position:absolute;bottom:4px;width:8px;height:7px;border:2px solid #e58b69;border-radius:50%}
+.crab-claw.left{left:0}.crab-claw.right{right:0}
+@keyframes harbor-crab-walk{0%,100%{opacity:0;transform:translateX(-20px)}12%,30%{opacity:1;transform:translateX(0)}45%{transform:translateX(28px)}53%{transform:translateX(25px)}75%{transform:translateX(62px)}90%{opacity:1;transform:translateX(92px)}}
+.harbor-event-jelly{left:var(--event-x);bottom:3px;width:19px;height:28px;filter:drop-shadow(0 0 5px #95ffffa0);animation:harbor-jelly-drift var(--event-duration) ease-in-out both}
+.jelly-bell{position:absolute;top:3px;left:2px;width:15px;height:12px;border-radius:60% 60% 30% 30%;background:#a6f7e79a;border:1px solid #d0fff2}
+.jelly-tentacles{position:absolute;top:13px;left:6px;height:13px;width:2px;background:#b5faf0b0;box-shadow:5px 0 0 #b5faf0b0,9px -2px 0 #b5faf0a0}
+@keyframes harbor-jelly-drift{0%,100%{opacity:0;transform:translate(0,12px)}15%{opacity:.75}45%{transform:translate(12px,-6px)}75%{opacity:.85;transform:translate(25px,-13px)}}
+.harbor-event-catnap{left:var(--event-x);bottom:65px;width:30px;height:21px;animation:harbor-nap var(--event-duration) ease-in-out both}
+.nap-cat{position:absolute;bottom:0;left:2px;width:24px;height:14px;background:#c8b1a3;border:1px solid #876f68;border-radius:60% 55% 50% 45%}
+.nap-ear{position:absolute;left:3px;top:-6px;width:9px;height:9px;background:#bca49a;clip-path:polygon(0 100%,50% 0,100% 100%)}
+.nap-face{position:absolute;left:5px;top:4px;width:9px;height:3px;border-bottom:1px solid #685a58;border-radius:50%}
+.nap-tail{position:absolute;right:-5px;top:2px;width:10px;height:10px;border:3px solid #bca49a;border-bottom:0;border-left:0;border-radius:80%}
+@keyframes harbor-nap{0%,100%{opacity:0;transform:translateX(-10px)}12%,88%{opacity:1;transform:translateX(0)}55%{transform:translateY(1px)}}
+.harbor-event-meteor{right:15%;top:6px;width:12px;height:12px;animation:harbor-meteor var(--event-duration) ease-out both}
+.meteor-star{position:absolute;left:0;top:0;width:7px;height:7px;border-radius:50%;background:#fff5c6;box-shadow:0 0 7px 2px #ffe7a2}
+.meteor-star:before{content:"";position:absolute;right:3px;top:3px;width:56px;height:2px;background:linear-gradient(90deg,transparent,#c8eaffae);transform:rotate(-26deg);transform-origin:right}
+@keyframes harbor-meteor{0%,20%,100%{opacity:0}25%{opacity:1;transform:translate(0,0)}60%{opacity:1;transform:translate(-95px,28px)}75%{opacity:0;transform:translate(-135px,40px)}}
+.harbor-event-paperboat{left:var(--event-x);bottom:30px;width:26px;height:25px;animation:harbor-paperboat-drift var(--event-duration) ease-in-out both}
+.paper-boat-sail{position:absolute;left:10px;top:1px;width:14px;height:17px;background:#fff4d8;clip-path:polygon(0 100%,0 0,100% 100%)}
+.paper-boat-hull{position:absolute;left:2px;bottom:3px;width:23px;height:9px;background:#f3ead6;clip-path:polygon(0 0,100% 0,73% 100%,27% 100%)}
+@keyframes harbor-paperboat-drift{0%,100%{opacity:0;transform:translateX(-40px) rotate(-5deg)}12%{opacity:1}35%{transform:translate(16px,-2px) rotate(5deg)}65%{transform:translate(44px,1px) rotate(-4deg)}88%{opacity:1;transform:translate(70px,0) rotate(3deg)}}
+.harbor-event-interaction{left:var(--event-x);bottom:66px;width:45px;height:80px;animation:harbor-interaction-scene var(--event-duration) linear both}
+.interaction-worker{position:absolute;bottom:0;left:9px;width:8px;height:24px}
+.interaction-worker .helmet{position:absolute;left:1px;top:0;width:7px;height:7px;background:#e2bb75;border-radius:4px}
+.interaction-worker .vest{position:absolute;top:7px;width:8px;height:10px;background:#d67e4b}
+.interaction-worker .legs{position:absolute;top:17px;left:1px;width:2px;height:7px;background:#3e6471;box-shadow:4px 0 #3e6471}
+.interaction-bird{position:absolute;left:0;top:0;width:19px;height:19px;animation:harbor-bird-visit var(--event-duration) ease-in-out both}
+.interaction-bird .tit-wing{animation:harbor-tit-flap .2s ease-in-out infinite alternate}
+@keyframes harbor-interaction-scene{0%,100%{opacity:0}10%,90%{opacity:1}}
+@keyframes harbor-bird-visit{0%{transform:translate(-25px,-15px)}25%{transform:translate(19px,24px)}40%,75%{transform:translate(18px,37px)}100%{transform:translate(80px,-50px)}}
+@media(max-width:700px){.harbor-event-meteor{right:8%}.harbor-event-interaction{bottom:56px}.harbor-event-crab{bottom:56px}.harbor-event-catnap{bottom:55px}}
+@media(prefers-reduced-motion:reduce){.harbor-event-seal,.harbor-event-crab,.harbor-event-jelly,.harbor-event-catnap,.harbor-event-meteor,.harbor-event-paperboat,.harbor-event-interaction{animation:none!important}}
