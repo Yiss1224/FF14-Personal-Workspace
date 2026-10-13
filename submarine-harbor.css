@@ -1,0 +1,32 @@
+/* Floating mini harbor: cosmetic only; all fleet data remains in existing storage. */
+#mini-harbor{position:fixed;z-index:45;bottom:12px;left:50%;transform:translateX(-50%);width:min(960px,calc(100vw - 26px));background:#102b40;color:#e8f5f8;border:1px solid #467484;border-radius:15px;box-shadow:0 14px 44px #06192670;overflow:hidden;font-family:inherit}
+.harbor-bar{display:flex;gap:12px;justify-content:space-between;align-items:center;padding:9px 13px;background:linear-gradient(90deg,#17374a,#22586a)}
+.harbor-bar strong{font-size:13px;letter-spacing:.025em}
+.harbor-bar small{font-size:11px;color:#b6d2db;margin-left:10px}
+#harbor-fold{min-height:27px;padding:3px 10px;background:#2c5667;color:#fff;border:1px solid #578191;font-size:11px}
+.harbor-body{padding:8px 12px 11px;max-height:280px;overflow-y:auto}
+.harbor-intro{font-size:11px;color:#b4cdd3;margin-bottom:4px}
+.harbor-lane{display:grid;grid-template-columns:minmax(130px,200px) 1fr;align-items:center;gap:10px;border-bottom:1px solid #ffffff16;padding:3px 0}
+.harbor-lane:last-child{border-bottom:0}
+.harbor-lane-title{min-width:0;line-height:1.4}.harbor-lane-title strong{font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.harbor-lane-title small{font-size:10px;color:#a2c8d2}
+.harbor-waterway{height:31px;position:relative;overflow:hidden;background:repeating-linear-gradient(180deg,#174c65 0,#174c65 9px,#235c71 10px,#174c65 19px);border:1px solid #396e7a;border-radius:6px}
+.harbor-pier{position:absolute;left:0;top:0;bottom:0;width:7%;background:repeating-linear-gradient(90deg,#806c56 0,#806c56 7px,#b09268 8px,#b09268 14px)}
+.harbor-finish{position:absolute;right:3%;top:1px;color:#f2c47e;font-size:20px;line-height:1.4}
+.harbor-boat{position:absolute;bottom:7px;width:37px;height:18px;display:block;transition:left 2s linear;filter:drop-shadow(1px 2px 1px #001d2b66)}
+.harbor-tower{position:absolute;left:11px;top:0;width:14px;height:8px;background:#a2c8cc;border:1px solid #d0e8e4;border-radius:4px 4px 0 0}
+.harbor-hull{position:absolute;top:6px;left:0;width:37px;height:12px;background:#6f9fac;border:1px solid #d1e4e2;clip-path:polygon(0 0,100% 0,86% 100%,14% 100%)}
+.harbor-boat.return .harbor-hull{transform:scaleX(-1)}
+.harbor-boat.sailing{animation:harbor-bob 3s ease-in-out infinite}
+@keyframes harbor-bob{0%,100%{bottom:7px}50%{bottom:9px}}
+.harbor-collapsed .harbor-body{display:none}
+.harbor-worker{position:absolute;bottom:3px;left:5%;height:17px;width:8px;pointer-events:none;animation:harbor-worker-walk 11s ease-in-out infinite alternate}
+.harbor-worker:before{content:"";position:absolute;top:0;left:2px;width:5px;height:5px;background:#e6bc85;border-radius:50%}
+.harbor-worker:after{content:"";position:absolute;top:5px;left:1px;width:7px;height:9px;background:#e9ad61;border-radius:2px}
+.harbor-yard{height:21px;background:#634f44;border-top:3px solid #9d8365;position:relative;overflow:hidden}
+.harbor-crates{position:absolute;right:6%;bottom:2px;width:54px;height:13px;background:repeating-linear-gradient(90deg,#a87a4e 0,#a87a4e 17px,#d7aa77 18px,#a87a4e 19px)}
+.harbor-worker.second{animation-duration:15s;animation-delay:-6s;left:20%}
+@keyframes harbor-worker-walk{from{transform:translateX(0)}to{transform:translateX(170px)}}
+body{padding-bottom:125px}
+@media(max-width:700px){.harbor-lane{grid-template-columns:110px 1fr;gap:6px}.harbor-body{padding:7px}.harbor-lane-title strong{font-size:11px}.harbor-lane-title small{font-size:9px}#mini-harbor{bottom:5px;width:calc(100vw - 12px)}}
+@media(max-width:500px){body{padding-bottom:165px}.harbor-lane{display:block}.harbor-lane-title{display:flex;align-items:center;justify-content:space-between;gap:5px}.harbor-waterway{height:24px}.harbor-boat{bottom:3px}.harbor-boat.sailing{animation:none}.harbor-body{max-height:230px}}
+@media(prefers-reduced-motion:reduce){.harbor-worker,.harbor-boat.sailing{animation:none}.harbor-boat{transition:none}}
