@@ -249,12 +249,13 @@ function bestItemRoutes(available,ship,key,maxHours,s,itemId,beamLimit=400){
 function renderItemPlanner(){
  const select=$('target-item'),search=$('target-item-search');if(!select)return;
  const names=new Map();
- for(const row of lootData)if(!names.has(row.itemId))names.set(row.itemId,{local:row.localName||row.name,en:row.name});
+ const aliases={30093:['銀山雀']};
+ for(const row of lootData)if(!names.has(row.itemId))names.set(row.itemId,{local:row.itemId===30093?'銀山雀':(row.localName||row.name),en:row.name,aliases:aliases[row.itemId]||[]});
  const all=[...names].map(([id,n])=>({id:String(id),...n})).sort((a,b)=>a.local.localeCompare(b.local));
  function fillOptions(query=''){
   const q=String(query||'').trim().toLocaleLowerCase();
   const current=select.value;
-  const filtered=q?all.filter(x=>x.local.toLocaleLowerCase().includes(q)||x.en.toLocaleLowerCase().includes(q)):all;
+  const filtered=q?all.filter(x=>x.local.toLocaleLowerCase().includes(q)||x.en.toLocaleLowerCase().includes(q)||x.aliases.some(a=>a.toLocaleLowerCase().includes(q))):all;
   select.innerHTML='<option value="">選擇想撈取的物品…</option>'+filtered.map(x=>'<option value="'+x.id+'">'+esc(x.local)+'</option>').join('');
   if(current&&filtered.some(x=>x.id===current))select.value=current;
  }
@@ -551,7 +552,7 @@ function savePlannerSettings(manualDeparture){
 }
 async function init(){
  try{
-  const [res,lootRes]=await Promise.all([fetch('submarine-route-data.json'),fetch('submarine-loot-data.json?v=20261017-3')]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
+  const [res,lootRes]=await Promise.all([fetch('submarine-route-data.json'),fetch('submarine-loot-data.json?v=20261017-4')]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
   data=await res.json();lootData=await lootRes.json();
   renderBuilds();renderSectors();renderItemPlanner();
   let manuallySelectedDeparture=plannerControls(state().plannerSettings);
