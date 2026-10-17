@@ -211,3 +211,26 @@ tbody tr:hover{background:var(--ui-teal-soft);}
 .item-planner>summary::before{content:"＋";display:inline-block;width:1.6em;color:var(--ui-teal,#007f86)}
 .item-planner[open]>summary::before{content:"－"}
 .item-planner-body{padding:0 18px 18px}
+
+/* Fleet inventory dialog */
+.inventory-launch{display:flex;justify-content:space-between;align-items:center;gap:14px;margin:12px 0 18px;padding:14px 16px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface-soft);color:var(--ui-ink)}
+.fleet-summary{margin-top:14px;color:var(--ui-muted)}
+.sub-inventory-dialog{width:min(1180px,calc(100vw - 28px));max-width:none;max-height:calc(100dvh - 28px);padding:0;border:1px solid var(--ui-border);border-radius:18px;background:var(--ui-bg);color:var(--ui-ink);box-shadow:0 24px 80px rgba(0,0,0,.32)}
+.sub-inventory-dialog::backdrop{background:rgba(7,18,30,.62);backdrop-filter:blur(3px)}
+.inventory-dialog-shell{display:flex;max-height:calc(100dvh - 30px);flex-direction:column}
+.inventory-dialog-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 22px;border-bottom:1px solid var(--ui-border);background:var(--ui-surface)}
+.inventory-dialog-header h2{margin:2px 0 0;color:var(--ui-ink)}
+.inventory-dialog-header .eyebrow{font-size:11px;letter-spacing:.12em;color:var(--ui-muted)}
+.inventory-dialog-body{overflow:auto;padding:18px 22px 26px}
+.inventory-dialog-section{margin:0 0 24px;padding:18px;border:1px solid var(--ui-border);border-radius:14px;background:var(--ui-surface)}
+.inventory-dialog-section h3{margin:0 0 12px;color:var(--ui-ink)}
+.sub-inventory-dialog .fleet-grid{grid-template-columns:repeat(auto-fit,minmax(235px,1fr))}
+.part-inventory-table{width:100%;min-width:650px;border-collapse:separate;border-spacing:0}
+.part-inventory-table th,.part-inventory-table td{padding:9px 10px;border-bottom:1px solid var(--ui-border);text-align:center}
+.part-inventory-table thead th{color:var(--ui-muted);font-size:13px}
+.part-inventory-table tbody th{text-align:left;white-space:nowrap}
+.part-inventory-table input{width:88px;max-width:100%;min-height:38px;text-align:center}
+.part-buildable{display:grid;gap:6px;margin-top:14px;padding:14px;border-radius:12px;background:var(--ui-teal-soft);color:var(--ui-ink)}
+.part-buildable strong{color:var(--ui-teal)}
+.part-buildable small{color:var(--ui-muted)}
+@media(max-width:600px){.inventory-launch{align-items:stretch;flex-direction:column}.inventory-launch button{width:100%}.inventory-dialog-header,.inventory-dialog-body{padding-left:13px;padding-right:13px}.inventory-dialog-section{padding:13px}}
