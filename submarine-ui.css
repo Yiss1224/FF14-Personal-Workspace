@@ -199,11 +199,11 @@ tbody tr:hover{background:var(--ui-teal-soft);}
 /* Item route recommendation, in the dispatch planner */
 .item-planner{margin:18px 0 20px;padding:18px;border:1px solid var(--ui-border,#dfe7ee);border-radius:14px;background:var(--ui-surface-soft,#f6f9fb)}
 .item-planner h3{margin:0 0 12px;color:var(--ui-ink,#1a2d42)}
-.item-planner-controls{display:grid;grid-template-columns:minmax(220px,1fr) 170px auto;gap:12px;align-items:end}
+.item-planner-controls{display:grid;grid-template-columns:minmax(220px,1fr) minmax(220px,1fr) 170px auto;gap:12px;align-items:end}
 .item-planner-controls label{display:grid;gap:6px;color:var(--ui-ink,#1a2d42);font-size:14px}
-.item-planner-controls select,.item-planner-controls button{min-height:42px}
+.item-planner-controls select,.item-planner-controls input,.item-planner-controls button{min-height:42px}
 .item-route-card{margin-top:12px}
-@media(max-width:700px){.item-planner-controls{grid-template-columns:1fr 1fr}.item-planner-controls label:first-child{grid-column:1/-1}.item-planner-controls button{grid-column:1/-1}}
+@media(max-width:700px){.item-planner-controls{grid-template-columns:1fr 1fr}.item-planner-controls label:nth-child(1),.item-planner-controls label:nth-child(2){grid-column:1/-1}.item-planner-controls button{grid-column:1/-1}}
 
 .item-planner{padding:0;overflow:hidden}
 .item-planner>summary{cursor:pointer;list-style:none;padding:16px 18px;font-weight:700;color:var(--ui-ink,#1a2d42)}
