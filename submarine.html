@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <title>FF14 潛水艇養成計畫</title>
   <link rel="stylesheet" href="submarine.css?v=20261012-3">
-  <link rel="stylesheet" href="submarine-ui.css?v=20261017-1">
+  <link rel="stylesheet" href="submarine-ui.css?v=20261017-2">
   <link rel="stylesheet" href="submarine-harbor.css?v=20261013-26">
 </head>
 <body>
@@ -45,10 +45,10 @@
       <div class="stock-grid">
         <label>青燐水燃料庫存 <input id="fuel-stock" type="number" min="0" step="1"></label>
         <label>魔導機械修理材料庫存 <input id="repair-stock" type="number" min="0" step="1"></label>
-        <label>1111 完整套數 <input id="parts-1111" type="number" min="0" step="1"></label>
-        <label>0020 船首套數 <input id="parts-0020" type="number" min="0" step="1"></label>
-        <label>3004 船體＋艦橋套數 <input id="parts-3004" type="number" min="0" step="1"></label>
-        <label>0003 鯨級艦橋數量 <input id="parts-0003" type="number" min="0" step="1"></label>
+      </div>
+      <div class="inventory-launch">
+        <span id="parts-inventory-summary">部件庫存尚未載入</span>
+        <button id="open-inventory" type="button">管理潛水艇與部件庫存</button>
       </div>
       <div id="estimate" class="estimate-grid"></div>
       
@@ -56,8 +56,30 @@
 
     <section class="panel" id="fleet-panel">
       <div class="section-title"><div><h2>船隊進度</h2></div></div>
-      <div id="fleet" class="fleet-grid"></div>
+      <p class="hint">潛水艇 Rank、名稱、登記狀態與部件庫存集中在管理視窗。</p>
+      <button type="button" data-open-inventory>管理潛水艇與部件庫存</button>
+      <div id="fleet-summary" class="fleet-summary"></div>
     </section>
+    <dialog id="sub-inventory-dialog" class="sub-inventory-dialog" aria-labelledby="sub-inventory-title">
+      <div class="inventory-dialog-shell">
+        <div class="inventory-dialog-header">
+          <div><span class="eyebrow">FLEET · PARTS</span><h2 id="sub-inventory-title">潛水艇與部件庫存</h2></div>
+          <button type="button" id="close-inventory" aria-label="關閉視窗">關閉</button>
+        </div>
+        <div class="inventory-dialog-body">
+          <section class="inventory-dialog-section">
+            <h3>潛水艇狀態</h3>
+            <div id="fleet" class="fleet-grid"></div>
+          </section>
+          <section class="inventory-dialog-section">
+            <h3>部件庫存</h3>
+            <p class="hint">依部件型號與船體、船尾、船首、艦橋分別登記件數。</p>
+            <div id="part-inventory"></div>
+            <div id="part-buildable" class="part-buildable"></div>
+          </section>
+        </div>
+      </div>
+    </dialog>
 
     <section class="panel" id="calculator-panel">
       <h2>當前派船計算器</h2>
@@ -253,8 +275,8 @@
     <span id="harbor-clock" class="harbor-screenreader" aria-live="off"></span>
   </aside>
   <div id="harbor-tooltip" class="harbor-tooltip" role="tooltip" hidden></div>
-  <script src="submarine.js?v=20261012-2"></script>
-  <script src="submarine-calculator.js?v=20261017-6"></script>
+  <script src="submarine.js?v=20261017-2"></script>
+  <script src="submarine-calculator.js?v=20261017-8"></script>
   <script src="submarine-settlement.js?v=20261012-10"></script>
   <script defer src="submarine-ledger.js?v=20261012-9"></script>
   <script defer src="submarine-drop-select.js?v=20261012-8"></script>
