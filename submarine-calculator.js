@@ -247,10 +247,19 @@ function bestItemRoutes(available,ship,key,maxHours,s,itemId,beamLimit=400){
  return [...unique.values()].sort((a,b)=>b.score-a.score).slice(0,5);
 }
 function renderItemPlanner(){
- const select=$('target-item');if(!select)return;
+ const select=$('target-item'),search=$('target-item-search');if(!select)return;
  const names=new Map();
- for(const row of lootData)if(!names.has(row.itemId))names.set(row.itemId,row.localName||row.name);
- select.innerHTML='<option value="">選擇想撈的物品…</option>'+[...names].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>'<option value="'+id+'">'+esc(name)+'</option>').join('');
+ for(const row of lootData)if(!names.has(row.itemId))names.set(row.itemId,{local:row.localName||row.name,en:row.name});
+ const all=[...names].map(([id,n])=>({id:String(id),...n})).sort((a,b)=>a.local.localeCompare(b.local));
+ function fillOptions(query=''){
+  const q=String(query||'').trim().toLocaleLowerCase();
+  const current=select.value;
+  const filtered=q?all.filter(x=>x.local.toLocaleLowerCase().includes(q)||x.en.toLocaleLowerCase().includes(q)):all;
+  select.innerHTML='<option value="">選擇想撈取的物品…</option>'+filtered.map(x=>'<option value="'+x.id+'">'+esc(x.local)+'</option>').join('');
+  if(current&&filtered.some(x=>x.id===current))select.value=current;
+ }
+ fillOptions();
+ if(search)search.oninput=()=>fillOptions(search.value);
  $('calc-item-routes').onclick=calculateItemRoutes;
 }
 function calculateItemRoutes(){
