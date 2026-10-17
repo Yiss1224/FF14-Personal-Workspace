@@ -102,7 +102,7 @@ function state(){
  }catch{return base}
 }
 function persist(mutator){const s=state();mutator(s);localStorage.setItem(KEY,JSON.stringify(s));window.dispatchEvent(new Event('submarine-build-state-updated'))}
-let data=null,lootData=[];
+let data=null,lootData=[],pendingItemDeparture=null;
 function rankRec(rank){return data.ranks.find(x=>x.rank===rank)||data.ranks.filter(x=>x.rank<=rank).at(-1)}
 function shipRank(ship){return Math.max(1,Number(ship.rank)||1)}
 function shipLabel(index,ship){
@@ -286,9 +286,9 @@ function calculateItemRoutes(){
  const total=stock(s),voyaging=ships.filter(ship=>ship.voyaging),ready=ships.filter(ship=>!ship.voyaging);
  let fixedUsage={};
  for(const ship of voyaging){
-  const next=allocate(installed(ship),fixedUsage,total);
-  if(!next){$('item-route-result').innerHTML='<p class="calc-warning">航行中的配件已超出目前登記庫存。請核對持有總數（含已裝配部件）。</p>';return}
-  fixedUsage=next;
+  const used=allocate(installed(ship),fixedUsage,total);
+  if(!used){$('item-route-result').innerHTML='<p class="calc-warning">航行中的配件已超出目前登記庫存。請核對持有總數（含已裝配部件）。</p>';return}
+  fixedUsage=used;
  }
  const candidates=[];
  for(const ship of ready){
@@ -301,16 +301,21 @@ function calculateItemRoutes(){
  }
  candidates.sort((a,b)=>b.route.score-a.route.score);
  const best=candidates.slice(0,5);
- if(!best.length){
-  $('item-route-result').innerHTML='<p class="calc-warning">'+(ready.length?'目前海域、Rank、可用部件庫存與 '+hours+' 小時限制內，找不到包含此物品的可行航線。':'所有已登記潛水艇目前都在航行中。')+'</p>';return;
- }
+ if(!best.length){$('item-route-result').innerHTML='<p class="calc-warning">'+(ready.length?'目前海域、Rank、可用部件庫存與 '+hours+' 小時限制內，找不到包含此物品的可行航線。':'所有已登記潛水艇目前都在航行中。')+'</p>';return}
  $('item-route-result').innerHTML=best.map(({ship,key,route},i)=>
   '<article class="route-card item-route-card"'+(i===0?' style="border:2px solid #e3aa35;box-shadow:0 0 0 3px rgba(227,170,53,.16)"':'')+'><h3>#'+(i+1)+' · '+(i===0?'<span style="display:inline-block;background:#e3aa35;color:#fff;padding:2px 8px;border-radius:999px;margin-right:6px">最佳</span>':'')+esc(shipLabel(ship.index,ship))+' · '+esc(makeLabel(route.path))+'</h3>'
   +'<div class="route-meta">配置 '+esc(key)+' · Rank '+shipRank(ship)+' · '+fmtTime(route.time)+' · '+route.fuel+' 罐燃料 · 航程 '+route.range+'</div>'
-  +'<div class="route-kpis"><span>預期約 '+fmtYield(route.yield)+' 個／趟（normal 組樣本）</span>'
-  +'<span>至少取得一次：約 '+(route.hit*100).toFixed(1)+'%</span>'
-  +'<span>預期量／出航週期：'+fmtYield(route.score*3600)+' 個／小時</span></div></article>'
- ).join('')+'<p class="hint">列出最高收益的五個配置候選；航行中潛水艇的部件先保留，庫存不足的配置會排除。各候選為替代方案，選定後再安排派船。掉落估值為統計期望值，實際結果會受機率影響。</p>';
+  +'<div class="route-kpis"><span>預期約 '+fmtYield(route.yield)+' 個／趟（normal 組樣本）</span><span>至少取得一次：約 '+(route.hit*100).toFixed(1)+'%</span><span>預期量／出航週期：'+fmtYield(route.score*3600)+' 個／小時</span></div>'
+  +'<div class="voyage-depart-actions"><span class="route-meta">選取後加入下方出航確認</span><button type="button" data-item-route="'+i+'">套用到出航確認</button></div></article>'
+ ).join('')+'<p class="hint">列出最高收益的五個庫存可行候選；航行中配件先保留。候選為替代方案，實際裝備需在遊戲內完成。</p>';
+ $('item-route-result').querySelectorAll('[data-item-route]').forEach(btn=>btn.onclick=()=>{
+  const choice=best[Number(btn.dataset.itemRoute)];
+  if(!choice)return;
+  pendingItemDeparture={shipIndex:choice.ship.index,key:choice.key,route:choice.route,
+   itemLabel:$('target-item')?.selectedOptions?.[0]?.textContent?.trim()||'指定物品'};
+  calculate();
+  $('calc-result').scrollIntoView({behavior:'smooth',block:'start'});
+ });
 }
 function cumulativeTo(rank){
  let n=0;
@@ -528,6 +533,35 @@ function calculate(){
   +(daily?'每天可收／派船窗口 '+fmtClock(windowSettings().start*60)+'～'+fmtClock(windowSettings().end*60)+'；考慮實際預計出航時間與下一次可收船時間。':'以 EXP／實際時間比較。')
   +' 智慧分配屬逐趟前瞻估算，不是保證全球最短畢業日；實際開圖 RNG、EXP 獎勵及未來航點變化仍會改變最佳選擇。</p>'
   +(registered.some(x=>shipRank(x)>80)?'<p class="hint calc-warning">航線資料目前只到海圖 3、Rank 80 的海域；Rank 81 以上使用現有海域預估。</p>':'');
+ if(pendingItemDeparture){
+  const pending=pendingItemDeparture,ship=ships[pending.shipIndex];
+  if(!ship||!ship.registered||ship.voyaging){
+   $('calc-result').insertAdjacentHTML('beforeend','<article class="route-card"><h3>指定物品航線</h3><p class="calc-warning">選取的潛水艇目前無法出航，請重新選擇候選。</p><button type="button" data-clear-item-route>清除選取</button></article>');
+  }else{
+   const currentBuild=installed(ship),routeText=makeLabel(pending.route.path);
+   const switchControl=currentBuild===pending.key
+    ?'<p class="route-meta">目前紀錄配置已符合，可直接確認出航。</p>'
+    :'<div class="switch-advice"><strong>請先在遊戲內換裝：'+esc(currentBuild)+' → '+esc(pending.key)+'</strong><span>'+esc(changes(currentBuild,pending.key))+'</span><button type="button" data-sync-item-build>已在遊戲換裝，更新紀錄</button></div>';
+   $('calc-result').insertAdjacentHTML('beforeend','<article class="route-card item-route-confirm" style="border:2px solid #36a6a0"><h3>指定物品航線已套用至出航確認</h3><div class="route-meta">'+esc(shipLabel(pending.shipIndex,ship))+' · '+esc(pending.itemLabel)+' · '+esc(routeText)+'</div><div class="route-meta">配置 '+esc(pending.key)+' · '+fmtTime(pending.route.time)+' · '+pending.route.fuel+' 罐燃料</div>'+switchControl+'<div class="voyage-depart-actions"><span class="route-meta">確認前請確定遊戲內已派往此航線。</span><button type="button" class="voyage-depart-button" data-depart-item-route>⚓ 確認出航</button><button type="button" data-clear-item-route>取消此選擇</button></div></article>');
+   $('calc-result').querySelector('[data-sync-item-build]')?.addEventListener('click',()=>{
+    if(!window.confirm('請確認已在 FF14 遊戲內將「'+shipLabel(pending.shipIndex,ship)+'」換成 '+pending.key+'。確認後只更新本工具的配置紀錄。'))return;
+    persist(st=>{if(st.ships?.[pending.shipIndex]&&!st.ships[pending.shipIndex].voyaging)st.ships[pending.shipIndex].currentBuild=pending.key});
+    renderBuilds();calculate();
+   });
+   $('calc-result').querySelector('[data-depart-item-route]')?.addEventListener('click',()=>{
+    const current=state(),latest=current.ships?.[pending.shipIndex];
+    if(!latest||!latest.registered||latest.voyaging){alert('潛艇狀態已變更，請重新計算。');calculate();return}
+    if(installed(latest)!==pending.key){alert('請先在遊戲內換裝並更新配置紀錄。');return}
+    const duration=Math.round(Number(pending.route.time));
+    if(!Number.isFinite(duration)||duration<=0){alert('航程時間無效，請重新計算。');return}
+    if(!window.confirm('已在 FF14 中將「'+shipLabel(pending.shipIndex,latest)+'」實際派往「'+routeText+'」嗎？確認後開始計時；燃料與物資會在返航結算時扣除。'))return;
+    const now=Date.now();
+    persist(st=>{const target=st.ships?.[pending.shipIndex];if(!target||target.voyaging)return;target.voyaging=true;target.voyage={departedAt:now,etaAt:now+duration*1000,durationSeconds:duration,route:routeText,build:pending.key,fuelEstimate:Number(pending.route.fuel)||0}});
+    pendingItemDeparture=null;window.dispatchEvent(new Event('submarine-voyage-started'));renderBuilds();calculate();
+   });
+  }
+  $('calc-result').querySelectorAll('[data-clear-item-route]').forEach(btn=>btn.onclick=()=>{pendingItemDeparture=null;calculate()});
+ }
  $('calc-result').querySelectorAll('[data-depart-ship]').forEach(btn=>btn.onclick=()=>{
   const i=Number(btn.dataset.departShip),choice=selected.get(i),current=state(),ship=current.ships?.[i];
   if(!ship||!ship.registered||ship.voyaging||!choice){alert('船隻狀態已變更，請重新計算航線。');calculate();return;}
