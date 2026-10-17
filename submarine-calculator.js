@@ -25,9 +25,23 @@ const buildPieces={
 };
 const partNames=['船體','船尾','船首','艦橋'],classNames={1:'鯊級',2:'雲鯨級',3:'鯨級',4:'腔棘魚級'};
 function validBuild(key,rank){const b=builds[key],rec=rankRec(rank);return Boolean(b&&b.min&&rec&&rank>=b.min&&rec.cap>=b.cost)}
+function legacyPartStock(parts){
+ const result={};for(let cls=1;cls<=5;cls++)for(let slot=0;slot<4;slot++)result[cls+':'+slot]=0;
+ for(let slot=0;slot<4;slot++)result['1:'+slot]=Math.max(0,Number(parts?.['1111'])||0);
+ result['2:2']=Math.max(0,Number(parts?.['0020'])||0);
+ result['3:0']=Math.max(0,Number(parts?.['3004'])||0);
+ result['4:3']=Math.max(0,Number(parts?.['3004'])||0);
+ result['3:3']=Math.max(0,Number(parts?.['0003'])||0);
+ return result;
+}
 function stock(s){
- const result={};
- for(const k of ['1111','0020','3004','0003'])for(const slot of [0,1,2,3])result[k+':'+slot]=Math.max(0,Number(s.parts?.[k])||0);
+ const matrix={...legacyPartStock(s.parts),...(s.partStock||{})},result={};
+ for(const k of ['1111','0020','3004','0003'])for(const slot of [0,1,2,3])result[k+':'+slot]=0;
+ for(let slot=0;slot<4;slot++)result['1111:'+slot]=Math.max(0,Number(matrix['1:'+slot])||0);
+ result['0020:2']=Math.max(0,Number(matrix['2:2'])||0);
+ result['3004:0']=Math.max(0,Number(matrix['3:0'])||0);
+ result['3004:3']=Math.max(0,Number(matrix['4:3'])||0);
+ result['0003:3']=Math.max(0,Number(matrix['3:3'])||0);
  return result;
 }
 function allocate(build,used,total){
@@ -80,10 +94,11 @@ function efficiency(route,daily){return route.actualXp/pickupElapsed(route.time,
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function state(){
- const base={fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4,'0003':0},ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0,name:''})),unlocks:{},logs:[],activeSectorMap:1};
+ const base={fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4,'0003':0},partStock:legacyPartStock({'1111':4,'0020':4,'3004':4,'0003':0}),ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0,name:''})),unlocks:{},logs:[],activeSectorMap:1};
  try{
   const saved=JSON.parse(localStorage.getItem(KEY)||'null')||{};
-  return {...base,...saved,parts:{...base.parts,...(saved.parts||{})},ships:base.ships.map((ship,i)=>({...ship,...(saved.ships?.[i]||{})})),unlocks:saved.unlocks||{},logs:Array.isArray(saved.logs)?saved.logs:[]};
+  const parts={...base.parts,...(saved.parts||{})};
+  return {...base,...saved,parts,partStock:{...legacyPartStock(parts),...(saved.partStock||{})},ships:base.ships.map((ship,i)=>({...ship,...(saved.ships?.[i]||{})})),unlocks:saved.unlocks||{},logs:Array.isArray(saved.logs)?saved.logs:[]};
  }catch{return base}
 }
 function persist(mutator){const s=state();mutator(s);localStorage.setItem(KEY,JSON.stringify(s));window.dispatchEvent(new Event('submarine-build-state-updated'))}
@@ -371,7 +386,7 @@ function calculate(){
  if(!data)return;
  const s=state(),ships=s.ships||[],open=unlockedSectors(s,145),
   hours=Number($('calc-hours').value)||48,target=Math.max(2,Math.min(90,Number($('calc-target-rank').value)||85)),
-  daily=Boolean($('daily-pickup')?.checked),total=stock(s),available0003=Math.max(0,Number(s.parts?.['0003'])||0);
+  daily=Boolean($('daily-pickup')?.checked),total=stock(s),available0003=Math.max(0,Number(total['0003:3'])||0);
  const w=windowSettings();
  if(daily&&!w.valid){$('calc-result').innerHTML='<p class="calc-warning">收船窗口結束時間必須晚於開始時間，且在同一天內。</p>';return}
  if(daily&&!w.departureInside){$('calc-result').innerHTML='<p class="calc-warning">預計本次派船時間應在收船窗口內；請調整時間後再計算。</p>';return}
