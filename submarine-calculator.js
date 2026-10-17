@@ -542,7 +542,7 @@ function savePlannerSettings(manualDeparture){
 }
 async function init(){
  try{
-  const [res,lootRes]=await Promise.all([fetch('submarine-route-data.json'),fetch('submarine-loot-data.json')]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
+  const [res,lootRes]=await Promise.all([fetch('submarine-route-data.json'),fetch('submarine-loot-data.json?v=20261017-2')]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
   data=await res.json();lootData=await lootRes.json();
   renderBuilds();renderSectors();renderItemPlanner();
   let manuallySelectedDeparture=plannerControls(state().plannerSettings);
