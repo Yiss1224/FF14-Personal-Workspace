@@ -74,8 +74,9 @@
         <button id="calc-routes" type="button">計算全艦隊配件與派船建議</button>
         
       </div>
-      <div class="item-planner">
-        <h3>指定物品撈取路線</h3>
+      <details class="item-planner">
+        <summary>指定物品撈取路線（需要時展開）</summary>
+        <div class="item-planner-body">
         <div class="item-planner-controls">
           <label>想撈取的物品 <select id="target-item"><option value="">載入物品資料…</option></select></label>
           <label>航程上限 <select id="target-item-hours"><option value="24">24 小時</option><option value="48">48 小時</option></select></label>
@@ -83,7 +84,8 @@
         </div>
         <div id="item-route-result" class="result" aria-live="polite"><p class="hint">從物品清單選擇目標，搜尋已開海域內的高預期掉落路線。</p></div>
         <p class="hint">掉落資料來自 <a href="https://github.com/saerielle/submersible-loot-db" target="_blank" rel="noreferrer">Submersible Loot DB</a> 社群回報；目前採用高觀測力掉落率與 normal 組平均數量作估值，非保證掉落。</p>
-      </div>
+        </div>
+      </details>
       <div id="ship-builds" class="build-grid"></div>
       <div id="calc-result" class="result">載入海域資料後即可計算；開放點預設只有溺沒海 A、B。</div>
       
@@ -251,7 +253,7 @@
   </aside>
   <div id="harbor-tooltip" class="harbor-tooltip" role="tooltip" hidden></div>
   <script src="submarine.js?v=20261012-2"></script>
-  <script src="submarine-calculator.js?v=20261017-1"></script>
+  <script src="submarine-calculator.js?v=20261017-2"></script>
   <script src="submarine-settlement.js?v=20261012-10"></script>
   <script defer src="submarine-ledger.js?v=20261012-9"></script>
   <script defer src="submarine-drop-select.js?v=20261012-8"></script>
