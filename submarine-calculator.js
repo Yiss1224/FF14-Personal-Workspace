@@ -249,7 +249,7 @@ function bestItemRoutes(available,ship,key,maxHours,s,itemId,beamLimit=400){
 function renderItemPlanner(){
  const select=$('target-item');if(!select)return;
  const names=new Map();
- for(const row of lootData)if(!names.has(row.itemId))names.set(row.itemId,row.name);
+ for(const row of lootData)if(!names.has(row.itemId))names.set(row.itemId,row.localName||row.name);
  select.innerHTML='<option value="">選擇想撈的物品…</option>'+[...names].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>'<option value="'+id+'">'+esc(name)+'</option>').join('');
  $('calc-item-routes').onclick=calculateItemRoutes;
 }
