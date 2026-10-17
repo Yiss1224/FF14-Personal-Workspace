@@ -1,13 +1,32 @@
 (function(){
 'use strict';
 const KEY='ff14_submarine_planner_v1';
-const fresh=()=>({
-  fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4,'0003':0},
+const legacyPartStock=parts=>{
+ const stock={};for(let cls=1;cls<=5;cls++)for(let slot=0;slot<4;slot++)stock[cls+':'+slot]=0;
+ const add=(cls,slot,n)=>{stock[cls+':'+slot]=Math.max(0,Number(n)||0)};
+ for(let slot=0;slot<4;slot++)add(1,slot,parts?.['1111']);
+ add(2,2,parts?.['0020']);
+ add(3,0,parts?.['3004']);add(4,3,parts?.['3004']);
+ add(3,3,parts?.['0003']);
+ return stock;
+};
+const partClasses={1:'鯊級',2:'雲鯨級',3:'鯨級',4:'腔棘魚級',5:'希爾德里昂級'};
+const partSlots=['船體','船尾','船首','艦橋'];
+const partRecipes={
+ '1111':['1:0','1:1','1:2','1:3'],
+ '1121':['1:0','1:1','2:2','1:3'],
+ '1123':['1:0','1:1','2:2','3:3'],
+ '3123':['3:0','1:1','2:2','3:3'],
+ '3124':['3:0','1:1','2:2','4:3']
+};
+const fresh=()=>{
+ const parts={'1111':4,'0020':4,'3004':4,'0003':0};
+ return {fuel:1600,repair:300,parts,partStock:legacyPartStock(parts),
   ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0,name:''})),
-  unlocks:{},logs:[],activeSectorMap:1
-});
+  unlocks:{},logs:[],activeSectorMap:1};
+};
 let state;
-try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');state=Object.assign(fresh(),saved||{});state.parts=Object.assign(fresh().parts,saved?.parts||{});state.ships=fresh().ships.map((x,i)=>Object.assign(x,saved?.ships?.[i]||{}));state.unlocks=saved?.unlocks||{};state.logs=Array.isArray(saved?.logs)?saved.logs:[]}catch(e){state=fresh()}
+try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');state=Object.assign(fresh(),saved||{});state.parts=Object.assign(fresh().parts,saved?.parts||{});state.partStock=Object.assign(legacyPartStock(state.parts),saved?.partStock||{});state.ships=fresh().ships.map((x,i)=>Object.assign(x,saved?.ships?.[i]||{}));state.unlocks=saved?.unlocks||{};state.logs=Array.isArray(saved?.logs)?saved.logs:[]}catch(e){state=fresh()}
 const $=id=>document.getElementById(id);
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const save=()=>{
@@ -48,6 +67,7 @@ window.addEventListener('submarine-settlement-saved',()=>{
   if(!saved)return;
   state=Object.assign(fresh(),saved);
   state.parts=Object.assign(fresh().parts,saved.parts||{});
+  state.partStock=Object.assign(legacyPartStock(state.parts),saved.partStock||{});
   state.ships=fresh().ships.map((x,i)=>Object.assign(x,saved.ships?.[i]||{}));
   state.logs=Array.isArray(saved.logs)?saved.logs:[];
   render();
@@ -85,13 +105,61 @@ function shipLabel(index,ship){
  return '潛水艇 '+(index+1)+(name?' · '+name:'');
 }
 function renderEstimate(){
- const s=Number(state.fuel)||0,r=Number(state.repair)||0;
+ const fuel=Number(state.fuel)||0,repair=Number(state.repair)||0;
  $('estimate').innerHTML=[
-  ['初始目標','Rank 85','按每艘目前 Rank、EXP、開放海域與船速即時計算，不再用固定趟數估算。'],
-  ['目前庫存',s.toLocaleString()+' 罐燃料 / '+r.toLocaleString()+' 個修理材料','預設採用你提供的庫存；可直接修改。'],
-  ['零件庫存','1111 ×'+(Number(state.parts['1111'])||0)+'、0020 ×'+(Number(state.parts['0020'])||0)+'、3004 ×'+(Number(state.parts['3004'])||0)+'、0003 ×'+(Number(state.parts['0003'])||0),'已開啟全艦隊 0003 智慧分配：依 Rank／EXP、已開航點、在航占用與預估 OJ 營運船日調整，每次收船後重新計算。'],
+  ['初始目標','Rank 85','依每艘目前 Rank、EXP、開放海域與船速即時計算。'],
+  ['目前庫存',fuel.toLocaleString()+' 罐燃料 / '+repair.toLocaleString()+' 個修理材料','燃料與修理材料仍可在本頁直接修改。'],
+  ['部件庫存','共 '+Object.values(state.partStock||{}).reduce((a,b)=>a+(Number(b)||0),0)+' 件','依型號與槽位逐件登記；全艦隊配置會讀取此庫存。'],
   ['估算範圍','路線資料到 Rank 80','不含 Rank 81 以上的新海域；EXP 預估不計隨機追加探索。']
  ].map(x=>'<div class="stat"><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong><small>'+esc(x[2])+'</small></div>').join('');
+}
+function renderPartInventory(){
+ const stock=state.partStock||legacyPartStock(state.parts),host=$('part-inventory');
+ host.innerHTML='<div class="table-wrap part-inventory-wrap"><table class="part-inventory-table"><thead><tr><th>部件型號</th>'+partSlots.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'
+  +Array.from({length:5},(_,i)=>i+1).map(cls=>'<tr><th>'+cls+' 型 · '+esc(partClasses[cls])+'</th>'+[0,1,2,3].map(slot=>'<td><input type="number" min="0" step="1" data-part-stock="'+cls+':'+slot+'" aria-label="'+esc(partClasses[cls]+' '+partSlots[slot]+'庫存')+'" value="'+(Number(stock[cls+':'+slot])||0)+'"></td>').join('')+'</tr>').join('')
+  +'</tbody></table></div><p class="hint">輸入每個槽位實際持有的部件件數，變更會立即保存並觸發派船建議重算。</p>';
+ host.querySelectorAll('[data-part-stock]').forEach(input=>input.onchange=()=>{
+  const key=input.dataset.partStock;
+  state.partStock[key]=Math.max(0,Math.floor(Number(input.value)||0));
+  syncLegacyPartCounts();save();
+ });
+ renderPartBuildable(stock);
+}
+function syncLegacyPartCounts(){
+ const stock=state.partStock;
+ const min=(keys)=>Math.min(...keys.map(k=>Number(stock[k])||0));
+ state.parts['1111']=min(['1:0','1:1','1:2','1:3']);
+ state.parts['0020']=Number(stock['2:2'])||0;
+ state.parts['3004']=Math.min(Number(stock['3:0'])||0,Number(stock['4:3'])||0);
+ state.parts['0003']=Number(stock['3:3'])||0;
+}
+function renderPartBuildable(stock){
+ const configs=Object.entries(partRecipes).map(([key,pieces])=>({key,pieces,rank:{1111:1,1121:15,1123:25,3123:25,3124:35}[key]}));
+ let best={count:-1,rank:-1,counts:{}},used={};
+ function walk(i,count,rank,counts){
+  if(i===configs.length){
+   if(count>best.count||(count===best.count&&rank>best.rank))best={count,rank,counts:{...counts}};
+   return;
+  }
+  const cfg=configs[i],limit=Math.min(4-count,...cfg.pieces.map(k=>Math.max(0,(Number(stock[k])||0)-(Number(used[k])||0))));
+  for(let n=0;n<=limit;n++){
+   cfg.pieces.forEach(k=>used[k]=(Number(used[k])||0)+n);
+   counts[cfg.key]=n;walk(i+1,count+n,rank+n*cfg.rank,counts);
+   cfg.pieces.forEach(k=>used[k]-=n);
+  }
+ }
+ walk(0,0,0,{});
+ const lines=Object.entries(best.counts).filter(([,n])=>n>0).map(([key,n])=>key+' × '+n+' 艘');
+ const class5=Object.keys(stock).filter(k=>k.startsWith('5:')).reduce((n,k)=>n+(Number(stock[k])||0),0);
+ $('part-buildable').innerHTML='<strong>依目前庫存最多可同時組成 '+Math.max(0,best.count)+' 艘</strong>'
+  +(lines.length?'<span>'+esc(lines.join('　／　'))+'</span>':'<span>目前數量不足以組出已登錄的配置。</span>')
+  +'<small>以上是純部件數量估算；Rank 門檻和各船實際已裝配置仍由派船計算器檢查。</small>'
+  +(class5?'<small>5 型目前已記錄 '+class5+' 件；現有建議配置尚未使用 5 型部件。</small>':'');
+}
+function renderFleetSummary(){
+ const registered=state.ships.filter(s=>s.registered).length;
+ $('fleet-summary').textContent='已登記 '+registered+' / 4 艘潛水艇；部件與個別 Rank 可在管理視窗調整。';
+ $('parts-inventory-summary').textContent='目前部件庫存：'+Object.values(state.partStock||{}).reduce((a,b)=>a+(Number(b)||0),0)+' 件（按型號與槽位管理）';
 }
 function renderFleet(){
  $('fleet').innerHTML=state.ships.map((s,i)=>{
@@ -166,11 +234,14 @@ function renderLogs(){
 }
 function render(){
  $('fuel-stock').value=Number(state.fuel)||0;$('repair-stock').value=Number(state.repair)||0;
- $('parts-1111').value=Number(state.parts['1111'])||0;$('parts-0020').value=Number(state.parts['0020'])||0;$('parts-3004').value=Number(state.parts['3004'])||0;$('parts-0003').value=Number(state.parts['0003'])||0;
- renderEstimate();renderFleet();renderRoutes();renderLogs();
+ renderEstimate();renderFleet();renderFleetSummary();renderPartInventory();renderRoutes();renderLogs();
 }
 [['fuel-stock','fuel'],['repair-stock','repair']].forEach(([id,key])=>$(id).onchange=()=>{state[key]=Math.max(0,Number($(id).value)||0);save()});
-[['parts-1111','1111'],['parts-0020','0020'],['parts-3004','3004'],['parts-0003','0003']].forEach(([id,key])=>$(id).onchange=()=>{state.parts[key]=Math.max(0,Number($(id).value)||0);save()});
+const inventoryDialog=$('sub-inventory-dialog');
+$('open-inventory').onclick=()=>inventoryDialog.showModal();
+document.querySelectorAll('[data-open-inventory]').forEach(btn=>btn.onclick=()=>inventoryDialog.showModal());
+$('close-inventory').onclick=()=>inventoryDialog.close();
+inventoryDialog.addEventListener('click',e=>{if(e.target===inventoryDialog)inventoryDialog.close()});
 // 完整 JSON 備份採用持久化資料快照，避免只匯出本模組較舊的記憶體副本。
 // 包含動態配件、海圖、航行歷史、所有目前已儲存的頁面輸入與計算器設定。
 function exportBackup(){
@@ -208,6 +279,8 @@ function importedState(obj){
   throw new Error('備份缺少配件庫存。');
  const result=Object.assign(fresh(),incoming);
  result.parts=Object.assign(fresh().parts,incoming.parts);
+ result.partStock=Object.assign(legacyPartStock(result.parts),
+  incoming.partStock&&typeof incoming.partStock==='object'&&!Array.isArray(incoming.partStock)?incoming.partStock:{});
  result.ships=fresh().ships.map((ship,i)=>Object.assign(ship,incoming.ships[i]||{}));
  result.unlocks=incoming.unlocks&&typeof incoming.unlocks==='object'&&!Array.isArray(incoming.unlocks)?incoming.unlocks:{};
  result.logs=incoming.logs;
