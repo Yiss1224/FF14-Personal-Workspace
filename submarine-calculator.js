@@ -87,7 +87,7 @@ function state(){
  }catch{return base}
 }
 function persist(mutator){const s=state();mutator(s);localStorage.setItem(KEY,JSON.stringify(s));window.dispatchEvent(new Event('submarine-build-state-updated'))}
-let data=null;
+let data=null,lootData=[];
 function rankRec(rank){return data.ranks.find(x=>x.rank===rank)||data.ranks.filter(x=>x.rank<=rank).at(-1)}
 function shipRank(ship){return Math.max(1,Number(ship.rank)||1)}
 function shipLabel(index,ship){
@@ -205,6 +205,74 @@ function bestRoutes(available,ship,buildKey,maxHours,s,requiredId=null,beamLimit
  return [...routes.values()].sort((a,b)=>b.score-a.score).slice(0,3);
 }
 
+
+const fmtYield=n=>n<0.01?n.toFixed(4):n<1?n.toFixed(3):n.toFixed(2);
+function bestItemRoutes(available,ship,key,maxHours,s,itemId,beamLimit=400){
+ const rank=shipRank(ship);if(!validBuild(key,rank))return [];
+ const stats=buildStats(key,rank),daily=Boolean($('daily-pickup')?.checked),itemRows=lootData.filter(x=>x.itemId===itemId),bySector=new Map(itemRows.map(x=>[x.sectorId,x]));
+ if(!bySector.size)return [];
+ const results=[];
+ for(const [map,home] of [[1,0],[2,31],[3,52]]){
+  const eligible=available.filter(p=>p.map===map&&p.rank<=rank&&bySector.has(p.id));
+  if(!eligible.length)continue;
+  let beam=[{path:[],prev:home,range:0,time:43200,fuel:0,used:new Set(),yield:0,miss:1}];
+  for(let depth=0;depth<5;depth++){
+   const next=[];
+   for(const cur of beam)for(const p of eligible){
+    if(cur.used.has(p.id))continue;
+    const edge=p.to[String(cur.prev)];if(!edge)continue;
+    const nr=cur.range+edge[0]+p.sr;if(nr>stats.range)continue;
+    const nt=cur.time+travelSeconds(edge[1],stats.speed)+surveySeconds(p,stats.speed);
+    if(nt>maxHours*3600)continue;
+    const row=bySector.get(p.id);
+    // 掉落資料提供高觀測力的機率與數量。採用 normal 檔的平均堆疊數估算。
+    const chance=Math.max(0,Math.min(1,row.chance));
+    const qty=Math.max(0,row.q[1]||0);
+    next.push({path:cur.path.concat(p),prev:p.id,range:nr,time:nt,fuel:cur.fuel+p.fuel,
+      used:new Set([...cur.used,p.id]),yield:cur.yield+chance*qty,miss:cur.miss*(1-chance)});
+   }
+   const score=r=>r.yield/pickupElapsed(r.time,daily);
+   next.sort((a,b)=>score(b)-score(a)||b.yield-a.yield);
+   beam=next.slice(0,beamLimit);
+   results.push(...beam.filter(r=>r.yield>0));
+   if(!beam.length)break;
+  }
+ }
+ const unique=new Map();
+ for(const r of results){
+  const label=makeLabel(r.path),score=r.yield/pickupElapsed(r.time,daily);
+  if(!unique.has(label)||unique.get(label).score<score)
+   unique.set(label,{...r,score,build:key,hit:1-r.miss});
+ }
+ return [...unique.values()].sort((a,b)=>b.score-a.score).slice(0,5);
+}
+function renderItemPlanner(){
+ const select=$('target-item');if(!select)return;
+ const names=new Map();
+ for(const row of lootData)if(!names.has(row.itemId))names.set(row.itemId,row.name);
+ select.innerHTML='<option value="">選擇想撈的物品…</option>'+[...names].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>'<option value="'+id+'">'+esc(name)+'</option>').join('');
+ $('calc-item-routes').onclick=calculateItemRoutes;
+}
+function calculateItemRoutes(){
+ const itemId=Number($('target-item')?.value),hours=Number($('target-item-hours')?.value)||24;
+ const s=state(),open=unlockedSectors(s,145),registered=(s.ships||[]).map((ship,i)=>({...ship,index:i})).filter(x=>x.registered&&!x.voyaging);
+ if(!itemId){$('item-route-result').innerHTML='<p class="calc-warning">請先選擇想撈取的物品。</p>';return}
+ const candidates=[];
+ for(const ship of registered){
+  const keys=ship.build&&ship.build!=='auto'?[ship.build]:['1111','1121','1123','3123','3124'];
+  for(const key of keys)if(validBuild(key,shipRank(ship)))
+   candidates.push(...bestItemRoutes(open,ship,key,hours,s,itemId).map(route=>({ship,key,route})));
+ }
+ const best=candidates.sort((a,b)=>b.route.score-a.route.score).slice(0,5);
+ if(!best.length){$('item-route-result').innerHTML='<p class="calc-warning">目前已開海域、Rank、配置與 '+hours+' 小時限制內，找不到包含此物品的可行航線。</p>';return}
+ $('item-route-result').innerHTML=best.map(({ship,key,route},i)=>
+  '<article class="route-card item-route-card"><h3>#'+(i+1)+' · '+esc(shipLabel(ship.index,ship))+' · '+esc(makeLabel(route.path))+'</h3>'
+  +'<div class="route-meta">配置 '+esc(key)+' · Rank '+shipRank(ship)+' · '+fmtTime(route.time)+' · '+route.fuel+' 罐燃料 · 航程 '+route.range+'</div>'
+  +'<div class="route-kpis"><span>預期約 '+fmtYield(route.yield)+' 個／趟（normal 組樣本）</span>'
+  +'<span>至少取得一次：約 '+(route.hit*100).toFixed(1)+'%</span>'
+  +'<span>預期量／出航週期：'+fmtYield(route.yield/(pickupElapsed(route.time,Boolean($('daily-pickup')?.checked))/3600))+' 個／小時</span></div></article>'
+ ).join('')+'<p class="hint">估算使用目前已開海域、船隻 Rank、配件航程與時速；採用社群資料中的高觀測力掉落率及 normal 組平均數量，為統計期望值，實際結果會受機率影響。</p>';
+}
 function cumulativeTo(rank){
  let n=0;
  for(const r of data.ranks)if(r.rank<rank)n+=r.xp;
@@ -474,9 +542,9 @@ function savePlannerSettings(manualDeparture){
 }
 async function init(){
  try{
-  const res=await fetch('submarine-route-data.json');if(!res.ok)throw new Error('route data '+res.status);
-  data=await res.json();
-  renderBuilds();renderSectors();
+  const [res,lootRes]=await Promise.all([fetch('submarine-route-data.json'),fetch('submarine-loot-data.json')]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
+  data=await res.json();lootData=await lootRes.json();
+  renderBuilds();renderSectors();renderItemPlanner();
   let manuallySelectedDeparture=plannerControls(state().plannerSettings);
   // 記錄已啟用長航線，避免之後手動切回 48h 又被升級。
   if(state().plannerSettings?.expandedLongRoutes!==true)savePlannerSettings(manuallySelectedDeparture);
@@ -497,7 +565,7 @@ async function init(){
   window.addEventListener('submarine-export-requested',()=>savePlannerSettings(manuallySelectedDeparture));
   window.addEventListener('submarine-data-imported',()=>{
    manuallySelectedDeparture=plannerControls(state().plannerSettings);
-   renderBuilds();renderSectors();calculate();
+   renderBuilds();renderSectors();renderItemPlanner();calculate();
   });
   refreshDepartureClock();
   window.addEventListener('storage',()=>{
