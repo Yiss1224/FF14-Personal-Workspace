@@ -280,23 +280,61 @@ function renderItemPlanner(){
 }
 function calculateItemRoutes(){
  const itemId=Number($('target-item')?.value),hours=Number($('target-item-hours')?.value)||24;
- const s=state(),open=unlockedSectors(s,145),registered=(s.ships||[]).map((ship,i)=>({...ship,index:i})).filter(x=>x.registered&&!x.voyaging);
+ const s=state(),open=unlockedSectors(s,145),ships=(s.ships||[]).map((ship,i)=>({...ship,index:i})).filter(x=>x.registered);
  if(!itemId){$('item-route-result').innerHTML='<p class="calc-warning">請先選擇想撈取的物品。</p>';return}
- const candidates=[];
- for(const ship of registered){
-  const keys=ship.build&&ship.build!=='auto'?[ship.build]:['1111','1121','1123','3123','3124'];
-  for(const key of keys)if(validBuild(key,shipRank(ship)))
-   candidates.push(...bestItemRoutes(open,ship,key,hours,s,itemId).map(route=>({ship,key,route})));
+ if(!ships.length){$('item-route-result').innerHTML='<p class="calc-warning">目前沒有已登記的潛水艇。</p>';return}
+ const total=stock(s),voyaging=ships.filter(ship=>ship.voyaging),ready=ships.filter(ship=>!ship.voyaging);
+ let fixedUsage={};
+ for(const ship of voyaging){
+  const next=allocate(installed(ship),fixedUsage,total);
+  if(!next){
+   $('item-route-result').innerHTML='<p class="calc-warning">航行中的配件已超出目前登記庫存。請在「潛水艇與部件庫存」核對總持有數量（含已裝配部件），再重新計算。</p>';return;
+  }
+  fixedUsage=next;
  }
- const best=candidates.sort((a,b)=>b.route.score-a.route.score).slice(0,5);
- if(!best.length){$('item-route-result').innerHTML='<p class="calc-warning">目前已開海域、Rank、配置與 '+hours+' 小時限制內，找不到包含此物品的可行航線。</p>';return}
- $('item-route-result').innerHTML=best.map(({ship,key,route},i)=>
+ const plans=ready.map(ship=>{
+  const keys=ship.build&&ship.build!=='auto'?[ship.build]:['1111','1121','1123','3123','3124'];
+  const choices=[];
+  for(const key of keys)if(validBuild(key,shipRank(ship))){
+   const route=bestItemRoutes(open,ship,key,hours,s,itemId,400)[0];
+   if(route)choices.push({key,route});
+  }
+  return {ship,choices};
+ });
+ const anyRoute=plans.some(plan=>plan.choices.length);
+ if(!anyRoute){
+  $('item-route-result').innerHTML='<p class="calc-warning">'+(ready.length?'目前已開海域、船隻 Rank、配置與 '+hours+' 小時限制內，找不到包含此物品的可行航線。':'所有已登記潛水艇目前都在航行中。')+'</p>';return;
+ }
+ let best={score:-1,count:-1,chosen:[]},chosen=[];
+ function evaluate(score){
+  const count=chosen.length;
+  if(score>best.score+1e-12||(Math.abs(score-best.score)<=1e-12&&count>best.count))
+   best={score,count,chosen:chosen.map(x=>({...x}))};
+ }
+ function assign(i,usage,score){
+  if(i>=plans.length){evaluate(score);return}
+  const plan=plans[i];
+  // 允許跳過一艘無庫存配置，其他船仍能得到有效建議。
+  assign(i+1,usage,score);
+  for(const option of plan.choices){
+   const next=allocate(option.key,usage,total);if(!next)continue;
+   chosen.push({ship:plan.ship,...option});
+   assign(i+1,next,score+option.route.score);
+   chosen.pop();
+  }
+ }
+ assign(0,fixedUsage,0);
+ if(!best.chosen.length){
+  $('item-route-result').innerHTML='<p class="calc-warning">目前可行航線需要的部件超出可用庫存。請調整部件數量，或等航行中的潛水艇返航後再計算。</p>';return;
+ }
+ const recommendations=best.chosen.sort((a,b)=>b.route.score-a.route.score).slice(0,5);
+ $('item-route-result').innerHTML=recommendations.map(({ship,key,route},i)=>
   '<article class="route-card item-route-card"><h3>#'+(i+1)+' · '+esc(shipLabel(ship.index,ship))+' · '+esc(makeLabel(route.path))+'</h3>'
   +'<div class="route-meta">配置 '+esc(key)+' · Rank '+shipRank(ship)+' · '+fmtTime(route.time)+' · '+route.fuel+' 罐燃料 · 航程 '+route.range+'</div>'
   +'<div class="route-kpis"><span>預期約 '+fmtYield(route.yield)+' 個／趟（normal 組樣本）</span>'
   +'<span>至少取得一次：約 '+(route.hit*100).toFixed(1)+'%</span>'
-  +'<span>預期量／出航週期：'+fmtYield(route.yield/(pickupElapsed(route.time,Boolean($('daily-pickup')?.checked))/3600))+' 個／小時</span></div></article>'
- ).join('')+'<p class="hint">估算使用目前已開海域、船隻 Rank、配件航程與時速；採用社群資料中的高觀測力掉落率及 normal 組平均數量，為統計期望值，實際結果會受機率影響。</p>';
+  +'<span>預期量／出航週期：'+fmtYield(route.score*3600)+' 個／小時</span></div></article>'
+ ).join('')+'<p class="hint">配置建議已按部件庫存做全隊分配；航行中潛水艇的實際配置先保留，閒置船會依 Rank、可用配置與目標物品收益安排。掉落估值採用社群高觀測力掉落率及 normal 組平均數量，實際結果會受機率影響。</p>';
 }
 function cumulativeTo(rank){
  let n=0;
