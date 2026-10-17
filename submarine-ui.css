@@ -204,3 +204,10 @@ tbody tr:hover{background:var(--ui-teal-soft);}
 .item-planner-controls select,.item-planner-controls button{min-height:42px}
 .item-route-card{margin-top:12px}
 @media(max-width:700px){.item-planner-controls{grid-template-columns:1fr 1fr}.item-planner-controls label:first-child{grid-column:1/-1}.item-planner-controls button{grid-column:1/-1}}
+
+.item-planner{padding:0;overflow:hidden}
+.item-planner>summary{cursor:pointer;list-style:none;padding:16px 18px;font-weight:700;color:var(--ui-ink,#1a2d42)}
+.item-planner>summary::-webkit-details-marker{display:none}
+.item-planner>summary::before{content:"＋";display:inline-block;width:1.6em;color:var(--ui-teal,#007f86)}
+.item-planner[open]>summary::before{content:"－"}
+.item-planner-body{padding:0 18px 18px}
