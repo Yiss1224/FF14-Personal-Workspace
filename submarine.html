@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <title>FF14 潛水艇養成計畫</title>
   <link rel="stylesheet" href="submarine.css?v=20261012-3">
-  <link rel="stylesheet" href="submarine-ui.css?v=20261019-goldberg">
+  <link rel="stylesheet" href="submarine-ui.css?v=20261019-linked-machine">
   <link rel="stylesheet" href="submarine-harbor.css?v=20261013-26">
 </head>
 <body>
@@ -94,17 +94,44 @@
         <label>每天可收船結束 <input id="pickup-end" type="time" value="22:00"></label>
         <label>預計本次派船時間 <input id="calc-departure-time" type="time" value="19:00"></label>
         <div id="dispatch-rube" class="dispatch-rube" aria-live="polite">
-          <div class="dispatch-rube-heading"><strong>派船機關</strong><span>球球會依序核對條件、海圖、庫存與排程</span></div>
-          <div class="dispatch-rube-rail" aria-hidden="true">
-            <span class="dispatch-rube-track"></span><span id="dispatch-rube-ball" class="dispatch-rube-ball"></span>
-          </div>
-          <ol class="dispatch-rube-steps">
-            <li data-rube-step="0"><span>01</span><b>條件</b></li>
-            <li data-rube-step="1"><span>02</span><b>海圖</b></li>
-            <li data-rube-step="2"><span>03</span><b>部件</b></li>
-            <li data-rube-step="3"><span>04</span><b>排程</b></li>
-          </ol>
-          <p id="dispatch-rube-status" class="dispatch-rube-status">調整上方條件後，按下計算，讓派船機關開始運轉。</p>
+          <div class="dispatch-rube-heading"><strong>派船機關</strong><span>球撞翹板 → 配重落下 → 齒輪收繩 → 閘門開啟</span></div>
+          <div class="dispatch-rube-canvas"><svg class="dispatch-rube-svg" viewBox="0 0 900 190" role="img" aria-label="小球撞動翹板，落下的配重推動齒輪收繩，拉開通往派船計算的閘門">
+            <defs>
+              <linearGradient id="rube-rail-gradient" x1="0" x2="1"><stop offset="0" stop-color="#78c9c1"/><stop offset="1" stop-color="#e7b970"/></linearGradient>
+              <filter id="rube-glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <path class="rube-rail" d="M36 47 L145 91 L424 104 L486 103 L538 135 L742 135"/>
+            <path class="rube-rail-highlight" d="M36 47 L145 91 L424 104 L486 103 L538 135 L742 135"/>
+            <path class="rube-support" d="M115 79 L115 155 M145 91 L145 155 M424 104 L424 155 M538 135 L538 155 M742 135 L742 155"/>
+            <path class="rube-machine-base" d="M88 155 H770"/>
+            <text class="rube-label" x="42" y="27">出發球</text><text class="rube-label" x="153" y="67">翹板</text>
+            <text class="rube-label" x="245" y="27">配重釋放</text><text class="rube-label" x="345" y="78">齒輪</text>
+            <text class="rube-label" x="438" y="26">滑輪繩索</text><text class="rube-label" x="492" y="72">閘門</text>
+            <text class="rube-label rube-destination-label" x="660" y="116">派船計算</text>
+            <path class="rube-hopper" d="M22 31 L48 43 L39 58 L14 48 Z"/>
+            <circle id="rube-main-ball" class="rube-marble" cx="40" cy="44" r="8"/>
+            <g id="rube-lever"><path class="rube-lever-arm" d="M143 91 L226 113"/><path class="rube-lever-tip" d="M143 91 l-9 -5 M226 113 l9 4"/></g>
+            <path class="rube-pivot" d="M181 121 L169 141 H193 Z"/>
+            <path class="rube-weight-guide" d="M263 37 V118 M280 37 V118"/>
+            <path class="rube-latch-link" d="M227 111 C242 100 249 81 263 76"/>
+            <g id="rube-weight"><rect class="rube-weight-block" x="251" y="42" width="40" height="27" rx="4"/><path class="rube-weight-mark" d="M260 51 h22 M260 58 h15"/><path class="rube-weight-pusher" d="M287 62 h13"/></g>
+            <path class="rube-transfer-ramp" d="M292 124 L349 132"/>
+            <circle id="rube-transfer-ball" class="rube-transfer-marble" cx="296" cy="126" r="7"/>
+            <g id="rube-gear">
+              <path class="rube-gear-edge" d="M374 104 L380 109 L389 105 L393 114 L401 119 L397 127 L402 134 L395 141 L397 150 L388 153 L383 161 L375 157 L367 162 L362 154 L353 155 L350 146 L342 141 L347 133 L343 125 L351 119 L352 111 L362 112 L367 104 Z"/>
+              <circle class="rube-gear-inner" cx="374" cy="132" r="15"/>
+              <path class="rube-gear-spokes" d="M374 109 V155 M351 132 H397 M358 116 L390 148 M390 116 L358 148"/>
+              <circle class="rube-gear-hub" cx="374" cy="132" r="5"/>
+            </g>
+            <path id="rube-rope" class="rube-rope" d="M389 114 C410 95 424 48 453 48 A12 12 0 0 1 477 48 L490 72"/>
+            <circle class="rube-pulley" cx="465" cy="48" r="12"/>
+            <path class="rube-gate-guide" d="M486 75 V113 M505 75 V113"/>
+            <g id="rube-gate"><rect class="rube-gate-panel" x="486" y="76" width="19" height="34" rx="3"/><path class="rube-gate-slats" d="M490 83 H501 M490 91 H501 M490 99 H501"/></g>
+            
+            <g id="rube-ready" class="rube-ready"><circle cx="715" cy="135" r="23"/><path d="M704 135 l8 8 16 -18"/></g>
+            <path class="rube-launch-mark" d="M744 123 l8 -8 M751 135 h12 M744 147 l8 8"/>
+          </svg></div>
+          <p id="dispatch-rube-status" class="dispatch-rube-status">按下計算後，機關會逐段帶動派船檢查。</p>
         </div>
         <button id="calc-routes" type="button">計算全艦隊配件與派船建議</button>
         
@@ -289,7 +316,7 @@
   </aside>
   <div id="harbor-tooltip" class="harbor-tooltip" role="tooltip" hidden></div>
   <script src="submarine.js?v=20261017-2"></script>
-  <script src="submarine-calculator.js?v=20261019-goldberg"></script>
+  <script src="submarine-calculator.js?v=20261019-linked-machine"></script>
   <script src="submarine-settlement.js?v=20261012-10"></script>
   <script defer src="submarine-ledger.js?v=20261012-9"></script>
   <script defer src="submarine-drop-select.js?v=20261012-8"></script>
