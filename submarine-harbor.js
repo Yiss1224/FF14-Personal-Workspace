@@ -9,7 +9,15 @@
   const liveStatus=document.getElementById('harbor-clock');
   const ambient=document.getElementById('harbor-ambient');
   const tooltip=document.getElementById('harbor-tooltip');
-  const starts=[9,15.5,22,28.5],finish=89; // moored to the right of each berth, not over its pier
+  const starts=[9,15.5,22,28.5];
+  let quayPercent=31.75;
+  function measureBerths(){
+    const stage=dock.getBoundingClientRect(),piers=[...dock.querySelectorAll('.harbor-slip-wall')];
+    if(stage.width<=0||piers.length!==5)return;
+    const centers=piers.map(p=>{const r=p.getBoundingClientRect();return r.left+r.width/2-stage.left});
+    for(let i=0;i<4;i++)starts[i]=(centers[i]+centers[i+1])/2/stage.width*100;
+    quayPercent=centers[4]/stage.width*100;
+  }
   const motion=window.matchMedia?window.matchMedia('(prefers-reduced-motion: reduce)'):null;
   const reduced=()=>Boolean(motion&&motion.matches);
   function read(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch{return {}}}
@@ -87,13 +95,14 @@
     const previous=running[i];
     if(previous&&previous.animation)previous.animation.cancel();
     running[i]=null;
+    boats[i].style.left=starts[i]+'%';
     boats[i].style.transform='translateX(-50%)';
   }
   // Dock maneuvers are short visual transitions, never a percentage of a day-long trip.
   // The offshore leg still follows the saved departure/ETA timestamps.
   function voyagePath(i,width,duration,down){
     const exit=Math.min(12000,duration*.1)/duration;
-    const offshore=38+i*4,turnaround=89-i*2;
+    const offshore=Math.min(90,quayPercent+6+i*1.5),turnaround=Math.min(96,Math.max(offshore+2,89-i*2));
     const x=percent=>width*(percent-starts[i])/100;
     return [
       {phase:0,x:0,y:0},
@@ -125,7 +134,7 @@
     // Keep the hull inside the water strip on desktop and mobile.
     const bottom=parseFloat(window.getComputedStyle(boat).bottom)||0;
     const down=Math.max(0,bottom-(6+i*2)),duration=eta-depart;
-    const key=depart+':'+eta+':'+Math.round(width)+':'+down;
+    const key=depart+':'+eta+':'+Math.round(width)+':'+down+':'+starts[i].toFixed(3);
     if(!reduced()&&typeof boat.animate==='function'&&width>0){
       if(!running[i]||running[i].key!==key){
         stop(i);
@@ -148,6 +157,7 @@
     }
   }
   function render(){
+    measureBerths();
     const state=read(),ships=Array.isArray(state.ships)?state.ships:[];
     const now=Date.now();let activeCount=0;
     const texts=[];
