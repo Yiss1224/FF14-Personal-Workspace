@@ -1,4 +1,4 @@
-/* Ambient harbor v2: read-only voyage display and cosmetic random vignettes.
+/* Ambient harbor v3: read-only voyage display and cosmetic random vignettes.
    No changes to fleet records, route recommendations, or settlement inventory. */
 (function(){
   'use strict';
@@ -45,9 +45,9 @@
   }
   function followTooltip(){
     tooltipFrame=null;
-    if(hoveredIndex<0||!tooltip||tooltip.hidden)return;
+    if(hoveredIndex<0||!tooltip||tooltip.hidden||document.hidden)return;
     positionTooltip(hoveredIndex);
-    tooltipFrame=window.requestAnimationFrame(followTooltip);
+    if(running[hoveredIndex])tooltipFrame=window.requestAnimationFrame(followTooltip);
   }
   function showTooltip(i){
     if(!tooltip||boats[i].hidden)return;
@@ -142,7 +142,6 @@
       const valid=Boolean(ship.voyaging&&v&&Number.isFinite(depart)&&depart>0&&
         Number.isFinite(eta)&&eta>depart);
       const ratio=valid?Math.max(0,Math.min(1,(now-depart)/(eta-depart))):0;
-      const progress=ratio<=.5?ratio*2:(1-ratio)*2;
       const active=Boolean(ship.voyaging),registered=Boolean(ship.registered);
       if(active)activeCount++;
       boat.hidden=!registered&&!active;
@@ -199,12 +198,17 @@
     interaction:'<span class="interaction-bird"><span class="tit-tail"></span><span class="tit-body"><span class="tit-eye"></span></span><span class="tit-wing"></span></span><span class="interaction-worker"><span class="helmet"></span><span class="vest"></span><span class="legs"></span></span>',
     teleport:'<span class="teleport-rays"></span><span class="teleport-character"><span class="teleport-head"></span><span class="teleport-torso"></span><span class="teleport-feet"></span></span><span class="teleport-particles"></span>'
   };
-  let nextScene=null,cleanup=null;
+  let nextScene=null,cleanup=null,lastScene=null;
+  const sceneTimers=new Set();
+  function sceneAfter(callback,delay){
+    const timer=window.setTimeout(()=>{sceneTimers.delete(timer);callback()},delay);
+    sceneTimers.add(timer);
+  }
   const rand=(lo,hi)=>lo+Math.random()*(hi-lo);
   function choose(){
     // Nighttime-only scenes follow the visitor's local clock.
     const hour=new Date().getHours(),night=hour>=18||hour<6;
-    const available=scenes.filter(scene=>!scene.night||night);
+    const available=scenes.filter(scene=>(!scene.night||night)&&scene.type!==lastScene);
     const totalWeight=available.reduce((sum,scene)=>sum+scene.weight,0);
     let n=rand(0,totalWeight);
     for(const scene of available){n-=scene.weight;if(n<0)return scene;}
@@ -214,6 +218,7 @@
     if(nextScene!==null)window.clearTimeout(nextScene);
     if(cleanup!==null)window.clearTimeout(cleanup);
     nextScene=null;cleanup=null;
+    sceneTimers.forEach(timer=>window.clearTimeout(timer));sceneTimers.clear();
   }
   function schedule(delay){
     if(!ambient||reduced()||document.hidden)return;
@@ -222,7 +227,7 @@
   function showScene(){
     nextScene=null;
     if(!ambient||reduced()||document.hidden)return;
-    const scene=choose();
+    const scene=choose();lastScene=scene.type;
     const node=document.createElement('span');
     node.className='harbor-event harbor-event-'+scene.type;
     node.setAttribute('aria-hidden','true');
@@ -233,14 +238,20 @@
     if(scene.type==='crab'||scene.type==='catnap'||scene.type==='interaction'||scene.type==='teleport')
       node.style.setProperty('--event-x',rand(8,23).toFixed(1)+'%');
     if(scene.type==='tit'){
-      // Two safe perches: upper crane edge or harbor lamp; stay inside scene.
-      const perch=Math.random()<.5?{x:94,y:85}:{x:Math.max(70,dock.clientWidth*.06),y:91};
+      // Use the real lamp position: its scale and height vary with the viewport.
+      const stage=dock.getBoundingClientRect();
+      const lamp=dock.querySelector('.harbor-lamp')?.getBoundingClientRect();
+      const perch=lamp?{x:lamp.left-stage.left-3,y:lamp.top-stage.top-11}:{x:70,y:65};
       node.style.setProperty('--tit-x',perch.x.toFixed(0)+'px');
       node.style.setProperty('--tit-y',perch.y.toFixed(0)+'px');
       node.style.setProperty('--tit-out',Math.min(dock.clientWidth-25,perch.x+165).toFixed(0)+'px');
     }
     node.innerHTML=shapes[scene.type];
     ambient.replaceChildren(node);
+    if(scene.type==='tit'){
+      sceneAfter(()=>node.classList.add('is-perched'),scene.duration*.46);
+      sceneAfter(()=>node.classList.remove('is-perched'),scene.duration*.68);
+    }
     cleanup=window.setTimeout(()=>{
       ambient.replaceChildren();cleanup=null;
     },scene.duration+150);
@@ -259,9 +270,17 @@
    'submarine-settlement-saved','submarine-data-imported',
    'submarine-voyage-started'].forEach(event=>window.addEventListener(event,refresh));
   window.addEventListener('storage',event=>{if(event.key===KEY)refresh();});
-  window.addEventListener('visibilitychange',()=>{
-    if(document.hidden&&tooltip){hoveredIndex=-1;tooltip.hidden=true;}
-    render();restartSceneLoop();
+  document.addEventListener('visibilitychange',()=>{
+    dock.classList.toggle('harbor-paused',document.hidden);
+    if(document.hidden){
+      if(hoveredIndex>=0)hideTooltip(hoveredIndex);
+      running.forEach(entry=>entry?.animation?.pause());
+      resetSceneTimers();ambient?.replaceChildren();
+    }else{
+      render();
+      running.forEach(entry=>entry?.animation?.play());
+      restartSceneLoop();
+    }
   });
   window.addEventListener('scroll',()=>{if(hoveredIndex>=0)positionTooltip(hoveredIndex);},{passive:true});
   window.addEventListener('resize',()=>{
@@ -272,7 +291,9 @@
     boats.forEach((_,i)=>stop(i));render();restartSceneLoop();
   });
   // Fallback movement / status refresh; WAAPI handles normal motion independently.
+  dock.classList.toggle('harbor-paused',document.hidden);
   render();
+  if(document.hidden)running.forEach(entry=>entry?.animation?.pause());
   viewportWidth=dock.getBoundingClientRect().width;
   restartSceneLoop();
   // Native movement runs on the browser animation timeline; refresh metadata less often.
@@ -280,3 +301,4 @@
   const nativeMotion=boats.every(boat=>typeof boat.animate==='function');
   window.setInterval(()=>{if(!document.hidden)render();},nativeMotion?10000:1000);
 })();
+
