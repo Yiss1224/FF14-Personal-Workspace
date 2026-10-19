@@ -93,6 +93,19 @@
         <label>每天可收船開始 <input id="pickup-start" type="time" value="19:00"></label>
         <label>每天可收船結束 <input id="pickup-end" type="time" value="22:00"></label>
         <label>預計本次派船時間 <input id="calc-departure-time" type="time" value="19:00"></label>
+        <div id="dispatch-rube" class="dispatch-rube" aria-live="polite">
+          <div class="dispatch-rube-heading"><strong>派船機關</strong><span>球球會依序核對條件、海圖、庫存與排程</span></div>
+          <div class="dispatch-rube-rail" aria-hidden="true">
+            <span class="dispatch-rube-track"></span><span id="dispatch-rube-ball" class="dispatch-rube-ball"></span>
+          </div>
+          <ol class="dispatch-rube-steps">
+            <li data-rube-step="0"><span>01</span><b>條件</b></li>
+            <li data-rube-step="1"><span>02</span><b>海圖</b></li>
+            <li data-rube-step="2"><span>03</span><b>部件</b></li>
+            <li data-rube-step="3"><span>04</span><b>排程</b></li>
+          </ol>
+          <p id="dispatch-rube-status" class="dispatch-rube-status">調整上方條件後，按下計算，讓派船機關開始運轉。</p>
+        </div>
         <button id="calc-routes" type="button">計算全艦隊配件與派船建議</button>
         
       </div>
