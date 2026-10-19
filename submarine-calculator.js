@@ -613,47 +613,95 @@ function savePlannerSettings(manualDeparture){
  };
  persist(s=>{s.plannerSettings={...(s.plannerSettings||{}),...snapshot}});
 }
+function rubeTween(duration,update,reduced){
+ return new Promise(resolve=>{
+  if(reduced){update(1);resolve();return}
+  const start=performance.now();
+  const frame=now=>{
+   const raw=Math.min(1,(now-start)/duration),p=raw*raw*(3-2*raw);
+   update(p);
+   if(raw<1)requestAnimationFrame(frame);else resolve();
+  };
+  requestAnimationFrame(frame);
+ });
+}
 async function runDispatchMachine(onComplete){
  const machine=$('dispatch-rube'),button=$('calc-routes');
  if(!machine||machine.classList.contains('is-running'))return;
- const stages=[...machine.querySelectorAll('[data-rube-step]')],ball=$('dispatch-rube-ball'),status=$('dispatch-rube-status');
- const fields=[...document.querySelectorAll('.calc-controls input,.calc-controls select')];
- const prior=fields.map(el=>el.disabled);
- machine.classList.remove('is-complete');machine.classList.add('is-running');
- fields.forEach(el=>el.disabled=true);
- button.disabled=true;button.setAttribute('aria-busy','true');
- stages.forEach(el=>el.classList.remove('is-active','is-done'));
- ball.style.left='8%';
- const messages=[
-  '核對航程上限、目標 Rank 與收船時間…',
-  '確認已開海域與可探索前置點…',
-  '盤點航行中占用與可用部件…',
-  '比較每艘潛艇的航線與整隊配置…'
- ];
- const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+ const status=$('dispatch-rube-status'),fields=[...document.querySelectorAll('.calc-controls input,.calc-controls select')];
+ const prior=fields.map(el=>el.disabled),reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+ const ball=$('rube-main-ball'),transfer=$('rube-transfer-ball'),lever=$('rube-lever'),weight=$('rube-weight'),latch=$('rube-latch-link'),
+  gear=$('rube-gear'),gate=$('rube-gate'),rope=$('rube-rope'),ready=$('rube-ready');
+ const pause=ms=>new Promise(resolve=>setTimeout(resolve,reduced?0:ms));
+ const reset=()=>{
+  ball.setAttribute('cx','40');ball.setAttribute('cy','44');transfer.setAttribute('cx','296');transfer.setAttribute('cy','126');
+  lever.setAttribute('transform','rotate(0 181 121)');weight.setAttribute('transform','translate(0 0)');
+  gear.setAttribute('transform','rotate(0 374 132)');gate.setAttribute('transform','translate(0 0)');
+  rope.setAttribute('d','M389 114 C410 95 424 48 453 48 A12 12 0 0 1 477 48 L490 72');latch.setAttribute('d','M227 111 C242 100 249 81 263 76');
+  ready.classList.remove('is-lit');machine.classList.remove('phase-ball','phase-lever','phase-weight','phase-gear','phase-gate','phase-finish','is-complete');
+ };
+ reset();machine.classList.add('is-running');fields.forEach(el=>el.disabled=true);button.disabled=true;button.setAttribute('aria-busy','true');
  try{
-  for(let i=0;i<stages.length;i++){
-   stages[i].classList.add('is-active');
-   ball.style.left=(8+(84*i/Math.max(1,stages.length-1)))+'%';
-   status.textContent=messages[i]||'整理派船建議…';
-   await new Promise(resolve=>setTimeout(resolve,reduced?80:420));
-   stages[i].classList.remove('is-active');stages[i].classList.add('is-done');
-  }
-  machine.classList.remove('is-running');machine.classList.add('is-complete');
-  status.textContent='檢查完成，正在整理推薦航線。';
+  status.textContent='出發球沿斜軌滾下，正要撞上翹板。';
+  machine.classList.add('phase-ball');
+  await rubeTween(520,p=>{ball.setAttribute('cx',40+105*p);ball.setAttribute('cy',44+47*p)},reduced);
+  status.textContent='碰撞！翹板翻轉，拉開配重卡榫。';
+  machine.classList.add('phase-lever');
+  await rubeTween(280,p=>{
+   const angle=-18*p,rad=angle*Math.PI/180;
+   lever.setAttribute('transform',`rotate(${angle} 181 121)`);
+   const tx=181+45*Math.cos(rad)+8*Math.sin(rad),ty=121+45*Math.sin(rad)-8*Math.cos(rad);
+   latch.setAttribute('d',`M ${tx} ${ty} Q 245 83 263 76`);
+  },reduced);
+  await pause(100);
+  status.textContent='配重沿導軌落下，撞動傳遞球。';
+  machine.classList.add('phase-weight');
+  await rubeTween(300,p=>weight.setAttribute('transform',`translate(0 ${62*p})`),reduced);
+  await rubeTween(340,p=>{transfer.setAttribute('cx',296+53*p);transfer.setAttribute('cy',126+6*p)},reduced);
+  status.textContent='傳遞球咬上齒輪，齒輪開始收緊滑輪繩索。';
+  machine.classList.add('phase-gear');
+  let ropeX=389,ropeY=114;
+  await rubeTween(480,p=>{
+   gear.setAttribute('transform',`rotate(${270*p} 374 132)`);
+   const angle=(-50+270*p)*Math.PI/180;
+   ropeX=374+20*Math.cos(angle);ropeY=132+20*Math.sin(angle);
+   rope.setAttribute('d',`M ${ropeX} ${ropeY} C410 95 424 48 453 48 A12 12 0 0 1 477 48 L490 72`);
+  },reduced);
+  status.textContent='繩索拉起閘門，航道打開。';
+  machine.classList.add('phase-gate');
+  await rubeTween(320,p=>{
+   gate.setAttribute('transform',`translate(0 ${-36*p})`);
+   rope.setAttribute('d',`M ${ropeX} ${ropeY} C410 95 424 48 453 48 A12 12 0 0 1 477 48 L490 ${72-36*p}`);
+  },reduced);
+  status.textContent='閘門已開！出發球穿過航道，觸發派船計算。';
+  machine.classList.add('phase-finish');
+  await rubeTween(900,p=>{
+   let x,y;
+   if(p<.52){const q=p/.52;x=145+(480-145)*q;y=91+(103-91)*q}
+   else if(p<.68){const q=(p-.52)/.16;x=480+(538-480)*q;y=103+(135-103)*q}
+   else{const q=(p-.68)/.32;x=538+(690-538)*q;y=135}
+   ball.setAttribute('cx',x);ball.setAttribute('cy',y);
+  },reduced);
+  ready.classList.add('is-lit');machine.classList.add('is-complete');
   onComplete();
  }finally{
+  machine.classList.remove('is-running');
   fields.forEach((el,i)=>el.disabled=prior[i]);
   button.disabled=false;button.removeAttribute('aria-busy');
  }
 }
 function resetDispatchMachine(){
  const machine=$('dispatch-rube');if(!machine||machine.classList.contains('is-running'))return;
- machine.classList.remove('is-complete');
- machine.querySelectorAll('[data-rube-step]').forEach(el=>el.classList.remove('is-active','is-done'));
- const ball=$('dispatch-rube-ball');if(ball)ball.style.left='8%';
- const status=$('dispatch-rube-status');if(status)status.textContent='調整上方條件後，按下計算，讓派船機關開始運轉。';
+ const ball=$('rube-main-ball'),transfer=$('rube-transfer-ball'),lever=$('rube-lever'),weight=$('rube-weight'),latch=$('rube-latch-link'),gear=$('rube-gear'),gate=$('rube-gate'),rope=$('rube-rope'),ready=$('rube-ready');
+ ball.setAttribute('cx','40');ball.setAttribute('cy','44');transfer.setAttribute('cx','296');transfer.setAttribute('cy','126');
+ lever.setAttribute('transform','rotate(0 181 121)');weight.setAttribute('transform','translate(0 0)');
+ gear.setAttribute('transform','rotate(0 374 132)');gate.setAttribute('transform','translate(0 0)');
+ rope.setAttribute('d','M389 114 C410 95 424 48 453 48 A12 12 0 0 1 477 48 L490 72');
+ latch.setAttribute('d','M227 111 C242 100 249 81 263 76');ready.classList.remove('is-lit');
+ machine.classList.remove('is-complete','phase-ball','phase-lever','phase-weight','phase-gear','phase-gate','phase-finish');
+ $('dispatch-rube-status').textContent='條件變更了。按下計算，讓機關重新帶動派船檢查。';
 }
+
 async function init(){
  try{
   const [res,lootRes]=await Promise.all([fetch('submarine-route-data.json'),fetch('submarine-loot-data.json?v=20261017-4')]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
