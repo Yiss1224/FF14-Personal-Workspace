@@ -7,7 +7,7 @@
   <title>FF14 潛水艇養成計畫</title>
   <link rel="stylesheet" href="submarine.css?v=20261012-3">
   <link rel="stylesheet" href="submarine-ui.css?v=20261019-feedback">
-  <link rel="stylesheet" href="submarine-harbor.css?v=20261019-polish">
+  <link rel="stylesheet" href="submarine-harbor.css?v=20261019-marina">
 </head>
 <body>
   <header>
@@ -250,25 +250,25 @@
         <span class="harbor-crane-cab"></span>
         <span class="harbor-crane-counterweight"></span>
       </span>
+      <span class="harbor-boathouse"><span></span></span>
       <span class="harbor-crate a"></span><span class="harbor-crate b"></span><span class="harbor-crate c"></span>
       <span class="harbor-worker"><span class="helmet"></span><span class="vest"></span><span class="legs"></span></span>
       <span class="harbor-worker second"><span class="helmet"></span><span class="vest"></span><span class="legs"></span></span>
     </div>
-    <!-- One continuous upper dock and five divider piers form four open slips. -->
+    <!-- A continuous service quay with four open-ended finger berths. -->
     <div class="harbor-slips" aria-hidden="true">
-      <span class="harbor-slip-wall" style="left:5.75%"></span>
-      <span class="harbor-slip-wall" style="left:12.25%"></span>
-      <span class="harbor-slip-wall" style="left:18.75%"></span>
-      <span class="harbor-slip-wall" style="left:25.25%"></span>
-      <span class="harbor-slip-wall" style="left:31.75%"></span>
-      <!-- Foreground L-arms hide the lower portion of each moored hull. -->
-      <span class="harbor-slip-foreground" style="left:5.75%"></span>
-      <span class="harbor-slip-foreground" style="left:12.25%"></span>
-      <span class="harbor-slip-foreground" style="left:18.75%"></span>
-      <span class="harbor-slip-foreground" style="left:25.25%"></span>
+      <span class="harbor-slip-wall" style="left:18%"></span>
+      <span class="harbor-slip-wall" style="left:38.5%"></span>
+      <span class="harbor-slip-wall" style="left:59%"></span>
+      <span class="harbor-slip-wall" style="left:79.5%"></span>
+      <span class="harbor-slip-wall" style="left:100%"></span>
+      <span class="harbor-berth-number" style="left:28.25%">01</span>
+      <span class="harbor-berth-number" style="left:48.75%">02</span>
+      <span class="harbor-berth-number" style="left:69.25%">03</span>
+      <span class="harbor-berth-number" style="left:89.75%">04</span>
     </div>
-    <span class="harbor-lamp" style="left:6%" aria-hidden="true"><span class="harbor-lamp-glow"></span></span>
-    <span class="harbor-lamp" style="left:28.5%" aria-hidden="true"><span class="harbor-lamp-glow"></span></span>
+    <span class="harbor-lamp" style="left:calc(var(--dock-width) * .22)" aria-hidden="true"><span class="harbor-lamp-glow"></span></span>
+    <span class="harbor-lamp" style="left:calc(var(--dock-width) * .91)" aria-hidden="true"><span class="harbor-lamp-glow"></span></span>
     <div class="harbor-goal" aria-hidden="true"><span class="harbor-goal-mark"></span></div>
     <div id="harbor-ambient" class="harbor-ambient" aria-hidden="true"></div>
     <div id="harbor-fleet" class="harbor-fleet" role="group" aria-label="四艘潛水艇的碼頭位置"></div>
@@ -282,6 +282,6 @@
   <script defer src="submarine-drop-select.js?v=20261012-8"></script>
   <script defer src="submarine-prices.js?v=20261012-7"></script>
   <script defer src="submarine-ui.js?v=20261019-feedback"></script>
-  <script defer src="submarine-harbor.js?v=20261019-departure-fix"></script>
+  <script defer src="submarine-harbor.js?v=20261019-marina"></script>
 </body>
 </html>
