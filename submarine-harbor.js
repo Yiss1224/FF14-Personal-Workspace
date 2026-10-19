@@ -89,47 +89,62 @@
     running[i]=null;
     boats[i].style.transform='translateX(-50%)';
   }
-  // Swim out of the slip first; cross the finger piers only after diving below them.
-  // Time spent in the exit/entry maneuver is a tiny fraction of the real voyage.
-  function boatPosition(i,phase,width){
-    const distance=width*(finish-starts[i])/100;
-    const down=44; // hull and sail clear the bottom edge of the finger piers
-    const exit=.035,enter=.965;
-    let x=0,y=0;
-    if(phase<exit){y=down*(phase/exit);}
-    else if(phase<.5){x=distance*((phase-exit)/(.5-exit));y=down;}
-    else if(phase<enter){x=distance*(1-(phase-.5)/(enter-.5));y=down;}
-    else{y=down*(1-(phase-enter)/(1-enter));}
-    return {x,y};
+  // Dock maneuvers are short visual transitions, never a percentage of a day-long trip.
+  // The offshore leg still follows the saved departure/ETA timestamps.
+  function voyagePath(i,width,duration,down){
+    const exit=Math.min(12000,duration*.1)/duration;
+    const offshore=38+i*4,turnaround=89-i*2;
+    const x=percent=>width*(percent-starts[i])/100;
+    return [
+      {phase:0,x:0,y:0},
+      {phase:exit*.25,x:0,y:down},
+      {phase:exit,x:x(offshore),y:down},
+      {phase:.5,x:x(turnaround),y:down},
+      {phase:1-exit,x:x(offshore),y:down},
+      {phase:1-exit*.25,x:0,y:down},
+      {phase:1,x:0,y:0}
+    ];
   }
-  function transformAt(i,phase,width){
-    const p=boatPosition(i,phase,width);
+  function boatPosition(i,phase,width,duration,down){
+    const path=voyagePath(i,width,duration,down);
+    const p=Math.max(0,Math.min(1,phase));
+    for(let n=1;n<path.length;n++){
+      const a=path[n-1],b=path[n];
+      if(p<=b.phase){
+        const t=(p-a.phase)/(b.phase-a.phase);
+        return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t};
+      }
+    }
+    return {x:0,y:0};
+  }
+  function positionTransform(p){
     return 'translate(calc(-50% + '+p.x.toFixed(2)+'px), '+p.y.toFixed(2)+'px)';
   }
-  // WAAPI keeps the entire departure → voyage → return route on the browser timeline.
   function animateBoat(i,depart,eta,now,ratio){
     const boat=boats[i],width=dock.getBoundingClientRect().width;
-    const key=depart+':'+eta+':'+Math.round(width);
+    // Keep the hull inside the water strip on desktop and mobile.
+    const bottom=parseFloat(window.getComputedStyle(boat).bottom)||0;
+    const down=Math.max(0,bottom-(6+i*2)),duration=eta-depart;
+    const key=depart+':'+eta+':'+Math.round(width)+':'+down;
     if(!reduced()&&typeof boat.animate==='function'&&width>0){
       if(!running[i]||running[i].key!==key){
         stop(i);
         boat.style.left=starts[i]+'%';
-        const phases=[0,.035,.5,.965,1];
-        const frames=phases.map(phase=>({
-          transform:transformAt(i,phase,width),offset:phase
+        const frames=voyagePath(i,width,duration,down).map(p=>({
+          transform:positionTransform(p),offset:p.phase
         }));
-        const animation=boat.animate(frames,{duration:eta-depart,easing:'linear',fill:'both'});
-        animation.currentTime=Math.max(0,Math.min(now-depart,eta-depart));
+        const animation=boat.animate(frames,{duration,easing:'linear',fill:'both'});
+        animation.currentTime=Math.max(0,Math.min(now-depart,duration));
         running[i]={key,animation};
       }else{
         const animation=running[i].animation;
         if(Math.abs((animation.currentTime||0)-(now-depart))>3000)
-          animation.currentTime=Math.max(0,Math.min(now-depart,eta-depart));
+          animation.currentTime=Math.max(0,Math.min(now-depart,duration));
       }
     }else{
       if(running[i])stop(i);
       boat.style.left=starts[i]+'%';
-      boat.style.transform=transformAt(i,ratio,width);
+      boat.style.transform=positionTransform(boatPosition(i,ratio,width,duration,down));
     }
   }
   function render(){
