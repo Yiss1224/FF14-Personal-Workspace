@@ -613,6 +613,47 @@ function savePlannerSettings(manualDeparture){
  };
  persist(s=>{s.plannerSettings={...(s.plannerSettings||{}),...snapshot}});
 }
+async function runDispatchMachine(onComplete){
+ const machine=$('dispatch-rube'),button=$('calc-routes');
+ if(!machine||machine.classList.contains('is-running'))return;
+ const stages=[...machine.querySelectorAll('[data-rube-step]')],ball=$('dispatch-rube-ball'),status=$('dispatch-rube-status');
+ const fields=[...document.querySelectorAll('.calc-controls input,.calc-controls select')];
+ const prior=fields.map(el=>el.disabled);
+ machine.classList.remove('is-complete');machine.classList.add('is-running');
+ fields.forEach(el=>el.disabled=true);
+ button.disabled=true;button.setAttribute('aria-busy','true');
+ stages.forEach(el=>el.classList.remove('is-active','is-done'));
+ ball.style.left='8%';
+ const messages=[
+  '核對航程上限、目標 Rank 與收船時間…',
+  '確認已開海域與可探索前置點…',
+  '盤點航行中占用與可用部件…',
+  '比較每艘潛艇的航線與整隊配置…'
+ ];
+ const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+ try{
+  for(let i=0;i<stages.length;i++){
+   stages[i].classList.add('is-active');
+   ball.style.left=(8+(84*i/Math.max(1,stages.length-1)))+'%';
+   status.textContent=messages[i]||'整理派船建議…';
+   await new Promise(resolve=>setTimeout(resolve,reduced?80:420));
+   stages[i].classList.remove('is-active');stages[i].classList.add('is-done');
+  }
+  machine.classList.remove('is-running');machine.classList.add('is-complete');
+  status.textContent='檢查完成，正在整理推薦航線。';
+  onComplete();
+ }finally{
+  fields.forEach((el,i)=>el.disabled=prior[i]);
+  button.disabled=false;button.removeAttribute('aria-busy');
+ }
+}
+function resetDispatchMachine(){
+ const machine=$('dispatch-rube');if(!machine||machine.classList.contains('is-running'))return;
+ machine.classList.remove('is-complete');
+ machine.querySelectorAll('[data-rube-step]').forEach(el=>el.classList.remove('is-active','is-done'));
+ const ball=$('dispatch-rube-ball');if(ball)ball.style.left='8%';
+ const status=$('dispatch-rube-status');if(status)status.textContent='調整上方條件後，按下計算，讓派船機關開始運轉。';
+}
 async function init(){
  try{
   const [res,lootRes]=await Promise.all([fetch('submarine-route-data.json'),fetch('submarine-loot-data.json?v=20261017-4')]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
@@ -629,9 +670,9 @@ async function init(){
     :fmtClock(w.start*60);
   }
   function updatePlanner(){savePlannerSettings(manuallySelectedDeparture);calculate()}
-  $('calc-routes').onclick=()=>{refreshDepartureClock();updatePlanner()};
+  $('calc-routes').onclick=()=>{refreshDepartureClock();runDispatchMachine(updatePlanner)};
   ['calc-hours','calc-target-rank','daily-pickup','pickup-start','pickup-end'].forEach(id=>{
-   const ctrl=$(id);if(ctrl)ctrl.onchange=updatePlanner;
+   const ctrl=$(id);if(ctrl)ctrl.onchange=()=>{resetDispatchMachine();updatePlanner()};
   });
   $('calc-departure-time').onchange=()=>{manuallySelectedDeparture=true;updatePlanner()};
   // 匯出前把目前表單值一併寫回 JSON；匯入完整備份後再套用時間與偏好。
