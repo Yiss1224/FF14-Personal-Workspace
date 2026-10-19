@@ -10,7 +10,7 @@
 .harbor-sea{position:absolute;inset:auto 0 0;height:51px;z-index:0;
   background:linear-gradient(180deg,var(--sea-top) 0%,#125c77 48%,var(--sea-bottom) 100%);
   opacity:.91}
-.harbor-sea:before{content:"";position:absolute;inset:-4px 0 auto;height:9px;
+.harbor-sea:before{content:"";position:absolute;inset:-4px -128px auto;height:9px;
   background:repeating-radial-gradient(ellipse 64px 11px at 30px 7px,transparent 0 28px,var(--sea-edge) 29px 31px,transparent 32px 64px);
   background-size:128px 9px;opacity:.72;animation:harbor-wave 8s linear infinite}
 .harbor-sea:after{content:"";position:absolute;left:30%;right:0;top:18px;height:20px;
@@ -53,7 +53,7 @@
   animation:harbor-crane-travel 24s ease-in-out infinite}
 .harbor-crane-trolley:after{content:"";position:absolute;left:2px;top:-5px;width:4px;height:4px;
   border-radius:50%;background:#384d55;border:1px solid #e1c58e;
-  animation:harbor-crane-pulley 1.5s linear infinite}
+  animation:none}
 .harbor-crane-cable{position:absolute;left:4px;top:6px;width:2px;height:66px;
   background:#d2ddd1;transform-origin:top center;
   animation:harbor-crane-lift 24s ease-in-out infinite}
@@ -63,7 +63,7 @@
   border:2px solid #71523d;border-radius:2px;
   background:repeating-linear-gradient(45deg,#bd925b 0 5px,#d7ac75 6px 8px);
   box-shadow:inset 0 2px #e0b983,0 2px 1px #193d4e66;
-  animation:harbor-crane-sway 4s ease-in-out infinite alternate}
+  animation:harbor-crane-sway 6s ease-in-out infinite alternate}
 .harbor-crane-load:after{content:"";position:absolute;left:7px;top:0;bottom:0;width:2px;background:#8c6647}
 .harbor-crane-cab{position:absolute;left:27px;top:16px;width:21px;height:18px;z-index:4;
   border:2px solid #476d71;border-radius:3px 3px 5px 3px;
@@ -73,17 +73,22 @@
   background:#eddbc0;border-radius:1px}
 .harbor-crane-wheel{position:absolute;left:12px;top:0;width:20px;height:20px;border-radius:50%;
   border:3px solid #678985;background:repeating-conic-gradient(#a6c5b4 0deg 28deg,#426973 29deg 59deg);
-  z-index:1;animation:harbor-crane-pulley 13s linear infinite}
+  z-index:1;animation:none}
 .harbor-crane-counterweight{position:absolute;left:0;top:16px;width:14px;height:13px;
   background:#c49f6b;border:2px solid #7e684e;box-shadow:0 2px #4a5b5e}
+/* Shared phase marks: lift, traverse, lower, pause, lift, return, lower. */
 @keyframes harbor-crane-travel{
-  0%,15%,100%{left:14px}
-  38%,61%{left:89px}
-  83%{left:14px}
+  0%,20%,100%{transform:translateX(0)}
+  40%,70%{transform:translateX(75px)}
+  90%{transform:translateX(0)}
 }
 @keyframes harbor-crane-lift{
-  0%,12%,72%,80%,100%{height:66px}
-  27%,56%,88%{height:25px}
+  0%,8%,50%,60%,100%{transform:scaleY(1)}
+  20%,40%,70%,90%{transform:scaleY(.38)}
+}
+@keyframes harbor-crane-hoist{
+  0%,8%,50%,60%,100%{transform:translateY(66px)}
+  20%,40%,70%,90%{transform:translateY(25.08px)}
 }
 @keyframes harbor-crane-sway{
   from{transform:rotate(-3deg)}
@@ -127,7 +132,7 @@
 .harbor-screenreader{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
   clip:rect(0,0,0,0);white-space:nowrap;border:0}
 body{padding-bottom:85px}
-@keyframes harbor-wave{from{background-position:0 0}to{background-position:128px 0}}
+@keyframes harbor-wave{from{transform:translateX(-128px)}to{transform:translateX(0)}}
 @keyframes harbor-shimmer{from{transform:translateX(-25px)}to{transform:translateX(45px)}}
 @keyframes harbor-hoist{from{height:10px}to{height:20px}}
 @keyframes harbor-worker-move{from{transform:translateX(0)}to{transform:translateX(44px)}}
@@ -643,9 +648,9 @@ body{padding-bottom:85px}
 }
 
 
-/* Whole-scene pixel pass: crisp blocks and stepped timing across every harbor motion. */
+/* Pixel silhouettes: motion is independent from the pixel treatment. */
 #mini-harbor,#mini-harbor *{image-rendering:pixelated}
-.harbor-sea{background:linear-gradient(180deg,#32839a 0 12%,#24728b 12% 34%,#155c77 34% 70%,#0e455f 70% 100%)}
+.harbor-sea{background:linear-gradient(180deg,var(--sea-edge) 0 2%,var(--sea-top) 2% 34%,var(--sea-mid,#155c77) 34% 70%,var(--sea-bottom) 70% 100%)}
 .harbor-sea:before{opacity:.8}
 .harbor-sea:after{background:repeating-linear-gradient(90deg,transparent 0 30px,#b9edf044 30px 34px,transparent 34px 76px)}
 .harbor-quay{box-shadow:0 3px 0 #314d53,0 6px 0 #263f45}
@@ -664,7 +669,7 @@ body{padding-bottom:85px}
 .harbor-crate{box-shadow:2px 2px 0 #543f35}
 .harbor-submarine{filter:drop-shadow(2px 2px 0 #092f4766)}
 .harbor-sub-hull{filter:drop-shadow(1px 2px 0 #0d3649)}
-.harbor-submarine .harbor-sprite{animation-timing-function:steps(4,end)}
+.harbor-submarine .harbor-sprite{animation-timing-function:ease-in-out}
 .harbor-sub-window{box-shadow:1px 1px 0 #385e68}
 .harbor-submarine.is-sailing .harbor-sub-hull{box-shadow:0 2px 0 #e3f9f670,1px 1px 0 #173d4e}
 .harbor-lamp-glow{border-radius:0;filter:none;
@@ -674,10 +679,6 @@ body{padding-bottom:85px}
 .harbor-night .harbor-lamp:after{box-shadow:0 0 0 2px #ffdb89aa,0 0 0 4px #ffdb8944}
 .harbor-night .harbor-sub-window{box-shadow:0 0 0 2px #f6d18f88}
 .harbor-event{filter:drop-shadow(1px 2px 0 #17394c66)}
-.harbor-event-gull,.harbor-event-fish,.harbor-event-cart,.harbor-event-cat,
-.harbor-event-tit,.harbor-event-seal,.harbor-event-crab,.harbor-event-jelly,
-.harbor-event-catnap,.harbor-event-meteor,.harbor-event-paperboat,.harbor-event-interaction,
-.harbor-event-teleport{animation-timing-function:steps(10,end)!important}
 .harbor-event-gull .gull-wing,.tit-wing{animation-timing-function:steps(3,end)!important}
 .harbor-event-fish{filter:none}
 .bubble{border-radius:0;box-shadow:inset 1px 1px 0 #efffffaa,1px 1px 0 #72c8d255}
@@ -686,26 +687,10 @@ body{padding-bottom:85px}
 .jelly-tentacles i{animation-timing-function:steps(3,end)}
 .meteor-star,.teleport-rays,.teleport-particles{image-rendering:pixelated}
 .harbor-lamp-glow,.teleport-rays,.harbor-night .harbor-lamp:after{animation-timing-function:steps(4,end)}
-@keyframes harbor-wave{from{background-position:0 0}to{background-position:128px 0}}
+@keyframes harbor-wave{from{transform:translateX(-128px)}to{transform:translateX(0)}}
 @media(prefers-reduced-motion:reduce){
   #mini-harbor *,#mini-harbor *:before,#mini-harbor *:after{animation:none!important;transition:none!important}
 }
-
-/* Stepped timing for the fixed props and every nested decorative loop as well. */
-.harbor-sea:before,.harbor-sea:after,
-.harbor-crane-trolley,.harbor-crane-trolley:after,.harbor-crane-cable,.harbor-crane-load,
-.harbor-crane-wheel,.harbor-worker,.harbor-submarine .harbor-sprite,
-.harbor-submarine.is-sailing .harbor-sprite:after,.harbor-sub-flag span,
-.harbor-night .harbor-lamp-glow,.gull-wing,.bubble,.cat-tail,.seal-ripple,
-.harbor-event-jelly .jelly-tentacles i,.nap-tail,.interaction-bird,
-.interaction-bird .tit-wing,.teleport-character,.teleport-rays,
-.teleport-rays:after,.teleport-particles{
-  animation-timing-function:steps(6,end)!important
-}
-.harbor-crane-trolley:after,.harbor-crane-wheel,.teleport-rays:after{
-  animation-timing-function:steps(8,end)!important
-}
-
 
 /* Performance trim: remove per-frame raster filters and keep one compositor hint per scene. */
 .harbor-event{filter:none!important;will-change:auto;contain:layout style}
@@ -728,17 +713,36 @@ body{padding-bottom:85px}
 
 
 
-/* Restore the original, lightweight crane loops with smooth interpolation. */
-.harbor-crane-trolley{animation:harbor-crane-travel 24s ease-in-out infinite}
-.harbor-crane-cable{animation:harbor-crane-lift 24s ease-in-out infinite}
-.harbor-crane-trolley:after{animation:harbor-crane-pulley 1.5s linear infinite}
-.harbor-crane-wheel{animation:harbor-crane-pulley 13s linear infinite}
-.harbor-crane-load{animation:harbor-crane-sway 4s ease-in-out infinite alternate}
-.harbor-worker{animation:harbor-worker-move 13s ease-in-out infinite alternate}
-.harbor-worker.second{animation-duration:17s;animation-delay:-5s}
-.harbor-crane-trolley,.harbor-crane-cable,.harbor-crane-load,.harbor-worker{
-  animation-timing-function:ease-in-out!important
-}
-.harbor-crane-trolley:after,.harbor-crane-wheel{
-  animation-timing-function:linear!important
-}
+
+/* Harbor detail and motion system · 2026-10-19 */
+.harbor-night{--sea-mid:#10364a}
+.harbor-crane-hoist{position:absolute;left:4px;top:6px;width:2px;height:0;animation:harbor-crane-hoist 24s ease-in-out infinite}
+.harbor-crane-load{transform-origin:50% 0}
+.harbor-submarine:nth-child(2) .harbor-sprite{animation-delay:-.8s}
+.harbor-submarine:nth-child(3) .harbor-sprite{animation-delay:-1.7s}
+.harbor-submarine:nth-child(4) .harbor-sprite{animation-delay:-2.4s}
+.harbor-sub-hull:before{content:"";position:absolute;left:15%;right:19%;top:3px;height:2px;background:#d5e9df;opacity:.8}
+.harbor-sub-hull:after{content:"";position:absolute;left:21%;top:8px;width:2px;height:2px;background:#a5c6c5;box-shadow:7px 0 #a5c6c5,14px 0 #a5c6c5}
+.harbor-submarine:hover .harbor-sub-window,.harbor-submarine:focus-visible .harbor-sub-window{background:#fff4bc;box-shadow:0 0 0 2px #f7d59266}
+.harbor-submarine.is-returning .harbor-sub-hull,.harbor-submarine.is-returning .harbor-conning{transform:scaleX(-1)}
+.harbor-submarine.is-returning .harbor-sub-fin{left:auto;right:-2px}
+.harbor-submarine.is-awaiting .harbor-sub-flag span{background:#f2c378;box-shadow:0 0 0 1px #fff0bc}
+.harbor-worker .helmet:after{content:"";position:absolute;left:3px;top:4px;width:4px;height:4px;background:#eac8a4;box-shadow:2px 1px #455566}
+.harbor-worker .vest:after{content:"";position:absolute;left:3px;top:0;width:1px;height:7px;background:#f8dfa2}
+.harbor-worker .legs{width:6px;background:none;box-shadow:none}
+.harbor-worker .legs:before,.harbor-worker .legs:after{content:"";position:absolute;top:0;width:2px;height:6px;background:#294854;transform-origin:top;animation:harbor-footstep .7s ease-in-out infinite alternate}
+.harbor-worker .legs:before{left:0}.harbor-worker .legs:after{right:0;animation-delay:-.7s}
+@keyframes harbor-footstep{from{transform:rotate(-18deg)}to{transform:rotate(18deg)}}
+.cat-body:after{content:"";position:absolute;left:1px;bottom:-2px;width:4px;height:3px;background:#eed9c7;box-shadow:8px 0 #eed9c7}
+.cat-face:after{display:none} /* two explicit ears already exist; remove the accidental third */
+.cat-ear.left{left:6px}.cat-ear.right{right:3px}
+.crab-body:before{content:"";position:absolute;left:-3px;bottom:-3px;width:3px;height:2px;background:#c9775d;box-shadow:4px 1px #c9775d,10px 1px #c9775d,14px 0 #c9775d;animation:harbor-crab-feet .35s steps(2,end) infinite alternate}
+@keyframes harbor-crab-feet{to{transform:translateY(-1px)}}
+.tit-body:after{content:"";position:absolute;right:-4px;top:4px;width:3px;height:2px;background:#596572}
+.harbor-event-tit.is-perched .tit-wing{animation:none;transform:rotate(12deg)}
+.harbor-event-tit.is-perched .tit-tail{transform:rotate(-8deg)}
+.jelly-bell{transform-origin:50% 85%;animation:harbor-jelly-breathe 1.8s ease-in-out infinite alternate}
+@keyframes harbor-jelly-breathe{to{transform:scale(.94,1.07)}}
+.harbor-event-seal .seal-ripple{border-radius:50%}
+#mini-harbor.harbor-paused *,#mini-harbor.harbor-paused *:before,#mini-harbor.harbor-paused *:after{animation-play-state:paused!important}
+@media(prefers-reduced-motion:reduce){#mini-harbor *,#mini-harbor *:before,#mini-harbor *:after{animation:none!important;transition:none!important}}
