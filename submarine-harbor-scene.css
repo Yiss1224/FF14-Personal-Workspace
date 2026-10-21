@@ -1,0 +1,52 @@
+/* Harbor scene v4 (experimental). Loaded after submarine-harbor.css.
+   Rules apply only once submarine-harbor-scene.js has drawn the canvas (.has-scene),
+   so the previous harbor stays intact if the scene cannot start. */
+#mini-harbor{--horizon:90px}
+@media(max-width:700px){#mini-harbor{--horizon:80px}}
+.harbor-scene{position:absolute;inset:0;width:100%;height:100%;z-index:0;
+  image-rendering:pixelated;image-rendering:crisp-edges;pointer-events:none}
+
+/* Decorative DOM replaced by the canvas. Kept in layout (visibility) because
+   submarine-harbor.js measures the berth walls and the tit perches on the lamps. */
+#mini-harbor.has-scene .harbor-sea,
+#mini-harbor.has-scene .harbor-quay,
+#mini-harbor.has-scene .harbor-yard-props,
+#mini-harbor.has-scene .harbor-slips,
+#mini-harbor.has-scene .harbor-lamp,
+#mini-harbor.has-scene .harbor-goal{visibility:hidden}
+#mini-harbor.has-scene .harbor-sea:before,#mini-harbor.has-scene .harbor-sea:after,
+#mini-harbor.has-scene .harbor-yard-props *,#mini-harbor.has-scene .harbor-lamp-glow,
+#mini-harbor.has-scene .harbor-goal{animation:none}
+
+/* Boats are drawn on the canvas; the DOM boat stays as the hover/focus/tooltip target. */
+#mini-harbor.has-scene .harbor-submarine{filter:none;transform-origin:50% 100%}
+#mini-harbor.has-scene .harbor-sprite{visibility:hidden;animation:none}
+#mini-harbor.has-scene .harbor-sprite *{animation:none}
+#mini-harbor.has-scene .harbor-submarine:focus-visible{outline:2px dashed #fff3c4;outline-offset:2px}
+/* One boat size everywhere: matches the canvas sprite and gives touch screens a larger target. */
+#mini-harbor.has-scene .harbor-submarine{width:44px;height:38px}
+
+/* Bottom-right control strip over open water: Eorzea time, weather, housing district, sound.
+   Selectors are specific enough to override the page's global button/select styles. */
+#mini-harbor .harbor-controls{position:absolute;right:4px;bottom:3px;z-index:9;display:flex;align-items:center;gap:3px;
+  pointer-events:auto;white-space:nowrap;font:600 10px/14px system-ui,sans-serif;color:#f3e6c4}
+#mini-harbor .harbor-controls>*{box-sizing:border-box;height:16px;min-height:0;min-width:0;width:auto;margin:0;padding:0 4px;
+  border-radius:3px;background:rgba(14,24,40,.82);border:1px solid #b89a52;box-shadow:none;color:inherit;
+  font:inherit;line-height:14px;white-space:nowrap;display:inline-flex;align-items:center}
+#mini-harbor .harbor-controls select{appearance:none;-webkit-appearance:none;padding:0 4px;cursor:pointer;max-width:76px}
+#mini-harbor .harbor-controls button{cursor:pointer}
+#mini-harbor .harbor-controls button:hover{background:#26324a}
+#mini-harbor .harbor-controls button[aria-pressed="true"]{background:#4b3d18}
+#mini-harbor .harbor-controls :focus-visible{outline:2px solid #fff3c4;outline-offset:1px}
+/* Narrow screens: two short rows that stay over the open water right of the pier. */
+@media(max-width:520px){
+  #mini-harbor .harbor-controls{flex-wrap:wrap;justify-content:flex-end;width:112px;row-gap:2px}
+  #mini-harbor .harbor-controls select{max-width:62px}
+}
+
+/* Tooltip in the style of the game's windows: deep navy panel, thin gold frame, title rule. */
+#mini-harbor.has-scene ~ .harbor-tooltip{background:linear-gradient(180deg,#1f2f4d 0%,#121c31 100%);
+  border:1px solid #c9a65a;box-shadow:inset 0 0 0 1px #3d5a80,0 6px 18px rgba(0,0,0,.45);border-radius:5px;color:#eef3f6;backdrop-filter:none}
+#mini-harbor.has-scene ~ .harbor-tooltip>strong{color:#f1d48a;border-bottom:1px solid rgba(201,166,90,.55);padding-bottom:5px;margin-bottom:8px}
+#mini-harbor.has-scene ~ .harbor-tooltip dt{color:#a9c2dc}
+#mini-harbor.has-scene ~ .harbor-tooltip:after{background:#121c31;border-color:#c9a65a}

@@ -69,12 +69,17 @@
     const route=active&&valid&&typeof v.route==='string'&&v.route.trim()?v.route.trim():'—';
     const status=!ship.registered&&!active?'泊位尚未啟用':
       !active?'停泊待命':!valid?'航行中・尚無航時紀錄':
-      now>=eta?'預計返航時間已到・待結算':now<(departed+eta)/2?'出航中':'返航中';
+      now>=eta?'已返回・待結算':now<(departed+eta)/2?'探索中':'返航中';
+    // Installed parts (read-only), same fallback as the calculator.
+    const CLASS=['','鯊','雲鯨','鯨','腔棘魚','希爾德里昂'],code=String(ship.currentBuild||'');
+    const build=/^[1-5]{4}$/.test(code)?code:((Number(ship.rank)||1)<15?'1111':'1121');
+    const parts='船體 '+CLASS[build[0]]+'・船尾 '+CLASS[build[1]]+'・船首 '+CLASS[build[2]]+'・艦橋 '+CLASS[build[3]];
     tooltip.innerHTML='<strong>⚓ '+esc(name)+'</strong>'+
       '<dl><dt>目前狀態</dt><dd>'+esc(status)+'</dd>'+
       '<dt>航線／目的地</dt><dd>'+esc(active?route:'尚未出航')+'</dd>'+
       '<dt>剩餘時間</dt><dd>'+esc(valid?remaining(eta-now):'—')+'</dd>'+
-      '<dt>預計返航 ETA</dt><dd>'+esc(valid?fmt(eta):'—')+'</dd></dl>';
+      '<dt>預計返航 ETA</dt><dd>'+esc(valid?fmt(eta):'—')+'</dd>'+
+      '<dt>配置 '+esc(build)+'</dt><dd>'+esc(parts)+'</dd></dl>';
     tooltip.hidden=false;
     positionTooltip(i);
     if(tooltipFrame===null)tooltipFrame=window.requestAnimationFrame(followTooltip);
@@ -100,10 +105,27 @@
   }
   // Dock maneuvers are short visual transitions, never a percentage of a day-long trip.
   // The offshore leg still follows the saved departure/ETA timestamps.
-  function voyagePath(i,width,duration,down){
+  // With a horizon (scene v4), each boat heads to its own lane far out at sea and
+  // shrinks with distance, so boats at sea never stack on one spot.
+  function voyagePath(i,width,duration,down,rise){
     const exit=Math.min(12000,duration*.1)/duration;
     const offshore=Math.min(90,quayPercent+6+i*1.5),turnaround=Math.min(96,Math.max(offshore+2,89-i*2));
     const x=percent=>width*(percent-starts[i])/100;
+    if(rise>0){
+      const cruise=Math.min(.45,exit+Math.min(30000,duration*.15)/duration);
+      const lane=Math.min(97,quayPercent+(100-quayPercent)*(.1+.27*i)),far=-rise+(i%2)*3,s=.62;
+      return [
+        {phase:0,x:0,y:0,s:1},
+        {phase:exit*.25,x:0,y:down,s:1},
+        {phase:exit,x:x(offshore),y:down,s:1},
+        {phase:cruise,x:x(lane),y:far,s},
+        {phase:.5,x:x(Math.min(97,lane+2)),y:far,s},
+        {phase:1-cruise,x:x(lane),y:far,s},
+        {phase:1-exit,x:x(offshore),y:down,s:1},
+        {phase:1-exit*.25,x:0,y:down,s:1},
+        {phase:1,x:0,y:0,s:1}
+      ];
+    }
     return [
       {phase:0,x:0,y:0},
       {phase:exit*.25,x:0,y:down},
@@ -114,32 +136,36 @@
       {phase:1,x:0,y:0}
     ];
   }
-  function boatPosition(i,phase,width,duration,down){
-    const path=voyagePath(i,width,duration,down);
+  function boatPosition(i,phase,width,duration,down,rise){
+    const path=voyagePath(i,width,duration,down,rise);
     const p=Math.max(0,Math.min(1,phase));
     for(let n=1;n<path.length;n++){
       const a=path[n-1],b=path[n];
       if(p<=b.phase){
         const t=(p-a.phase)/(b.phase-a.phase);
-        return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t};
+        const sa=a.s??1,sb=b.s??1;
+        return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,s:sa+(sb-sa)*t};
       }
     }
-    return {x:0,y:0};
+    return {x:0,y:0,s:1};
   }
   function positionTransform(p){
-    return 'translate(calc(-50% + '+p.x.toFixed(2)+'px), '+p.y.toFixed(2)+'px)';
+    const scale=p.s!==undefined&&p.s!==1?' scale('+p.s.toFixed(3)+')':'';
+    return 'translate(calc(-50% + '+p.x.toFixed(2)+'px), '+p.y.toFixed(2)+'px)'+scale;
   }
   function animateBoat(i,depart,eta,now,ratio){
     const boat=boats[i],width=dock.getBoundingClientRect().width;
     // Keep the hull inside the water strip on desktop and mobile.
     const bottom=parseFloat(window.getComputedStyle(boat).bottom)||0;
-    const down=Math.max(0,bottom-(6+i*2)),duration=eta-depart;
-    const key=depart+':'+eta+':'+Math.round(width)+':'+down+':'+starts[i].toFixed(3);
+    const horizon=parseFloat(window.getComputedStyle(dock).getPropertyValue('--horizon'))||0;
+    const rise=horizon>0?Math.max(0,horizon-bottom-22):0;
+    const down=rise>0?Math.min(4,bottom):Math.max(0,bottom-(6+i*2)),duration=eta-depart;
+    const key=depart+':'+eta+':'+Math.round(width)+':'+down+':'+rise+':'+starts[i].toFixed(3);
     if(!reduced()&&typeof boat.animate==='function'&&width>0){
       if(!running[i]||running[i].key!==key){
         stop(i);
         boat.style.left=starts[i]+'%';
-        const frames=voyagePath(i,width,duration,down).map(p=>({
+        const frames=voyagePath(i,width,duration,down,rise).map(p=>({
           transform:positionTransform(p),offset:p.phase
         }));
         const animation=boat.animate(frames,{duration,easing:'linear',fill:'both'});
@@ -153,7 +179,7 @@
     }else{
       if(running[i])stop(i);
       boat.style.left=starts[i]+'%';
-      boat.style.transform=positionTransform(boatPosition(i,ratio,width,duration,down));
+      boat.style.transform=positionTransform(boatPosition(i,ratio,width,duration,down,rise));
     }
   }
   function render(){
@@ -178,15 +204,16 @@
       if(hoveredIndex===i)showTooltip(i);
       const label=typeof ship.name==='string'&&ship.name.trim()?ship.name.trim():'潛水艇 '+(i+1);
       const status=!registered&&!active?'泊位空置':!active?'停泊中':
-        !valid?'航行中，未記錄時間':ratio>=1?'預計已返航，待結算':'預計 '+fmt(eta)+' 返航';
+        !valid?'航行中，未記錄時間':ratio>=1?'已返回，待結算':'預計 '+fmt(eta)+' 返航';
       texts.push(label+'：'+status);
     });
     liveStatus.textContent=(activeCount?'航行中 '+activeCount+' 艘。':'碼頭待命。')+' '+texts.join('；');
     setNightTheme();
   }
+  // Night follows Eorzea time when available (decorative only).
+  const etHour=()=>window.HarborEorzea?window.HarborEorzea.eorzeaTime(Date.now()).hour:new Date().getHours();
   function setNightTheme(){
-    // Local clock controls only decorative illumination, not in-game weather.
-    const hour=new Date().getHours();
+    const hour=etHour();
     dock.classList.toggle('harbor-night',hour>=18||hour<6);
   }
 
@@ -232,7 +259,7 @@
   const rand=(lo,hi)=>lo+Math.random()*(hi-lo);
   function choose(){
     // Nighttime-only scenes follow the visitor's local clock.
-    const hour=new Date().getHours(),night=hour>=18||hour<6;
+    const hour=etHour(),night=hour>=18||hour<6;
     const available=scenes.filter(scene=>(!scene.night||night)&&scene.type!==lastScene);
     const totalWeight=available.reduce((sum,scene)=>sum+scene.weight,0);
     let n=rand(0,totalWeight);
@@ -245,13 +272,16 @@
     nextScene=null;cleanup=null;
     sceneTimers.forEach(timer=>window.clearTimeout(timer));sceneTimers.clear();
   }
+  // The canvas harbor scene (has-scene) runs its own event system; these DOM vignettes
+  // remain the fallback when the canvas is unavailable.
+  const sceneEvents=()=>dock.classList.contains('has-scene')&&Boolean(window.HarborEvents);
   function schedule(delay){
-    if(!ambient||reduced()||document.hidden)return;
+    if(!ambient||reduced()||document.hidden||sceneEvents())return;
     nextScene=window.setTimeout(showScene,delay);
   }
   function showScene(){
     nextScene=null;
-    if(!ambient||reduced()||document.hidden)return;
+    if(!ambient||reduced()||document.hidden||sceneEvents())return;
     const scene=choose();lastScene=scene.type;
     const node=document.createElement('span');
     node.className='harbor-event harbor-event-'+scene.type;
