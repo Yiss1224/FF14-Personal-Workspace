@@ -74,13 +74,14 @@ async function main(){
       assert.ok(await page.evaluate(()=>document.getElementById('mini-harbor').classList.contains('has-scene')),'場景未啟動');
       const painted=await page.evaluate(()=>{const c=document.querySelector('.harbor-scene'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i]>0)n++;return n/(c.width*c.height)});
       assert.ok(painted>.4,'畫布幾乎空白：'+painted);
-      const expect=['停泊待命','出航中','返航中','預計返航時間已到・待結算'];
+      const expect=['停泊待命','探索中','返航中','已返回・待結算'];
       for(let i=0;i<4;i++){
         assert.strictEqual((await boatBox(page,i)).hidden,false);
         const tip=await tooltipFor(page,i);
         assert.ok(tip&&tip.includes(expect[i]),'第 '+(i+1)+' 艘提示框：'+tip);
       }
-      assert.ok((await tooltipFor(page,0)).includes('鸚鵡螺'));
+      const tip0=await tooltipFor(page,0);
+      assert.ok(tip0.includes('鸚鵡螺')&&tip0.includes('配置 1121')&&tip0.includes('船首 雲鯨'),'提示框應顯示名稱與配件：'+tip0);
       assert.deepStrictEqual(page.errors,[]);
       await ctx.close();
     });
@@ -137,7 +138,7 @@ async function main(){
     await ctx.close();
   });
 
-  await test('開發預覽：19 種事件皆可播放、結束後完整清理',async()=>{
+  await test('開發預覽：全部 25 種事件皆可播放、結束後完整清理',async()=>{
     const ctx=await browser.newContext({viewport:{width:1440,height:900}});
     await ctx.route(/imgur|universalis/,route=>route.abort());
     await ctx.addInitScript(([key,value])=>localStorage.setItem(key,value),[KEY,JSON.stringify(fleetSeed())]);
@@ -145,7 +146,7 @@ async function main(){
     await page.goto(base+'/submarine.html?harbor-dev=1&harbor-hour=13');await page.waitForTimeout(1500);
     assert.ok(await page.evaluate(()=>Boolean(document.getElementById('harbor-dev-panel'))));
     const list=await page.evaluate(()=>HarborScene.events.list());
-    assert.ok(list.length>=15,'事件數量不足：'+list.length);
+    assert.ok(list.length>=25,'事件數量不足：'+list.length);
     await page.evaluate(()=>HarborScene.events.setAuto(false));
     for(const ev of list){
       if(ev.time==='night')await page.evaluate(()=>HarborScene.events.setHour(22));else await page.evaluate(()=>HarborScene.events.setHour(13));
@@ -185,6 +186,70 @@ async function main(){
     void before;await ctx.close();
   });
 
+  await test('艾歐澤亞時間、住宅區天氣、音效開關（不影響潛艇資料）',async()=>{
+    const {ctx,page}=await open(fleetSeed());
+    const before=await page.evaluate(k=>localStorage.getItem(k),KEY);
+    const info=await page.evaluate(()=>{const c=document.querySelector('.harbor-controls');const et=HarborEorzea.eorzeaTime(Date.now());
+      return {text:c.querySelector('.harbor-et').textContent,expect:'ET '+String(et.hour).padStart(2,'0')+':'+String(et.minute).padStart(2,'0'),
+        wx:c.querySelector('.harbor-wx').textContent,expectWx:HarborEorzea.WEATHER_NAMES[HarborEorzea.weather(Date.now(),'mist')],
+        sound:c.querySelector('.harbor-sound').getAttribute('aria-pressed'),scene:HarborScene.time()}});
+    assert.ok(Math.abs(parseInt(info.text.slice(6))-parseInt(info.expect.slice(6)))<=1||info.text===info.expect,'ET 時鐘不符：'+info.text+' / '+info.expect);
+    assert.strictEqual(info.wx,info.expectWx);assert.strictEqual(info.sound,'false','音效預設應關閉');
+    assert.deepStrictEqual(info.scene.builds,['1121','1121','1121','1121'],'配置應取自實際紀錄（無紀錄時依 Rank 推定）');
+    for(const zone of ['lavenderBeds','goblet','shirogane','mist']){
+      await page.selectOption('.harbor-zone',zone);await page.waitForTimeout(60);
+      const r=await page.evaluate(z=>({wx:document.querySelector('.harbor-wx').textContent,expect:HarborEorzea.WEATHER_NAMES[HarborEorzea.weather(Date.now(),z)],prefs:JSON.parse(localStorage.getItem('ff14_harbor_prefs')),scene:HarborScene.time().zone}),zone);
+      assert.strictEqual(r.wx,r.expect,zone+' 天氣不符');assert.strictEqual(r.prefs.zone,zone);assert.strictEqual(r.scene,zone);
+    }
+    await page.click('.harbor-sound');
+    assert.strictEqual(await page.getAttribute('.harbor-sound','aria-pressed'),'true');
+    assert.strictEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ff14_harbor_prefs')).sound),true);
+    assert.strictEqual(await page.evaluate(k=>localStorage.getItem(k),KEY),before,'碼頭設定不得改動潛艇資料');
+    // The control strip stays below the submarines' hit areas.
+    const overlap=await page.evaluate(()=>{const c=document.querySelector('.harbor-controls').getBoundingClientRect();
+      return [...document.querySelectorAll('[data-harbor-ship]')].filter(b=>!b.hidden).some(b=>{const r=b.getBoundingClientRect();return r.left<c.right&&r.right>c.left&&r.top<c.bottom&&r.bottom>c.top})});
+    assert.strictEqual(overlap,false,'控制列遮擋潛水艇點擊區');
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
+  await test('潛水艇外形依實際配件組合；天氣預覽參數可切換',async()=>{
+    const seed=fleetSeed();seed.ships[0].currentBuild='3124';seed.ships[3].currentBuild='5555';
+    const ctx=await browser.newContext({viewport:{width:1440,height:900}});
+    await ctx.route(/imgur|universalis/,route=>route.abort());
+    await ctx.addInitScript(([key,value])=>localStorage.setItem(key,value),[KEY,JSON.stringify(seed)]);
+    const page=await ctx.newPage();await page.goto(base+'/submarine.html?harbor-weather=rain');await page.waitForTimeout(1500);
+    const t=await page.evaluate(()=>HarborScene.time());
+    assert.strictEqual(t.builds[0],'3124');assert.strictEqual(t.builds[3],'5555');assert.strictEqual(t.weather,'rain');
+    assert.strictEqual(await page.evaluate(()=>document.querySelector('.harbor-wx').textContent),'小雨');
+    await ctx.close();
+  });
+
+  await test('計算器變更實際配置後，碼頭潛水艇外形即時更新',async()=>{
+    const {ctx,page}=await open(fleetSeed());
+    await page.waitForSelector('[data-installed="0"]',{timeout:20000});
+    assert.strictEqual((await page.evaluate(()=>HarborScene.time().builds))[0],'1121');
+    await page.selectOption('[data-installed="0"]','1123');await page.waitForTimeout(300);
+    assert.strictEqual((await page.evaluate(()=>HarborScene.time().builds))[0],'1123','外形未跟隨配置更新');
+    assert.strictEqual((await page.evaluate(k=>JSON.parse(localStorage.getItem(k)).ships[0].currentBuild,KEY)),'1123');
+    assert.ok((await tooltipFor(page,0)).includes('配置 1123'));
+    await ctx.close();
+  });
+
+  await test('返航：航程到時偵測到抵港事件；音效關閉時不建立音訊',async()=>{
+    const seed=fleetSeed();const now=Date.now();seed.ships[1].voyage={departedAt:now-10*HOUR,etaAt:now+3000,route:'溺沒海 A → B'};
+    const ctx=await browser.newContext({viewport:{width:1440,height:900}});
+    await ctx.route(/imgur|universalis/,route=>route.abort());
+    await ctx.addInitScript(([key,value])=>{localStorage.setItem(key,value);window.__audioCreated=0;const A=window.AudioContext;window.AudioContext=function(){window.__audioCreated++;return new A()}},[KEY,JSON.stringify(seed)]);
+    const page=await ctx.newPage();await page.goto(base+'/submarine.html');
+    await page.evaluate(()=>{window.__arrived=[];window.addEventListener('harbor-submarine-arrived',e=>window.__arrived.push(e.detail.index))});
+    await page.waitForFunction(()=>window.__arrived.length>0,null,{timeout:20000});
+    assert.deepStrictEqual(await page.evaluate(()=>window.__arrived),[1]);
+    assert.strictEqual(await page.evaluate(()=>window.__audioCreated),0,'音效關閉時不應建立 AudioContext');
+    assert.ok((await tooltipFor(page,1)).includes('已返回・待結算'));
+    await ctx.close();
+  });
+
   await test('減少動態偏好：畫面為靜態圖，無動畫循環',async()=>{
     const {ctx,page}=await open(fleetSeed(),{reducedMotion:'reduce'});
     assert.ok(await page.evaluate(()=>document.getElementById('mini-harbor').classList.contains('has-scene')));
@@ -193,7 +258,7 @@ async function main(){
     const b=await page.evaluate(()=>window.HarborScene.stats().frames);
     assert.ok(b-a<=1,'reduced motion 仍持續繪製：'+(b-a));
     assert.strictEqual(await page.evaluate(()=>document.getAnimations().filter(x=>x.playState==='running').length),0);
-    assert.ok((await tooltipFor(page,1)).includes('出航中'));
+    assert.ok((await tooltipFor(page,1)).includes('探索中'));
     await page.waitForTimeout(9000);
     assert.strictEqual((await page.evaluate(()=>HarborScene.events.status())).active.length,0,'減少動態時不應播放事件');
     await ctx.close();
@@ -204,7 +269,7 @@ async function main(){
     const state=await page.evaluate(()=>({scene:document.getElementById('mini-harbor').classList.contains('has-scene'),
       quay:getComputedStyle(document.querySelector('.harbor-quay')).visibility,sprite:getComputedStyle(document.querySelector('.harbor-sprite')).visibility}));
     assert.deepStrictEqual(state,{scene:false,quay:'visible',sprite:'visible'});
-    assert.ok((await tooltipFor(page,1)).includes('出航中'));
+    assert.ok((await tooltipFor(page,1)).includes('探索中'));
     assert.deepStrictEqual(page.errors,[]);
     await ctx.close();
   });

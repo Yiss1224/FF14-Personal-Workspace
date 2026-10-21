@@ -69,12 +69,17 @@
     const route=active&&valid&&typeof v.route==='string'&&v.route.trim()?v.route.trim():'—';
     const status=!ship.registered&&!active?'泊位尚未啟用':
       !active?'停泊待命':!valid?'航行中・尚無航時紀錄':
-      now>=eta?'預計返航時間已到・待結算':now<(departed+eta)/2?'出航中':'返航中';
+      now>=eta?'已返回・待結算':now<(departed+eta)/2?'探索中':'返航中';
+    // Installed parts (read-only), same fallback as the calculator.
+    const CLASS=['','鯊','雲鯨','鯨','腔棘魚','希爾德里昂'],code=String(ship.currentBuild||'');
+    const build=/^[1-5]{4}$/.test(code)?code:((Number(ship.rank)||1)<15?'1111':'1121');
+    const parts='船體 '+CLASS[build[0]]+'・船尾 '+CLASS[build[1]]+'・船首 '+CLASS[build[2]]+'・艦橋 '+CLASS[build[3]];
     tooltip.innerHTML='<strong>⚓ '+esc(name)+'</strong>'+
       '<dl><dt>目前狀態</dt><dd>'+esc(status)+'</dd>'+
       '<dt>航線／目的地</dt><dd>'+esc(active?route:'尚未出航')+'</dd>'+
       '<dt>剩餘時間</dt><dd>'+esc(valid?remaining(eta-now):'—')+'</dd>'+
-      '<dt>預計返航 ETA</dt><dd>'+esc(valid?fmt(eta):'—')+'</dd></dl>';
+      '<dt>預計返航 ETA</dt><dd>'+esc(valid?fmt(eta):'—')+'</dd>'+
+      '<dt>配置 '+esc(build)+'</dt><dd>'+esc(parts)+'</dd></dl>';
     tooltip.hidden=false;
     positionTooltip(i);
     if(tooltipFrame===null)tooltipFrame=window.requestAnimationFrame(followTooltip);
@@ -199,15 +204,16 @@
       if(hoveredIndex===i)showTooltip(i);
       const label=typeof ship.name==='string'&&ship.name.trim()?ship.name.trim():'潛水艇 '+(i+1);
       const status=!registered&&!active?'泊位空置':!active?'停泊中':
-        !valid?'航行中，未記錄時間':ratio>=1?'預計已返航，待結算':'預計 '+fmt(eta)+' 返航';
+        !valid?'航行中，未記錄時間':ratio>=1?'已返回，待結算':'預計 '+fmt(eta)+' 返航';
       texts.push(label+'：'+status);
     });
     liveStatus.textContent=(activeCount?'航行中 '+activeCount+' 艘。':'碼頭待命。')+' '+texts.join('；');
     setNightTheme();
   }
+  // Night follows Eorzea time when available (decorative only).
+  const etHour=()=>window.HarborEorzea?window.HarborEorzea.eorzeaTime(Date.now()).hour:new Date().getHours();
   function setNightTheme(){
-    // Local clock controls only decorative illumination, not in-game weather.
-    const hour=new Date().getHours();
+    const hour=etHour();
     dock.classList.toggle('harbor-night',hour>=18||hour<6);
   }
 
@@ -253,7 +259,7 @@
   const rand=(lo,hi)=>lo+Math.random()*(hi-lo);
   function choose(){
     // Nighttime-only scenes follow the visitor's local clock.
-    const hour=new Date().getHours(),night=hour>=18||hour<6;
+    const hour=etHour(),night=hour>=18||hour<6;
     const available=scenes.filter(scene=>(!scene.night||night)&&scene.type!==lastScene);
     const totalWeight=available.reduce((sum,scene)=>sum+scene.weight,0);
     let n=rand(0,totalWeight);

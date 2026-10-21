@@ -267,7 +267,7 @@
   });
 
   // 5. Gull: flies in, lands on a bollard, preens and looks around, takes off again.
-  def({id:'gull',name:'海鷗歇腳',time:'notnight',weight:9,cooldown:180,
+  def({id:'gull',name:'海鷗歇腳',time:'notnight',dry:true,weight:9,cooldown:180,
     can:env=>(env.G.bollards||[]).some(b=>Math.abs(b-env.fisherX)>8),
     setup(e,env){
       const opts=env.G.bollards.filter(b=>Math.abs(b-env.fisherX)>8&&!env.workers.some(wk=>Math.abs(wk.x-b)<6));
@@ -297,7 +297,7 @@
   }
 
   // 6. Long-tailed tit: bounces in, hops on the lamp, tilts its head, flicks its tail, leaves.
-  def({id:'tit',name:'長尾山雀',time:'notnight',weight:7,cooldown:200,minor:true,
+  def({id:'tit',name:'長尾山雀',time:'notnight',dry:true,weight:7,cooldown:200,minor:true,
     can:env=>env.G.lamps&&env.G.lamps.length>0,
     setup(e,env){
       e.li=Math.floor(e.r()*env.G.lamps.length);e.lx=env.G.lamps[e.li];e.ly=env.G.apronY-17;e.dur=10;
@@ -319,7 +319,7 @@
   });
 
   // 7. Adventurer: walks out along the pier, sits and watches the sea, then heads back.
-  def({id:'adventurer',name:'冒險者看海',time:'any',weight:7,cooldown:240,
+  def({id:'adventurer',name:'冒險者看海',time:'any',dry:true,weight:7,cooldown:240,
     setup(e,env){
       e.pal=ADVENTURERS[Math.floor(e.r()*ADVENTURERS.length)];
       const lo=env.G.landR+18,hi=Math.min(env.fisherX-14,lo+110);e.stop=Math.round(lerp(lo,Math.max(lo,hi),.2+e.r()*.8));
@@ -351,7 +351,9 @@
   // 8. Teleport: aether ring, light column, the traveller materialises, looks around, departs.
   def({id:'teleport',name:'傳送魔法',time:'any',weight:5,cooldown:300,
     setup(e,env){
-      const lo=env.G.landR+8,hi=env.fisherX-12;e.x=Math.round(lerp(lo,hi,e.r()));e.dur=12.5;e.parts=[];e.zones=[['deck',e.x-7,e.x+7]];
+      const lo=env.G.landR+8,hi=env.fisherX-12,ae=env.G.aetheryte;
+      // Travellers arrive beside the aetheryte; without one (narrow screens) anywhere on the deck.
+      e.x=Math.round(ae?Math.min(hi,ae.x+7):lerp(lo,hi,e.r()));e.dur=12.5;e.parts=[];e.zones=[['deck',e.x-7,e.x+7]];
       e.pal=MAGE;
     },
     update(e,dt,env){
@@ -426,7 +428,7 @@
   });
 
   // 10. Harbor cat: steps out from the crates, grooms, stretches, naps; looks up when people pass.
-  def({id:'cat',name:'碼頭小貓',time:'any',weight:8,cooldown:260,
+  def({id:'cat',name:'碼頭小貓',time:'any',dry:true,weight:8,cooldown:260,
     can:env=>env.G.crateX!==undefined,
     setup(e,env){
       e.sx=env.G.crateX+13;e.edge=env.G.crateX+9;e.dur=27;e.z=[];e.butterfly=env.day&&e.r()<.75;
@@ -490,7 +492,7 @@
       // Nearest moored submarine whose berth is clear of the crate stack (else simply the nearest).
       const door=env.G.office.x+4,list=mooredBoats(env).filter(b=>b.big).sort((a,b)=>Math.abs(a.cx-door)-Math.abs(b.cx-door));
       const clear=list.filter(b=>env.G.crateX===undefined||Math.abs(b.cx-(env.G.crateX+5))>16),d=clear[0]||list[0];
-      e.i=d.i;e.door=door;e.dir=d.flip?-1:1;e.target=Math.round(d.cx+e.dir*1);e.speed=6.5;
+      e.i=d.i;e.door=door;e.dir=d.flip?-1:1;e.target=Math.round(d.cx+e.dir*1);e.speed=9;
       e.go=Math.abs(e.target-e.door)/e.speed;
       // seq: leave door, arrive, hatch open, crate 1 down, crate 2 down, hatch shut, start back
       e.seq=[1,1+e.go,1+e.go+1,1+e.go+4.5,1+e.go+8,1+e.go+8.8,1+e.go+9.4];e.dur=e.seq[6]+e.go+1.6;
@@ -550,7 +552,7 @@
   });
 
   // 14. Meteors at night; now and then a short shower.
-  def({id:'meteor',name:'流星',time:'night',weight:8,cooldown:160,minor:true,
+  def({id:'meteor',name:'流星',time:'night',clearSky:true,weight:8,cooldown:160,minor:true,
     setup(e,env){
       const shower=e.r()<.2,n=shower?4+Math.floor(e.r()*3):1;e.dur=shower?9:3.2;e.m=[];
       const top=env.G.horizonY-env.G.skyRows;
@@ -608,7 +610,7 @@
   });
 
   // 17. Chance meeting: the harbourmaster looks out to sea, a visitor steps out of the office, they greet.
-  def({id:'greet',name:'碼頭偶遇',time:'any',weight:6,cooldown:300,
+  def({id:'greet',name:'碼頭偶遇',time:'any',dry:true,weight:6,cooldown:300,
     can:env=>Boolean(env.G.office),
     setup(e,env){
       e.door=env.G.office.x+4;e.meet=Math.round(lerp(env.G.landR+16,Math.min(env.fisherX-24,env.G.landR+90),.3+e.r()*.5));
@@ -671,7 +673,7 @@
   });
 
   // 19. Chocobo (rare): trots down the pier, kwehs at the sea, flaps its little wings, runs home.
-  def({id:'chocobo',name:'陸行鳥來訪（彩蛋）',time:'any',weight:1.5,cooldown:1800,rare:true,
+  def({id:'chocobo',name:'陸行鳥來訪（彩蛋）',time:'any',dry:true,weight:1.5,cooldown:1800,rare:true,
     setup(e,env){
       e.stop=Math.round(Math.min(env.fisherX-16,env.G.landR+130));e.run=(e.stop+10)/12;e.seq=[e.run,e.run+1,e.run+2.6,e.run+3.6,e.run+4.4];
       e.dur=e.seq[4]+e.run+1;e.zones=[['deck',-10,e.stop+10]];
@@ -690,10 +692,147 @@
     }
   });
 
+
+  /* ---------- Eorzea events ---------- */
+  const MOOGLE={w:'#fbf7f2',k:'#3a2a2a',n:'#e88aa0',r:'#e04848',a:'#8a6a5a',p:'#7a4fa0'};
+  const MOOGLE_A=['....r....','....a....','..wwwww..','p.wkwkw.p','ppwwnwwpp','.pwwwwwp.','..wwwww..','..w...w..'];
+  const MOOGLE_B=['....r....','....a....','p.wwwww.p','ppwkwkwpp','..wwnww..','..wwwww..','..wwwww..','..w...w..'];
+  // 20. Moogle mail: a moogle bobs in with a letter, slips it into the workshop door, says kupo, leaves.
+  def({id:'moogle',name:'莫古力郵差',time:'any',weight:6,cooldown:300,
+    can:env=>Boolean(env.G.office),
+    setup(e,env){
+      const o=env.G.office;e.door=o.door||o.x+6;e.doorY=env.G.apronY-7;e.dur=12;
+      e.from={x:Math.min(env.w-4,e.door+120),y:env.G.horizonY-env.G.skyRows+2};e.to={x:-12,y:env.G.horizonY-env.G.skyRows};
+      e.zones=[['deck',-4,e.door+12],['sky',0,env.w]];
+    },
+    actors(g,e,env){
+      const t=e.t,flap=Math.floor(t*8)%2?MOOGLE_A:MOOGLE_B;let x,y;
+      if(t<4){const k=smooth(t/4);x=lerp(e.from.x,e.door+6,k);y=lerp(e.from.y,e.doorY-8,k)+Math.sin(t*5)*2}
+      else if(t<8){x=e.door+6;y=e.doorY-8+Math.sin(t*4)*1.2}
+      else{const k=smooth(seg(t,8,e.dur));x=lerp(e.door+6,e.to.x,k);y=lerp(e.doorY-8,e.to.y,k)+Math.sin(t*5)*2}
+      spr(g,flap,MOOGLE,x-4,y,t>=8);e.focus=[x,y+4];
+      // The letter: carried, pushed through the door slot, then gone.
+      const lt=seg(t,4.6,5.6);
+      if(t<5.6){const lx=lerp(x-1,e.door,lt),ly=lerp(y+7,e.doorY-2,lt);R(g,'#fffbea',lx,ly,3,2);R(g,'#d0402e',lx+1,ly+1,1,1)}
+      if(t>5.6&&t<6.2)R(g,'#ffe9a8',e.door-1,e.doorY-3,4,1);
+      if(t>6.2&&t<7.8)bubble(g,x+1,y-1,'♪','#b5452e');
+    }
+  });
+
+  // 21. Adventuring party: tank, healer and two damage dealers walk out, the leader points to sea.
+  const PARTY=[
+    {hair:'#8a5a3a',skin:'#efcca8',top:'#5a7fb0',legs:'#3a4a68',boots:'#4a3424',belt:'#c9a24a',shield:'#c9a24a'},
+    {hair:'#e9e3d0',skin:'#f6dcc3',top:'#f4f1e6',legs:'#cfd8c8',boots:'#7a6a4a',cape:'#6fb07a'},
+    {hair:'#c43c3c',skin:'#efcca8',top:'#a83a3a',legs:'#3a2a2a',boots:'#2a1f1a',ears:true,tail:'#c43c3c'},
+    {hair:'#2a2a3a',skin:'#f0d0b2',top:'#4a3a6a',legs:'#2a2440',boots:'#2a2a2a',hat:'#3a2f5a'}
+  ];
+  def({id:'party',name:'冒險者小隊',time:'any',dry:true,weight:5,cooldown:360,
+    setup(e,env){
+      const lo=env.G.landR+30;e.stop=Math.round(Math.min(env.fisherX-16,lo+60+e.r()*40));e.speed=7;
+      e.walk=(e.stop+4)/e.speed;e.seq=[e.walk+3*.9,e.walk+3*.9+4.5];e.dur=e.seq[1]+e.walk+4;
+      e.marks={walk:e.walk*.6,point:e.walk+3,leave:e.seq[1]+e.walk*.4};
+      e.zones=[['deck',-4,e.stop+6]];
+    },
+    actors(g,e,env){
+      const t=e.t,y=deckY(env),pos=[];
+      PARTY.forEach((pal,i)=>{
+        const delay=i*.9,target=e.stop-i*6;let x,dir=1,pose='walk';
+        if(t<delay)return;
+        if(t<e.seq[1]){x=Math.min(target,-4+(t-delay)*e.speed);if(x>=target){pose=i===0&&t>e.walk+3&&t<e.walk+5?'wave':'stand';dir=i===1&&t>e.walk+4?-1:1}}
+        else{const back=t-e.seq[1]-i*.3;x=target-Math.max(0,back)*e.speed;dir=-1;pose=back>0?'walk':'stand'}
+        if(x<-6)return;
+        person(g,{x,y,dir,pal,pose,frame:Math.floor(t*7)+i,swish:Math.round(Math.sin(t*2+i))});
+        if(pal.shield)R(g,pal.shield,dir>0?x-1:x+3,y-6,1,3);
+        pos.push(x+1);
+      });
+      if(t>e.walk+3&&t<e.walk+4.6)bubble(g,e.stop+1,y-10,'!','#b5452e');
+      e.pos=pos;e.focus=[e.stop-8,y-5];
+    }
+  });
+
+  // 22. Big ship: a three-master crosses far out, lanterns lit after dark.
+  const SHIP3={m:'#4a3a2e',S:'#f2ecdc',s:'#d9cfb8',h:'#3d2e24',H:'#6a4a32',f:'#c84a3a'};
+  const SHIP3_L=['...f...f....f..','...m...m....m..','..SmS.SmS..SmS.','.ssmSssmSs.smS.','.SSmSSSmSSSSmSS','..smS.smS..smS.','hhhhhhhhhhhhhhh','.HHHHHHHHHHHHH.','..hhhhhhhhhhh..'];
+  def({id:'bigship',name:'遠方大船',time:'any',weight:4,cooldown:420,minor:true,
+    setup(e,env){e.x0=env.w+10;e.x1=Math.max(env.G.dockR+30,env.w*.5);e.dur=Math.min(45,Math.max(18,(e.x0-e.x1)/4));e.y=env.G.horizonY+1;e.zones=[['horizon',0,env.w]]},
+    far(g,e,env){
+      const x=Math.round(lerp(e.x0,e.x1,e.t/e.dur)),fade=Math.min(seg(e.t,0,2),1-seg(e.t,e.dur-3,e.dur));e.focus=[x,e.y-4];
+      spr(g,SHIP3_L,SHIP3,x-7,e.y-8,false,fade);
+      g.globalAlpha=.45*fade;for(let k=1;k<8;k++)if((k+Math.floor(e.t*4))%3)R(g,'#e8f8f6',x+8+k,e.y+1,1,1);g.globalAlpha=1;
+    },
+    light(g,e,env){if(!env.night)return;const x=Math.round(lerp(e.x0,e.x1,e.t/e.dur)),f=Math.min(seg(e.t,0,2),1-seg(e.t,e.dur-3,e.dur));for(const dx of [-5,0,5])A.glow(g,x+dx,e.y-1,3,.45*f,[255,210,130])}
+  });
+
+  // 23. Airship: envelope, gondola and spinning propellers cross the sky.
+  const AIR={E:'#d9c08a',e:'#b39a64',r:'#8a3a2a',g:'#5a4030',G:'#7a5a40',w:'#ffe7a8',p:'#3a3a3a'};
+  const AIR_A=['...EEEEEEEEEE...','..EeEEEEEEEEeE..','.EEEEEEEEEEEEEE.','.rEEEEEEEEEEEEr.','..eeeeeeeeeeee..','.....g....g.....','..p.GGGGGGGG.p..','..p.GwGwGwGG.p..','.....GGGGGG.....'];
+  def({id:'airship',name:'飛空艇航線',time:'any',weight:5,cooldown:400,minor:true,
+    setup(e,env){e.x0=env.w+20;e.x1=-24;e.speed=Math.max(9,(e.x0-e.x1)/40);e.dur=(e.x0-e.x1)/e.speed;e.y=env.G.horizonY-env.G.skyRows+13;e.zones=[['sky',0,env.w]]},
+    far(g,e,env){
+      const x=Math.round(e.x0-e.t*e.speed),y=Math.round(e.y+Math.sin(e.t*.8)*1.2);e.focus=[x,y+4];
+      spr(g,AIR_A,AIR,x-8,y,false);
+      const f=Math.floor(e.t*14)%2;R(g,'#cfd6d8',x-8+2,y+6+f,1,1);R(g,'#cfd6d8',x-8+13,y+7-f,1,1);
+    },
+    light(g,e,env){if(!env.night)return;const x=Math.round(e.x0-e.t*e.speed),y=Math.round(e.y+Math.sin(e.t*.8)*1.2);A.glow(g,x-2,y+7,4,.5,[255,220,150]);A.glow(g,x+2,y+7,4,.5,[255,220,150])}
+  });
+
+  // 24. Sea serpent (rare): coils break the far water one by one, the crested head rises, then dives.
+  def({id:'serpent',name:'海蛇剪影（彩蛋）',time:'any',weight:1,cooldown:2400,rare:true,
+    setup(e,env){
+      const lo=Math.max(env.G.dockR+24,env.w*.45),hi=env.w-30,subs=env.boatDraw.filter(d=>d&&!d.moored).map(d=>d.towerX);
+      let best=null;for(let k=0;k<12;k++){const x=lerp(lo,Math.max(lo,hi),e.r()),gap=Math.min(99,...subs.map(s=>Math.abs(s-x)));if(!best||gap>best.gap)best={x,gap}}
+      e.x=Math.round(best.x);e.y=Math.round(env.G.horizonY+(env.G.waterline-env.G.horizonY)*.55);e.dur=12;e.drops=[];
+      e.zones=[['farsea',e.x-24,e.x+24]];
+    },
+    update(e,dt){if(e.t>7.6&&!e.splash){e.splash=true;for(let k=0;k<12;k++)e.drops.push({x:e.x+14+(e.r()-.5)*6,y:e.y-1,vx:(e.r()-.5)*10,vy:-8-e.r()*9,g:40,life:0,max:.7,col:foam})}stepParticles(e.drops,dt)},
+    surface(g,e,env){
+      const t=e.t,body=env.night?'#2a3550':'#2f4a5c',fin=env.night?'#4a7aa0':'#5fa3a8';e.focus=[e.x,e.y-4];
+      // Three coils rise and sink in turn, travelling toward the head.
+      for(let i=0;i<3;i++){const k=Math.sin(Math.PI*seg(t,1+i*.6,5.2+i*.6))*(1-seg(t,7,8));if(k<=0)continue;
+        const cx=e.x-18+i*11+Math.round(seg(t,1,8)*4),hgt=Math.round(k*5);
+        for(let r=0;r<hgt;r++)R(g,body,cx-4+Math.floor(r*.8),e.y-r,9-Math.floor(r*1.6),1);
+        if(hgt>=3){R(g,fin,cx-1,e.y-hgt,1,1);R(g,fin,cx+1,e.y-hgt-1,1,2)}R(g,foam,cx-5,e.y+1,11,1)}
+      const head=Math.sin(Math.PI*seg(t,3.2,7.8));
+      if(head>0){const hx=e.x+16,neck=Math.round(head*12),hy=e.y-neck;
+        R(g,body,hx,hy+2,3,neck-1);R(g,body,hx,hy,6,3);R(g,body,hx+5,hy+1,2,2);R(g,'#f4e6a0',hx+4,hy,1,1);R(g,'#d8e8e8',hx+6,hy+2,1,1);
+        R(g,fin,hx-1,hy-2,1,3);R(g,fin,hx+1,hy-3,1,3);R(g,fin,hx+3,hy-2,1,2);R(g,fin,hx-1,hy+4,1,3);R(g,foam,hx-3,e.y+1,9,1)}
+      drawParticles(g,e.drops);
+    }
+  });
+
+  // 25. Salvage: a returned submarine's crew holds up a glinting find, then stows it in a crate.
+  def({id:'salvage',name:'打撈品出艙',time:'any',weight:7,cooldown:200,
+    can:env=>env.boatDraw.some(d=>d&&d.moored&&d.big&&d.awaiting),
+    setup(e,env){
+      const list=env.boatDraw.filter(d=>d&&d.moored&&d.big&&d.awaiting),d=list[Math.floor(e.r()*list.length)];
+      e.i=d.i;e.dur=11;e.spark=[];e.zones=[['boat'+d.i,0,0]];e.pal=MECH;
+    },
+    update(e,dt,env){const d=env.boatDraw[e.i];if(!d||!d.moored){e.done=true;return}
+      if(e.t>2.8&&e.t<7.6&&e.r()<dt*14){const bow=d.flip?d.x0+4:d.x0+d.w-7,ix=bow+(d.flip?-2:4);e.spark.push({x:ix+(e.r()-.5)*7,y:d.y0+3+(e.r()-.5)*4,vx:0,vy:-3,life:0,max:.6,col:'#fff2b0'})}
+      stepParticles(e.spark,dt)},
+    actors(g,e,env){
+      const d=env.boatDraw[e.i];if(!d)return;const t=e.t,hx=d.flip?d.x0+d.w-13:d.x0+12,top=d.y0+2;e.focus=[hx,top];
+      R(g,'#122630',hx-1,top,3,1);
+      // Climbs out onto the hull, kneels and shows the find at chest height (below the pier deck).
+      const dir=d.flip?-1:1,deck=d.y0+8,bow=d.flip?d.x0+4:d.x0+d.w-7;
+      let px=hx-1,py=top+9,pose='stand';
+      if(t<1.6){py=lerp(top+9,top,smooth(seg(t,.4,1.6)));g.save();g.beginPath();g.rect(0,0,env.w,top+1);g.clip();person(g,{x:px,y:py,dir,pal:e.pal,pose});g.restore()}
+      else if(t<9.2){px=lerp(hx-1,bow,smooth(seg(t,1.6,2.6)));py=lerp(top,deck,seg(t,1.6,2.1));pose=t<2.6?'walk':'crouch';
+        if(t>8.2){px=lerp(bow,hx-1,smooth(seg(t,8.2,9.2)));pose='walk'}
+        person(g,{x:px,y:py,dir:t>8.2?-dir:dir,pal:e.pal,pose,frame:Math.floor(t*7)})}
+      else{py=lerp(top,top+9,smooth(seg(t,9.2,10.2)));g.save();g.beginPath();g.rect(0,0,env.w,top+1);g.clip();person(g,{x:hx-1,y:py,dir,pal:e.pal,pose:'stand'});g.restore()}
+      if(t>2.8&&t<7.6){const ix=bow+(dir>0?4:-2),iy=deck-5+Math.round(Math.sin(t*3)*.5);R(g,'#8a6a2a',ix-1,iy,4,3);R(g,'#d8b45c',ix-1,iy,4,1);R(g,'#fff2b0',ix+1,iy+1,1,1);
+        if(t<5)bubble(g,ix+1,iy-1,'!','#2f7a5a')}
+      drawParticles(g,e.spark);
+    }
+  });
+
   /* ============================================================
      Scheduler
      ============================================================ */
   function timeOk(d,env){
+    if(d.dry&&env.raining)return false;
+    if(d.clearSky&&!env.clear)return false;
     if(d.time==='night')return env.P.light>.55;
     if(d.time==='day')return env.P.light<.3;
     if(d.time==='notnight')return env.P.light<.6;
