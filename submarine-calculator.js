@@ -130,7 +130,12 @@ function renderBuilds(){
   });
  }
  $('ship-builds').querySelectorAll('[data-voyaging]').forEach(el=>el.onchange=()=>{
-  persist(s=>{s.ships[Number(el.dataset.voyaging)].voyaging=el.checked});calculate();
+  persist(s=>{
+   const ship=s.ships[Number(el.dataset.voyaging)];
+   // 手動標記出航時，不沿用已過預計返航時間的上一趟航程；舊資料改存 lastVoyage，不刪除。
+   if(el.checked&&!ship.voyaging&&ship.voyage&&!(Number(ship.voyage.etaAt)>Date.now())){ship.lastVoyage=ship.voyage;delete ship.voyage}
+   ship.voyaging=el.checked;
+  });calculate();
  });
 }
 
@@ -569,7 +574,7 @@ function calculate(){
   const duration=Math.round(Number(choice.route.time));
   if(!Number.isFinite(duration)||duration<=0){alert('航程時間無效，請重新計算。');return;}
   const routeText=makeLabel(choice.route.path),label=shipLabel(i,ship);
-  if(!window.confirm('已在 FF14 中將「'+label+'」實際派往「'+routeText+'」嗎？\\n確認後開始計時；燃料與物資會在返航結算時扣除。'))return;
+  if(!window.confirm('已在 FF14 中將「'+label+'」實際派往「'+routeText+'」嗎？\n確認後開始計時；燃料與物資會在返航結算時扣除。'))return;
   const now=Date.now();
   persist(st=>{
    if(!st.ships?.[i]||st.ships[i].voyaging)return;

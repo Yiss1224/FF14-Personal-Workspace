@@ -1,0 +1,279 @@
+// Stage-1 data-correctness regression tests for submarine.html (Playwright + Chromium).
+// Run: node tests/submarine-stage1-playwright.cjs
+// Needs the `playwright` package (local or global). Set CHROMIUM_PATH to use a specific browser binary.
+'use strict';
+const http=require('http');
+const fs=require('fs');
+const path=require('path');
+const assert=require('assert');
+
+function loadPlaywright(){
+  for(const id of ['playwright','/opt/node22/lib/node_modules/playwright']){
+    try{return require(id)}catch(e){}
+  }
+  throw new Error('找不到 playwright 套件，請先安裝：npm i -D playwright');
+}
+const {chromium}=loadPlaywright();
+const ROOT=path.resolve(__dirname,'..');
+const KEY='ff14_submarine_planner_v1';
+const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8'};
+
+function serve(){
+  const server=http.createServer((req,res)=>{
+    const file=path.join(ROOT,decodeURIComponent(new URL(req.url,'http://x').pathname));
+    if(!file.startsWith(ROOT)||!fs.existsSync(file)||fs.statSync(file).isDirectory()){res.writeHead(404);res.end();return}
+    res.writeHead(200,{'content-type':TYPES[path.extname(file)]||'application/octet-stream'});
+    fs.createReadStream(file).pipe(res);
+  });
+  return new Promise(resolve=>server.listen(0,'127.0.0.1',()=>resolve(server)));
+}
+
+const HOUR=3600e3;
+const baseSeed=()=>({
+  fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4,'0003':0},
+  ships:[
+    {registered:true,rank:20,exp:0,name:'',currentBuild:'1121'},
+    {registered:true,rank:10,exp:0,name:''},
+    {registered:false,rank:1,exp:0,name:''},
+    {registered:false,rank:1,exp:0,name:''}
+  ],
+  unlocks:{},logs:[],activeSectorMap:1
+});
+
+let browser,base,passed=0;
+const results=[];
+async function context(seed){
+  const ctx=await browser.newContext();
+  await ctx.route(/imgur|universalis/,route=>route.abort());
+  if(seed!==undefined){
+    // Seed once per context; later navigations and other tabs keep the stored data.
+    await ctx.addInitScript(([key,value])=>{
+      if(localStorage.getItem('__stage1_seeded'))return;
+      localStorage.setItem('__stage1_seeded','1');
+      if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);
+    },[KEY,seed===null?null:typeof seed==='string'?seed:JSON.stringify(seed)]);
+  }
+  return ctx;
+}
+async function open(ctx){
+  const page=await ctx.newPage();
+  page.errors=[];page.dialogs=[];
+  page.on('pageerror',e=>page.errors.push(e.message));
+  page.on('dialog',async d=>{page.dialogs.push(d.message());await d.accept()});
+  await page.goto(base+'/submarine.html');
+  await page.waitForFunction(()=>document.querySelector('#calc-result .route-card')||/失敗/.test(document.getElementById('calc-result').textContent),null,{timeout:20000});
+  return page;
+}
+const stored=page=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)),KEY);
+async function setField(page,selector,value){
+  await page.evaluate(([sel,val])=>{
+    const el=document.querySelector(sel);
+    if(el.type==='checkbox')el.checked=val;else el.value=String(val);
+    el.dispatchEvent(new Event('change',{bubbles:true}));
+  },[selector,value]);
+}
+async function tooltip(page,index){
+  await page.hover('[data-harbor-ship="'+index+'"]',{force:true});
+  await page.waitForTimeout(100);
+  const text=await page.evaluate(()=>document.getElementById('harbor-tooltip').innerText.replace(/\s+/g,' '));
+  await page.mouse.move(2,2);
+  return text;
+}
+async function test(name,fn){
+  const started=Date.now();
+  try{await fn();passed++;results.push('PASS '+name+' ('+(Date.now()-started)+'ms)')}
+  catch(e){results.push('FAIL '+name+'\n     '+String(e.stack||e).split('\n').slice(0,3).join('\n     '));process.exitCode=1}
+}
+
+async function main(){
+  const server=await serve();
+  base='http://127.0.0.1:'+server.address().port;
+  browser=await chromium.launch(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}
+    :fs.existsSync('/opt/pw-browsers/chromium')?{executablePath:'/opt/pw-browsers/chromium'}:{});
+
+  await test('1. 出航後修改燃料、修理材料、Rank、EXP、船名、登記、部件，voyage 都保留',async()=>{
+    const ctx=await context(baseSeed()),page=await open(ctx);
+    await page.click('[data-depart-ship="0"]');
+    const voyage=(await stored(page)).ships[0].voyage;
+    assert.ok(voyage&&voyage.etaAt>voyage.departedAt,'出航後應寫入 voyage');
+    const edits=[
+      ['燃料',()=>setField(page,'#fuel-stock',1500)],
+      ['修理材料',()=>setField(page,'#repair-stock',250)],
+      ['Rank',()=>setField(page,'[data-rank="1"]',12)],
+      ['EXP',()=>setField(page,'[data-exp="0"]',345)],
+      ['登記',()=>setField(page,'[data-registered="2"]',true)],
+      ['部件庫存',()=>setField(page,'[data-part-stock="1:0"]',6)],
+      ['船名',async()=>{
+        await page.click('#open-inventory');
+        await page.click('[data-edit-ship-name="0"]');
+        await page.fill('[data-ship-name-input="0"]','鸚鵡螺');
+        await page.click('[data-save-ship-name="0"]');
+        await page.click('#close-inventory');
+      }]
+    ];
+    for(const [label,edit] of edits){
+      await edit();
+      assert.deepStrictEqual((await stored(page)).ships[0].voyage,voyage,'修改'+label+'後 voyage 被覆寫');
+    }
+    const s=await stored(page);
+    assert.strictEqual(s.fuel,1500);assert.strictEqual(s.repair,250);
+    assert.strictEqual(s.ships[1].rank,12);assert.strictEqual(s.ships[0].exp,345);
+    assert.strictEqual(s.ships[2].registered,true);assert.strictEqual(s.partStock['1:0'],6);
+    assert.strictEqual(s.ships[0].name,'鸚鵡螺');
+    const tip=await tooltip(page,0);
+    assert.ok(!tip.includes('尚無航時紀錄')&&tip.includes('預計返航 ETA'),'碼頭應顯示航程時間：'+tip);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
+  await test('2. 確認出航對話框使用真正換行，不顯示字面 \\n',async()=>{
+    const ctx=await context(baseSeed()),page=await open(ctx);
+    await page.click('[data-depart-ship="0"]');
+    const message=page.dialogs.at(-1);
+    assert.ok(message.includes('嗎？\n確認後開始計時'),'應含換行：'+JSON.stringify(message));
+    assert.ok(!message.includes('\\n'),'不應含字面 \\n');
+    await ctx.close();
+  });
+
+  await test('3a. 舊版資料：已結束航程仍留在 voyage，手動勾選航行中不沿用舊計時',async()=>{
+    const now=Date.now(),seed=baseSeed();
+    seed.ships[1].voyaging=false;
+    seed.ships[1].voyage={departedAt:now-72*HOUR,etaAt:now-48*HOUR,route:'溺沒海 A → B'};
+    const ctx=await context(seed),page=await open(ctx);
+    await page.check('[data-voyaging="1"]');
+    const ship=(await stored(page)).ships[1];
+    assert.strictEqual(ship.voyaging,true);
+    assert.strictEqual(ship.voyage,undefined,'舊航程不應作為進行中航程');
+    assert.deepStrictEqual(ship.lastVoyage,seed.ships[1].voyage,'舊航程應保留在 lastVoyage');
+    const tip=await tooltip(page,1);
+    assert.ok(tip.includes('航行中・尚無航時紀錄')&&!tip.includes('待結算'),tip);
+    await ctx.close();
+  });
+
+  await test('3b. 進行中航程誤取消再勾回，計時保留',async()=>{
+    const ctx=await context(baseSeed()),page=await open(ctx);
+    await page.click('[data-depart-ship="0"]');
+    const voyage=(await stored(page)).ships[0].voyage;
+    await page.uncheck('[data-voyaging="0"]');
+    await page.check('[data-voyaging="0"]');
+    const ship=(await stored(page)).ships[0];
+    assert.strictEqual(ship.voyaging,true);
+    assert.deepStrictEqual(ship.voyage,voyage);
+    await ctx.close();
+  });
+
+  await test('3c. 返航結算後，航程移至 lastVoyage；再手動勾選不會顯示舊航程',async()=>{
+    const ctx=await context(baseSeed()),page=await open(ctx);
+    await page.click('[data-depart-ship="0"]');
+    const voyage=(await stored(page)).ships[0].voyage;
+    await page.fill('#settle-rank','21');await page.fill('#settle-exp','0');
+    await page.click('#settle-save');
+    let ship=(await stored(page)).ships[0];
+    assert.strictEqual(ship.voyaging,false);assert.strictEqual(ship.voyage,undefined);
+    assert.strictEqual(ship.lastVoyage.etaAt,voyage.etaAt);assert.ok(ship.lastVoyage.settledAt>0);
+    await page.check('[data-voyaging="0"]');
+    ship=(await stored(page)).ships[0];
+    assert.strictEqual(ship.voyage,undefined);
+    assert.ok((await tooltip(page,0)).includes('尚無航時紀錄'));
+    await ctx.close();
+  });
+
+  await test('4a. 雙分頁：B 返航結算後，A 用舊畫面改燃料，不會蓋掉 Rank 與紀錄',async()=>{
+    const ctx=await context(baseSeed()),a=await open(ctx),b=await open(ctx);
+    await b.fill('#settle-rank','21');await b.fill('#settle-exp','100');await b.click('#settle-save');
+    await a.waitForTimeout(200);
+    await setField(a,'#fuel-stock',1400);
+    const s=await stored(a);
+    assert.strictEqual(s.logs.length,1,'返航紀錄遺失');
+    assert.strictEqual(s.ships[0].rank,21,'Rank 被舊狀態覆寫');
+    assert.strictEqual(s.ships[0].exp,100);
+    assert.strictEqual(s.fuel,1400);
+    assert.ok((await a.textContent('#log-summary')).includes('1 趟'),'A 分頁應同步顯示新紀錄');
+    await ctx.close();
+  });
+
+  await test('4b. 雙分頁：B 出航後，A 改 Rank 不會清掉 B 的 voyage',async()=>{
+    const ctx=await context(baseSeed()),a=await open(ctx),b=await open(ctx);
+    await b.click('[data-depart-ship="0"]');
+    const voyage=(await stored(b)).ships[0].voyage;
+    await a.waitForTimeout(200);
+    await setField(a,'[data-rank="1"]',15);
+    const s=await stored(a);
+    assert.deepStrictEqual(s.ships[0].voyage,voyage);assert.strictEqual(s.ships[0].voyaging,true);
+    assert.strictEqual(s.ships[1].rank,15);
+    await ctx.close();
+  });
+
+  await test('4c. 雙分頁：B 新增紀錄後，A 刪除畫面上的舊紀錄仍刪對筆',async()=>{
+    const seed=baseSeed();
+    seed.logs=[{date:'2026-10-01',ship:1,route:'舊紀錄',exp:0,fuel:5,repair:0,note:'old'}];
+    const ctx=await context(seed),a=await open(ctx),b=await open(ctx);
+    await b.fill('#settle-rank','21');await b.fill('#settle-exp','0');await b.fill('#settle-note','new');await b.click('#settle-save');
+    await a.waitForTimeout(200);
+    await a.click('details.settlement-history:has(#log-table) > summary');
+    await a.locator('#log-table tr',{hasText:'old'}).locator('[data-delete]').click();
+    const s=await stored(a);
+    assert.deepStrictEqual(s.logs.map(l=>l.note),['new']);
+    await ctx.close();
+  });
+
+  await test('5. 舊版儲存格式（無 partStock／plannerSettings／name，含自訂欄位）可載入且修改不遺失資料',async()=>{
+    const legacy={fuel:900,repair:120,parts:{'1111':3,'0020':2,'3004':1,'0003':1},
+      ships:[{registered:true,rank:33,exp:5},{registered:true,rank:18,exp:0},{registered:false,rank:1,exp:0},{registered:false,rank:1,exp:0}],
+      unlocks:{'u-0-1':true,'sector-5':true},logs:[{date:'2025-01-01',ship:1,route:'A → B',exp:100,fuel:3,repair:1,note:'legacy'}],
+      customField:{keep:true}};
+    const ctx=await context(legacy),page=await open(ctx);
+    await setField(page,'#fuel-stock',880);
+    const s=await stored(page);
+    assert.strictEqual(s.fuel,880);assert.deepStrictEqual(s.customField,{keep:true});
+    assert.deepStrictEqual(s.logs,legacy.logs);assert.deepStrictEqual(s.unlocks,legacy.unlocks);
+    assert.strictEqual(s.ships[0].rank,33);assert.strictEqual(s.ships[0].exp,5);
+    assert.strictEqual(s.partStock['1:0'],3);assert.strictEqual(s.partStock['3:3'],1);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
+  await test('6. 完整備份匯入仍正常',async()=>{
+    const ctx=await context(baseSeed()),page=await open(ctx);
+    const backup=baseSeed();backup.fuel=4321;backup.ships[3]={registered:true,rank:44,exp:7,name:'匯入艇'};
+    backup.logs=[{date:'2026-09-09',ship:4,route:'X',exp:1,fuel:0,repair:0}];
+    await page.setInputFiles('#import-data',{name:'backup.json',mimeType:'application/json',
+      buffer:Buffer.from(JSON.stringify({schema:2,app:'ff14-submarine-planner',data:backup}))});
+    await page.waitForFunction(()=>document.getElementById('fuel-stock').value==='4321');
+    const s=await stored(page);
+    assert.strictEqual(s.ships[3].name,'匯入艇');assert.strictEqual(s.logs.length,1);
+    await ctx.close();
+  });
+
+  // Near-simultaneous writes from two tabs. localStorage has no cross-tab transaction:
+  // writes landing within a few ms can still overwrite each other, so 0 ms is measured, not asserted.
+  await test('7. 雙分頁近乎同時寫入不同欄位：0 ms 量測、100 ms 間隔須零遺失',async()=>{
+    const ctx=await context(baseSeed()),a=await open(ctx),b=await open(ctx);
+    const rounds=Number(process.env.STAGE1_ROUNDS)||15;
+    // Fire inside each page at a shared wall-clock instant for precise offsets.
+    const fire=(page,selector,value,at)=>page.evaluate(([sel,val,when])=>new Promise(done=>setTimeout(()=>{
+      const el=document.querySelector(sel);el.value=String(val);el.dispatchEvent(new Event('change',{bubbles:true}));done();
+    },Math.max(0,when-Date.now()))),[selector,value,at]);
+    const report={};
+    for(const gap of [0,100]){
+      let lost=0;
+      for(let i=1;i<=rounds;i++){
+        const value=gap*1000+i,at=Date.now()+400;
+        await Promise.all([fire(a,'#fuel-stock',value,at),fire(b,'[data-exp="1"]',value,at+gap)]);
+        await a.waitForTimeout(600);
+        const s=await stored(a);
+        if(s.fuel!==value||s.ships[1].exp!==value)lost++;
+      }
+      report[gap+'ms']=lost+'/'+rounds+' 輪遺失';
+    }
+    results.push('     近乎同時寫入結果：'+JSON.stringify(report));
+    assert.strictEqual(report['100ms'],'0/'+rounds+' 輪遺失','間隔 100 ms 的寫入不應遺失');
+    assert.deepStrictEqual([...a.errors,...b.errors],[]);
+    await ctx.close();
+  });
+
+  await browser.close();server.close();
+  console.log(results.join('\n'));
+  console.log(passed+' passed, '+(results.filter(r=>r.startsWith('FAIL')).length)+' failed');
+}
+main().catch(e=>{console.error(e);process.exit(1)});

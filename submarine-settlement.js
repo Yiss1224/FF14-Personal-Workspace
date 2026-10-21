@@ -121,6 +121,8 @@ function commit(){
   });
   s.fuel=Number(s.fuel||0)-fuel;s.repair=Number(s.repair||0)-repair;
   ship.rank=rank;ship.exp=exp;ship.voyaging=false;
+  // 已結算的航程不再作為進行中航程；保留為 lastVoyage，避免之後手動標記出航時誤用舊計時。
+  if(ship.voyage){ship.lastVoyage={...ship.voyage,settledAt:Date.now()};delete ship.voyage}
   for(const p of newlyOpened)s.unlocks['sector-'+p.id]=true;
   localStorage.setItem(KEY,JSON.stringify(s));
   window.dispatchEvent(new Event('submarine-settlement-saved'));
