@@ -50,10 +50,43 @@ const update=mutator=>{
  mutator(state);
  localStorage.setItem(KEY,JSON.stringify(state));render();window.dispatchEvent(new Event('submarine-state-updated'));
 };
-window.addEventListener('submarine-build-state-updated',()=>{if(reload())renderFleet()});
-window.addEventListener('submarine-settlement-saved',()=>{if(reload())render()});
+// 外部更新（其他分頁、計算器、返航結算）重畫畫面時，保留使用者尚未送出的輸入、船名草稿與焦點。
+// 只保留使用者實際輸入過、尚未觸發 change 的欄位；未修改的欄位照常顯示最新資料。
+function editableKey(el){
+ if(!el||!el.matches?.('input,select,textarea'))return null;
+ if(el.id==='fuel-stock'||el.id==='repair-stock')return '#'+el.id;
+ for(const attr of ['data-part-stock','data-rank','data-exp','data-registered','data-ship-name-input'])
+  if(el.hasAttribute(attr))return '['+attr+'="'+el.getAttribute(attr)+'"]';
+ return null;
+}
+const dirtyFields=new Set();
+document.addEventListener('input',e=>{const key=editableKey(e.target);if(key)dirtyFields.add(key)},true);
+document.addEventListener('change',e=>{const key=editableKey(e.target);if(key)dirtyFields.delete(key)},true);
+function preservingEdits(paint){
+ const active=document.activeElement,focusKey=editableKey(active);
+ let selection=null;
+ try{if(focusKey&&active.selectionStart!==null)selection=[active.selectionStart,active.selectionEnd]}catch(e){}
+ const drafts=[...dirtyFields].map(key=>[key,document.querySelector(key)?.value]).filter(([,value])=>value!==undefined);
+ const editors=[...document.querySelectorAll('[data-ship-name-editor]')].filter(x=>!x.hidden)
+  .map(x=>[x.dataset.shipNameEditor,x.querySelector('[data-ship-name-input]')?.value??'']);
+ paint();
+ for(const [key,value] of drafts){const el=document.querySelector(key);if(el)el.value=value}
+ for(const [i,value] of editors){
+  const editor=document.querySelector('[data-ship-name-editor="'+i+'"]'),input=editor?.querySelector('[data-ship-name-input]');
+  if(!editor||!input)continue;
+  editor.hidden=false;input.value=value;
+  document.querySelector('[data-edit-ship-name="'+i+'"]')?.setAttribute('aria-expanded','true');
+ }
+ const el=focusKey&&document.querySelector(focusKey);
+ if(el&&document.activeElement!==el){
+  el.focus({preventScroll:true});
+  try{if(selection)el.setSelectionRange(selection[0],selection[1])}catch(e){}
+ }
+}
+window.addEventListener('submarine-build-state-updated',()=>{if(reload())preservingEdits(renderFleet)});
+window.addEventListener('submarine-settlement-saved',()=>{if(reload())preservingEdits(render)});
 // 其他分頁寫入時同步本頁，之後的修改才會以新資料為基礎。
-window.addEventListener('storage',e=>{if((e.key===KEY||e.key===null)&&reload())render()});
+window.addEventListener('storage',e=>{if((e.key===KEY||e.key===null)&&reload())preservingEdits(render)});
 const rankRoutes=[
  [1,4,'溺沒海','A → B','起步，先開 B→E 的前置鏈'],
  [5,9,'溺沒海','A → C → D','可用時用較高 EXP 點'],

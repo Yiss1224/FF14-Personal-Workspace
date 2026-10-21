@@ -272,6 +272,101 @@ async function main(){
     await ctx.close();
   });
 
+  // Cross-tab sync must not discard what the user is still typing in this tab.
+  const activeKey=page=>page.evaluate(()=>{const a=document.activeElement;return a?(a.id?'#'+a.id:[...a.attributes].map(x=>x.name+'='+x.value).filter(x=>x.startsWith('data-')).join(' ')):null});
+  const typeInto=async(page,selector,text)=>{await page.focus(selector);await page.keyboard.press('ControlOrMeta+A');await page.keyboard.type(text)};
+
+  await test('8a. A 正在輸入燃料（未離開欄位）時 B 修改修理材料，A 的輸入與焦點保留，離開後兩者都寫入',async()=>{
+    const ctx=await context(baseSeed()),a=await open(ctx),b=await open(ctx);
+    await typeInto(a,'#fuel-stock','1700');
+    await setField(b,'#repair-stock',222);
+    await a.waitForFunction(()=>document.getElementById('repair-stock').value==='222');
+    assert.strictEqual(await a.inputValue('#fuel-stock'),'1700','燃料草稿被重畫清掉');
+    assert.strictEqual(await activeKey(a),'#fuel-stock','焦點遺失');
+    await a.keyboard.press('Tab');
+    const s=await stored(a);
+    assert.strictEqual(s.fuel,1700);assert.strictEqual(s.repair,222);
+    await ctx.close();
+  });
+
+  await test('8b. A 未修改但停在燃料欄位時，B 改了燃料，A 顯示新值（不保留過時數字）',async()=>{
+    const ctx=await context(baseSeed()),a=await open(ctx),b=await open(ctx);
+    await a.focus('#fuel-stock');
+    await setField(b,'#fuel-stock',1234);
+    await a.waitForFunction(()=>document.getElementById('fuel-stock').value==='1234');
+    assert.strictEqual(await activeKey(a),'#fuel-stock');
+    await ctx.close();
+  });
+
+  await test('8c. A 在管理視窗輸入 Rank／部件時 B 寫入，A 的輸入、焦點與游標位置保留',async()=>{
+    const ctx=await context(baseSeed()),a=await open(ctx),b=await open(ctx);
+    await a.click('#open-inventory');
+    await typeInto(a,'[data-rank="1"]','33');
+    await setField(b,'#fuel-stock',1111);
+    await a.waitForFunction(()=>document.getElementById('fuel-stock').value==='1111');
+    assert.strictEqual(await a.inputValue('[data-rank="1"]'),'33');
+    assert.strictEqual(await activeKey(a),'data-rank=1');
+    await a.keyboard.type('4');
+    assert.strictEqual(await a.inputValue('[data-rank="1"]'),'334','重畫後應可在原欄位接續輸入');
+    // 先離開 Rank 欄位完成儲存（本分頁 Tab 後焦點遺失屬階段 3 項目，不在此測試）。
+    await a.keyboard.press('Tab');
+    assert.strictEqual((await stored(a)).ships[1].rank,334);
+    await typeInto(a,'[data-part-stock="2:2"]','9');
+    await setField(b,'#repair-stock',99);
+    await a.waitForFunction(()=>document.getElementById('repair-stock').value==='99');
+    assert.strictEqual(await a.inputValue('[data-part-stock="2:2"]'),'9');
+    await a.keyboard.press('Tab');
+    const s=await stored(a);
+    assert.strictEqual(s.partStock['2:2'],9);assert.strictEqual(s.fuel,1111);assert.strictEqual(s.repair,99);
+    await ctx.close();
+  });
+
+  await test('8d. A 船名編輯中（含已移開焦點的草稿）時 B 寫入，編輯區、草稿與焦點保留，儲存後不蓋掉 B 的資料',async()=>{
+    const ctx=await context(baseSeed()),a=await open(ctx),b=await open(ctx);
+    await a.click('#open-inventory');
+    await a.click('[data-edit-ship-name="0"]');
+    await a.fill('[data-ship-name-input="0"]','草稿號');
+    await setField(b,'#fuel-stock',1300);
+    await a.waitForFunction(()=>document.getElementById('fuel-stock').value==='1300');
+    assert.strictEqual(await a.isHidden('[data-ship-name-editor="0"]'),false,'船名編輯區被關閉');
+    assert.strictEqual(await a.inputValue('[data-ship-name-input="0"]'),'草稿號');
+    assert.strictEqual(await activeKey(a),'data-ship-name-input=0');
+    await a.click('#sub-inventory-title');
+    await setField(b,'#repair-stock',123);
+    await a.waitForFunction(()=>document.getElementById('repair-stock').value==='123');
+    assert.strictEqual(await a.inputValue('[data-ship-name-input="0"]'),'草稿號','未聚焦的船名草稿被清掉');
+    await a.click('[data-save-ship-name="0"]');
+    const s=await stored(a);
+    assert.strictEqual(s.ships[0].name,'草稿號');assert.strictEqual(s.fuel,1300);assert.strictEqual(s.repair,123);
+    assert.strictEqual(await a.isHidden('[data-ship-name-editor="0"]'),true,'儲存後編輯區應關閉');
+    await ctx.close();
+  });
+
+  await test('8e. 同分頁：船名編輯中切換計算器配置，船名草稿保留',async()=>{
+    const ctx=await context(baseSeed()),a=await open(ctx);
+    await a.click('#open-inventory');
+    await a.click('[data-edit-ship-name="1"]');
+    await a.fill('[data-ship-name-input="1"]','二號草稿');
+    await a.click('#close-inventory');
+    await a.selectOption('[data-build="0"]','1121');
+    await a.click('#open-inventory');
+    assert.strictEqual(await a.isHidden('[data-ship-name-editor="1"]'),false);
+    assert.strictEqual(await a.inputValue('[data-ship-name-input="1"]'),'二號草稿');
+    await ctx.close();
+  });
+
+  await test('8f. A 正在輸入計算器目標 Rank 時 B 寫入，目標 Rank 草稿保留',async()=>{
+    const ctx=await context(baseSeed()),a=await open(ctx),b=await open(ctx);
+    await typeInto(a,'#calc-target-rank','60');
+    await setField(b,'#fuel-stock',1500);
+    await a.waitForFunction(()=>document.getElementById('fuel-stock').value==='1500');
+    assert.strictEqual(await a.inputValue('#calc-target-rank'),'60');
+    assert.strictEqual(await activeKey(a),'#calc-target-rank');
+    await a.keyboard.press('Tab');
+    assert.strictEqual((await stored(a)).plannerSettings.targetRank,60);
+    await ctx.close();
+  });
+
   await browser.close();server.close();
   console.log(results.join('\n'));
   console.log(passed+' passed, '+(results.filter(r=>r.startsWith('FAIL')).length)+' failed');

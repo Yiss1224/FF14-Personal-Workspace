@@ -646,9 +646,19 @@ async function init(){
    renderBuilds();renderSectors();renderItemPlanner();calculate();
   });
   refreshDepartureClock();
+  // 其他分頁寫入時，保留本頁正在輸入、尚未觸發 change 的計算器設定。
+  const plannerIds=['calc-hours','calc-target-rank','daily-pickup','pickup-start','pickup-end','calc-departure-time'];
+  const plannerDrafts=new Set();
+  for(const id of plannerIds){
+   $(id)?.addEventListener('input',()=>plannerDrafts.add(id));
+   $(id)?.addEventListener('change',()=>plannerDrafts.delete(id),true);
+  }
   window.addEventListener('storage',()=>{
+   const drafts=[...plannerDrafts].map(id=>[id,$(id).type==='checkbox'?$(id).checked:$(id).value]);
    manuallySelectedDeparture=plannerControls(state().plannerSettings);
-   refreshDepartureClock();renderBuilds();renderSectors();calculate();
+   refreshDepartureClock();
+   for(const [id,value] of drafts){if($(id).type==='checkbox')$(id).checked=value;else $(id).value=value}
+   renderBuilds();renderSectors();calculate();
   });
   window.addEventListener('submarine-state-updated',()=>{renderBuilds();renderSectors();calculate()});
   calculate();
