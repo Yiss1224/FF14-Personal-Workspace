@@ -58,7 +58,15 @@ function clockMinutes(id,fallback){
  const [h,m]=str.split(':').map(Number);
  return h>=0&&h<24&&m>=0&&m<60?h*60+m:fallback;
 }
+// 同一次同步計算期間，收船窗口欄位不會改變；以快照避免排序比較時反覆讀取 DOM。
+let windowSnapshot=null;
+function withWindowSnapshot(run){
+ if(windowSnapshot)return run();
+ windowSnapshot=windowSettings();
+ try{return run()}finally{windowSnapshot=null}
+}
 function windowSettings(){
+ if(windowSnapshot)return windowSnapshot;
  const start=clockMinutes('pickup-start',19*60),end=clockMinutes('pickup-end',22*60);
  const valid=end>start;
  const from=valid?start:19*60,to=valid?end:22*60;
@@ -130,7 +138,12 @@ function renderBuilds(){
   });
  }
  $('ship-builds').querySelectorAll('[data-voyaging]').forEach(el=>el.onchange=()=>{
-  persist(s=>{s.ships[Number(el.dataset.voyaging)].voyaging=el.checked});calculate();
+  persist(s=>{
+   const ship=s.ships[Number(el.dataset.voyaging)];
+   // 手動標記出航時，不沿用已過預計返航時間的上一趟航程；舊資料改存 lastVoyage，不刪除。
+   if(el.checked&&!ship.voyaging&&ship.voyage&&!(Number(ship.voyage.etaAt)>Date.now())){ship.lastVoyage=ship.voyage;delete ship.voyage}
+   ship.voyaging=el.checked;
+  });calculate();
  });
 }
 
@@ -177,11 +190,30 @@ function routeMetrics(path,speed,buildRange){
  if(range>buildRange)return null;
  return {range,time,fuel,xp};
 }
+// 實測 EXP 查詢表：每份 logs 只掃描一次，依正規化後的航線文字分組，並保留原始紀錄順序。
+const measuredTables=new WeakMap();
+function measuredTable(logs){
+ let table=measuredTables.get(logs);
+ if(!table){
+  table=new Map();
+  logs.forEach((x,index)=>{
+   const key=String(x.route||'').trim().replace(/\s+/g,' ');
+   if(!(Number(x.exp)>0))return;
+   if(!table.has(key))table.set(key,[]);
+   table.get(key).push({index,exp:Number(x.exp)});
+  });
+  measuredTables.set(logs,table);
+ }
+ return table;
+}
 function measuredExp(path,s){
  const route=makeLabel(path),shortRoute=path.map(p=>p.letter).join(' → ');
- const matches=(s.logs||[]).filter(x=>[route,shortRoute].includes(String(x.route||'').trim().replace(/\s+/g,' '))&&Number(x.exp)>0);
- if(!matches.length)return null;
- return matches.reduce((a,x)=>a+Number(x.exp),0)/matches.length;
+ const table=measuredTable(s.logs||[]),full=table.get(route)||[],short=route===shortRoute?[]:table.get(shortRoute)||[];
+ if(!full.length&&!short.length)return null;
+ // 兩組依原始紀錄順序合併後再加總，與逐筆過濾的加總順序相同，平均值完全一致。
+ const matches=[];let i=0,j=0;
+ while(i<full.length||j<short.length)matches.push(j>=short.length||(i<full.length&&full[i].index<short[j].index)?full[i++]:short[j++]);
+ return matches.reduce((a,x)=>a+x.exp,0)/matches.length;
 }
 function bestRoutes(available,ship,buildKey,maxHours,s,requiredId=null,beamLimit=180){
  const rank=shipRank(ship);if(!validBuild(buildKey,rank))return [];
@@ -278,7 +310,8 @@ function renderItemPlanner(){
  if(search)search.oninput=()=>fillOptions(search.value);
  $('calc-item-routes').onclick=calculateItemRoutes;
 }
-function calculateItemRoutes(){
+function calculateItemRoutes(){return withWindowSnapshot(calculateItemRoutesNow)}
+function calculateItemRoutesNow(){
  const itemId=Number($('target-item')?.value),hours=Number($('target-item-hours')?.value)||24;
  const s=state(),open=unlockedSectors(s,145),ships=(s.ships||[]).map((ship,i)=>({...ship,index:i})).filter(x=>x.registered);
  if(!itemId){$('item-route-result').innerHTML='<p class="calc-warning">請先選擇想撈取的物品。</p>';return}
@@ -401,7 +434,8 @@ function estimatedFinishDays(plan,option,targetRank,daily){
  const futureRate=Math.max(baseline,bestKnown);
  return turns+Math.max(0,rem-option.route.actualXp)/futureRate;
 }
-function calculate(){
+function calculate(){return withWindowSnapshot(calculateNow)}
+function calculateNow(){
  if(!data)return;
  const s=state(),ships=s.ships||[],open=unlockedSectors(s,145),
   hours=Number($('calc-hours').value)||48,target=Math.max(2,Math.min(90,Number($('calc-target-rank').value)||85)),
@@ -569,7 +603,7 @@ function calculate(){
   const duration=Math.round(Number(choice.route.time));
   if(!Number.isFinite(duration)||duration<=0){alert('航程時間無效，請重新計算。');return;}
   const routeText=makeLabel(choice.route.path),label=shipLabel(i,ship);
-  if(!window.confirm('已在 FF14 中將「'+label+'」實際派往「'+routeText+'」嗎？\\n確認後開始計時；燃料與物資會在返航結算時扣除。'))return;
+  if(!window.confirm('已在 FF14 中將「'+label+'」實際派往「'+routeText+'」嗎？\n確認後開始計時；燃料與物資會在返航結算時扣除。'))return;
   const now=Date.now();
   persist(st=>{
    if(!st.ships?.[i]||st.ships[i].voyaging)return;
@@ -641,9 +675,20 @@ async function init(){
    renderBuilds();renderSectors();renderItemPlanner();calculate();
   });
   refreshDepartureClock();
-  window.addEventListener('storage',()=>{
+  // 其他分頁寫入時，保留本頁正在輸入、尚未觸發 change 的計算器設定。
+  const plannerIds=['calc-hours','calc-target-rank','daily-pickup','pickup-start','pickup-end','calc-departure-time'];
+  const plannerDrafts=new Set();
+  for(const id of plannerIds){
+   $(id)?.addEventListener('input',()=>plannerDrafts.add(id));
+   $(id)?.addEventListener('change',()=>plannerDrafts.delete(id),true);
+  }
+  window.addEventListener('storage',e=>{
+   if(e.key!==KEY&&e.key!==null)return;
+   const drafts=[...plannerDrafts].map(id=>[id,$(id).type==='checkbox'?$(id).checked:$(id).value]);
    manuallySelectedDeparture=plannerControls(state().plannerSettings);
-   refreshDepartureClock();renderBuilds();renderSectors();calculate();
+   refreshDepartureClock();
+   for(const [id,value] of drafts){if($(id).type==='checkbox')$(id).checked=value;else $(id).value=value}
+   renderBuilds();renderSectors();calculate();
   });
   window.addEventListener('submarine-state-updated',()=>{renderBuilds();renderSectors();calculate()});
   calculate();

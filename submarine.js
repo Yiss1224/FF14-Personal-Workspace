@@ -25,54 +25,68 @@ const fresh=()=>{
   ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0,name:''})),
   unlocks:{},logs:[],activeSectorMap:1};
 };
+function normalize(saved){
+ const s=Object.assign(fresh(),saved||{});
+ s.parts=Object.assign(fresh().parts,saved?.parts||{});
+ s.partStock=Object.assign(legacyPartStock(s.parts),saved?.partStock||{});
+ s.ships=fresh().ships.map((x,i)=>Object.assign(x,saved?.ships?.[i]||{}));
+ s.unlocks=saved?.unlocks||{};
+ s.logs=Array.isArray(saved?.logs)?saved.logs:[];
+ return s;
+}
 let state;
-try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');state=Object.assign(fresh(),saved||{});state.parts=Object.assign(fresh().parts,saved?.parts||{});state.partStock=Object.assign(legacyPartStock(state.parts),saved?.partStock||{});state.ships=fresh().ships.map((x,i)=>Object.assign(x,saved?.ships?.[i]||{}));state.unlocks=saved?.unlocks||{};state.logs=Array.isArray(saved?.logs)?saved.logs:[]}catch(e){state=fresh()}
+try{state=normalize(JSON.parse(localStorage.getItem(KEY)||'null'))}catch(e){state=fresh()}
 const $=id=>document.getElementById(id);
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const save=()=>{
- try{
-  const latest=JSON.parse(localStorage.getItem(KEY)||'{}');
-  (latest.ships||[]).forEach((ship,i)=>{
-   if(!state.ships[i])return;
-   for(const key of ['build','currentBuild','voyaging'])if(Object.prototype.hasOwnProperty.call(ship,key))state.ships[i][key]=ship[key];
-  });
- }catch(e){}
- // 計算器、海圖可獨立寫入；一般手動欄位存檔不得覆寫較新的設定。
- try{
-  const latest=JSON.parse(localStorage.getItem(KEY)||'{}');
-  if(Object.prototype.hasOwnProperty.call(latest,'plannerSettings'))state.plannerSettings=latest.plannerSettings;
-  if(Object.prototype.hasOwnProperty.call(latest,'activeSectorMap'))state.activeSectorMap=latest.activeSectorMap;
-  if(latest.lootPrices)state.lootPrices=latest.lootPrices;
-  if(latest.lootItemIds)state.lootItemIds=latest.lootItemIds;
-  if(latest.marketWorld)state.marketWorld=latest.marketWorld;
-  if(latest.unlocks&&typeof latest.unlocks==='object')state.unlocks=latest.unlocks;
- }catch(e){}
+// 以 localStorage 的最新內容取代記憶體副本；資料損毀時保留目前的記憶體狀態。
+function reload(){
+ try{state=normalize(JSON.parse(localStorage.getItem(KEY)||'null'));return true}
+ catch(e){console.error('潛艇資料讀取失敗，保留目前畫面資料',e);return false}
+}
+// 每次寫入都先重新讀取最新儲存資料，只套用本次修改的欄位。
+// 避免本模組較舊的記憶體副本覆寫計算器（voyage、配置）、返航結算或其他分頁寫入的資料。
+const update=mutator=>{
+ reload();
+ mutator(state);
  localStorage.setItem(KEY,JSON.stringify(state));render();window.dispatchEvent(new Event('submarine-state-updated'));
 };
-window.addEventListener('submarine-build-state-updated',()=>{
- try{
-  const latest=JSON.parse(localStorage.getItem(KEY)||'{}');
-  (latest.ships||[]).forEach((ship,i)=>{
-   if(!state.ships[i])return;
-   for(const key of ['build','currentBuild','voyaging'])if(Object.prototype.hasOwnProperty.call(ship,key))state.ships[i][key]=ship[key];
-  });
-  state.unlocks=latest.unlocks||state.unlocks;
-  if(Object.prototype.hasOwnProperty.call(latest,'activeSectorMap'))state.activeSectorMap=latest.activeSectorMap;
-  renderFleet();
- }catch(e){/* Keep current in-memory state when storage is malformed. */}
-});
-window.addEventListener('submarine-settlement-saved',()=>{
- try{
-  const saved=JSON.parse(localStorage.getItem(KEY)||'null');
-  if(!saved)return;
-  state=Object.assign(fresh(),saved);
-  state.parts=Object.assign(fresh().parts,saved.parts||{});
-  state.partStock=Object.assign(legacyPartStock(state.parts),saved.partStock||{});
-  state.ships=fresh().ships.map((x,i)=>Object.assign(x,saved.ships?.[i]||{}));
-  state.logs=Array.isArray(saved.logs)?saved.logs:[];
-  render();
- }catch(e){console.error('返航結算同步失敗',e)}
-});
+// 外部更新（其他分頁、計算器、返航結算）重畫畫面時，保留使用者尚未送出的輸入、船名草稿與焦點。
+// 只保留使用者實際輸入過、尚未觸發 change 的欄位；未修改的欄位照常顯示最新資料。
+function editableKey(el){
+ if(!el||!el.matches?.('input,select,textarea'))return null;
+ if(el.id==='fuel-stock'||el.id==='repair-stock')return '#'+el.id;
+ for(const attr of ['data-part-stock','data-rank','data-exp','data-registered','data-ship-name-input'])
+  if(el.hasAttribute(attr))return '['+attr+'="'+el.getAttribute(attr)+'"]';
+ return null;
+}
+const dirtyFields=new Set();
+document.addEventListener('input',e=>{const key=editableKey(e.target);if(key)dirtyFields.add(key)},true);
+document.addEventListener('change',e=>{const key=editableKey(e.target);if(key)dirtyFields.delete(key)},true);
+function preservingEdits(paint){
+ const active=document.activeElement,focusKey=editableKey(active);
+ let selection=null;
+ try{if(focusKey&&active.selectionStart!==null)selection=[active.selectionStart,active.selectionEnd]}catch(e){}
+ const drafts=[...dirtyFields].map(key=>[key,document.querySelector(key)?.value]).filter(([,value])=>value!==undefined);
+ const editors=[...document.querySelectorAll('[data-ship-name-editor]')].filter(x=>!x.hidden)
+  .map(x=>[x.dataset.shipNameEditor,x.querySelector('[data-ship-name-input]')?.value??'']);
+ paint();
+ for(const [key,value] of drafts){const el=document.querySelector(key);if(el)el.value=value}
+ for(const [i,value] of editors){
+  const editor=document.querySelector('[data-ship-name-editor="'+i+'"]'),input=editor?.querySelector('[data-ship-name-input]');
+  if(!editor||!input)continue;
+  editor.hidden=false;input.value=value;
+  document.querySelector('[data-edit-ship-name="'+i+'"]')?.setAttribute('aria-expanded','true');
+ }
+ const el=focusKey&&document.querySelector(focusKey);
+ if(el&&document.activeElement!==el){
+  el.focus({preventScroll:true});
+  try{if(selection)el.setSelectionRange(selection[0],selection[1])}catch(e){}
+ }
+}
+window.addEventListener('submarine-build-state-updated',()=>{if(reload())preservingEdits(renderFleet)});
+window.addEventListener('submarine-settlement-saved',()=>{if(reload())preservingEdits(render)});
+// 其他分頁寫入時同步本頁，之後的修改才會以新資料為基礎。
+window.addEventListener('storage',e=>{if((e.key===KEY||e.key===null)&&reload())preservingEdits(render)});
 const rankRoutes=[
  [1,4,'溺沒海','A → B','起步，先開 B→E 的前置鏈'],
  [5,9,'溺沒海','A → C → D','可用時用較高 EXP 點'],
@@ -119,9 +133,8 @@ function renderPartInventory(){
   +Array.from({length:5},(_,i)=>i+1).map(cls=>'<tr><th>'+cls+' 型 · '+esc(partClasses[cls])+'</th>'+[0,1,2,3].map(slot=>'<td><input type="number" min="0" step="1" data-part-stock="'+cls+':'+slot+'" aria-label="'+esc(partClasses[cls]+' '+partSlots[slot]+'庫存')+'" value="'+(Number(stock[cls+':'+slot])||0)+'"></td>').join('')+'</tr>').join('')
   +'</tbody></table></div><p class="hint">輸入每個槽位實際持有的部件件數，變更會立即保存並觸發派船建議重算。</p>';
  host.querySelectorAll('[data-part-stock]').forEach(input=>input.onchange=()=>{
-  const key=input.dataset.partStock;
-  state.partStock[key]=Math.max(0,Math.floor(Number(input.value)||0));
-  syncLegacyPartCounts();save();
+  const key=input.dataset.partStock,count=Math.max(0,Math.floor(Number(input.value)||0));
+  update(s=>{s.partStock[key]=count;syncLegacyPartCounts()});
  });
  renderPartBuildable(stock);
 }
@@ -190,8 +203,8 @@ function renderFleet(){
  function saveName(i){
   const input=fleet.querySelector('[data-ship-name-input="'+i+'"]');
   if(!input)return;
-  state.ships[i].name=[...input.value.trim()].slice(0,40).join('');
-  save();
+  const name=[...input.value.trim()].slice(0,40).join('');
+  update(s=>{s.ships[i].name=name});
  }
  fleet.querySelectorAll('[data-edit-ship-name]').forEach(el=>el.onclick=()=>{
   const i=Number(el.dataset.editShipName);
@@ -212,9 +225,9 @@ function renderFleet(){
   if(e.key==='Enter'){e.preventDefault();saveName(i);}
   if(e.key==='Escape'){e.preventDefault();closeEditor(i);}
  });
- fleet.querySelectorAll('[data-registered]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.registered].registered=el.checked;save()});
- fleet.querySelectorAll('[data-rank]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.rank].rank=Number(el.value)||1;save()});
- fleet.querySelectorAll('[data-exp]').forEach(el=>el.onchange=()=>{state.ships[+el.dataset.exp].exp=Number(el.value)||0;save()});
+ fleet.querySelectorAll('[data-registered]').forEach(el=>el.onchange=()=>{const i=+el.dataset.registered,on=el.checked;update(s=>{s.ships[i].registered=on})});
+ fleet.querySelectorAll('[data-rank]').forEach(el=>el.onchange=()=>{const i=+el.dataset.rank,rank=Number(el.value)||1;update(s=>{s.ships[i].rank=rank})});
+ fleet.querySelectorAll('[data-exp]').forEach(el=>el.onchange=()=>{const i=+el.dataset.exp,exp=Number(el.value)||0;update(s=>{s.ships[i].exp=exp})});
 }
 function renderRoutes(){
  $('route-table').innerHTML=rankRoutes.map(r=>'<tr><td>'+r[0]+'–'+r[1]+'</td><td>'+r[2]+'</td><td><strong>'+r[3]+'</strong></td><td>'+r[4]+'</td></tr>').join('');
@@ -229,14 +242,32 @@ function renderUnlocks(){
 function renderLogs(){
  const runs=state.logs.length,fuelUsed=state.logs.reduce((a,l)=>a+(Number(l.fuel)||0),0),repairUsed=state.logs.reduce((a,l)=>a+(Number(l.repair)||0),0),xp=state.logs.reduce((a,l)=>a+(Number(l.exp)||0),0);
  $('log-summary').innerHTML='已記錄 <strong>'+runs+' 趟</strong>／累計 '+fuelUsed.toLocaleString()+' 燃料、'+repairUsed.toLocaleString()+' 修理材料、'+xp.toLocaleString()+' EXP。剩餘庫存：燃料 <strong>'+Number(state.fuel||0).toLocaleString()+'</strong>、修理材料 <strong>'+Number(state.repair||0).toLocaleString()+'</strong>。';
- $('log-table').innerHTML=runs?'<table><thead><tr><th>日期</th><th>艇</th><th>航線</th><th>EXP</th><th>燃料</th><th>修理</th><th>備註</th><th></th></tr></thead><tbody>'+state.logs.slice().reverse().map((l,idx)=>'<tr><td>'+esc(l.date)+'</td><td>'+esc(shipLabel(Number(l.ship)-1,state.ships[Number(l.ship)-1]))+'</td><td>'+esc(l.route)+'</td><td>'+Number(l.exp||0).toLocaleString()+'</td><td>'+Number(l.fuel||0)+'</td><td>'+Number(l.repair||0)+'</td><td>'+(l.kind==='settlement'?'<strong>返航結算 · Rank '+esc(l.rankAfter)+' / EXP '+Number(l.expAfter||0).toLocaleString()+'</strong>；'+(l.openedSectors||[]).map(p=>esc(p.label)).join('、')+'<br>':'')+esc(l.note||'')+'</td><td><button type="button" data-delete="'+(runs-1-idx)+'">刪除</button></td></tr>').join('')+'</tbody></table>':'<div class="empty">還沒有出航紀錄。</div>';
- $('log-table').querySelectorAll('[data-delete]').forEach(el=>el.onclick=()=>{const entry=state.logs[+el.dataset.delete];if(entry?.kind==='settlement'&&!confirm('刪除這筆返航結算？會回補消耗物資，但 Rank／EXP 和海圖不會倒回。若需修正可直接在上方手動修改。'))return;const l=state.logs.splice(+el.dataset.delete,1)[0];state.fuel=Number(state.fuel||0)+(Number(l.fuel)||0);state.repair=Number(state.repair||0)+(Number(l.repair)||0);save()});
+ // 出航紀錄表收合時不重建（紀錄多時每次修改都要重建整張表）；展開時再依最新資料產生。
+ if(!logPanel||logPanel.open)renderLogTable();
 }
+function renderLogTable(){
+ const runs=state.logs.length;
+ $('log-table').innerHTML=runs?'<table><thead><tr><th>日期</th><th>艇</th><th>航線</th><th>EXP</th><th>燃料</th><th>修理</th><th>備註</th><th></th></tr></thead><tbody>'+state.logs.slice().reverse().map((l,idx)=>'<tr><td>'+esc(l.date)+'</td><td>'+esc(shipLabel(Number(l.ship)-1,state.ships[Number(l.ship)-1]))+'</td><td>'+esc(l.route)+'</td><td>'+Number(l.exp||0).toLocaleString()+'</td><td>'+Number(l.fuel||0)+'</td><td>'+Number(l.repair||0)+'</td><td>'+(l.kind==='settlement'?'<strong>返航結算 · Rank '+esc(l.rankAfter)+' / EXP '+Number(l.expAfter||0).toLocaleString()+'</strong>；'+(l.openedSectors||[]).map(p=>esc(p.label)).join('、')+'<br>':'')+esc(l.note||'')+'</td><td><button type="button" data-delete="'+(runs-1-idx)+'">刪除</button></td></tr>').join('')+'</tbody></table>':'<div class="empty">還沒有出航紀錄。</div>';
+ $('log-table').querySelectorAll('[data-delete]').forEach(el=>el.onclick=()=>{
+  const index=+el.dataset.delete,entry=state.logs[index],shown=JSON.stringify(entry);
+  if(entry?.kind==='settlement'&&!confirm('刪除這筆返航結算？會回補消耗物資，但 Rank／EXP 和海圖不會倒回。若需修正可直接在上方手動修改。'))return;
+  // 依畫面上的紀錄內容在最新資料中定位，避免其他分頁增刪紀錄後刪錯筆。
+  let missing=false;
+  update(s=>{
+   const at=JSON.stringify(s.logs[index])===shown?index:s.logs.findIndex(x=>JSON.stringify(x)===shown);
+   if(at<0){missing=true;return}
+   const l=s.logs.splice(at,1)[0];s.fuel=Number(s.fuel||0)+(Number(l.fuel)||0);s.repair=Number(s.repair||0)+(Number(l.repair)||0);
+  });
+  if(missing)alert('這筆紀錄已在其他分頁變更或刪除，畫面已更新為最新資料。');
+ });
+}
+const logPanel=$('log-table').closest('details');
+logPanel?.addEventListener('toggle',()=>{if(logPanel.open)renderLogTable()});
 function render(){
  $('fuel-stock').value=Number(state.fuel)||0;$('repair-stock').value=Number(state.repair)||0;
  renderEstimate();renderFleet();renderFleetSummary();renderPartInventory();renderRoutes();renderLogs();
 }
-[['fuel-stock','fuel'],['repair-stock','repair']].forEach(([id,key])=>$(id).onchange=()=>{state[key]=Math.max(0,Number($(id).value)||0);save()});
+[['fuel-stock','fuel'],['repair-stock','repair']].forEach(([id,key])=>$(id).onchange=()=>{const value=Math.max(0,Number($(id).value)||0);update(s=>{s[key]=value})});
 const inventoryDialog=$('sub-inventory-dialog');
 $('open-inventory').onclick=()=>inventoryDialog.showModal();
 document.querySelectorAll('[data-open-inventory]').forEach(btn=>btn.onclick=()=>inventoryDialog.showModal());
@@ -293,7 +324,7 @@ $('import-data').onchange=async e=>{
  const f=e.target.files?.[0];if(!f)return;
  try{
   const parsed=JSON.parse(await f.text()),restored=importedState(parsed);
-  // 直接覆寫儲存資料而非呼叫 save()，以免舊記憶體裡的配件配置覆蓋匯入值。
+  // 匯入是整份還原：直接覆寫儲存資料，不與現有資料合併。
   localStorage.setItem(KEY,JSON.stringify(restored));
   state=restored;
   render();
