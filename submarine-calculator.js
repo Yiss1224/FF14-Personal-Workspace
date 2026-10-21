@@ -58,7 +58,15 @@ function clockMinutes(id,fallback){
  const [h,m]=str.split(':').map(Number);
  return h>=0&&h<24&&m>=0&&m<60?h*60+m:fallback;
 }
+// 同一次同步計算期間，收船窗口欄位不會改變；以快照避免排序比較時反覆讀取 DOM。
+let windowSnapshot=null;
+function withWindowSnapshot(run){
+ if(windowSnapshot)return run();
+ windowSnapshot=windowSettings();
+ try{return run()}finally{windowSnapshot=null}
+}
 function windowSettings(){
+ if(windowSnapshot)return windowSnapshot;
  const start=clockMinutes('pickup-start',19*60),end=clockMinutes('pickup-end',22*60);
  const valid=end>start;
  const from=valid?start:19*60,to=valid?end:22*60;
@@ -182,11 +190,30 @@ function routeMetrics(path,speed,buildRange){
  if(range>buildRange)return null;
  return {range,time,fuel,xp};
 }
+// 實測 EXP 查詢表：每份 logs 只掃描一次，依正規化後的航線文字分組，並保留原始紀錄順序。
+const measuredTables=new WeakMap();
+function measuredTable(logs){
+ let table=measuredTables.get(logs);
+ if(!table){
+  table=new Map();
+  logs.forEach((x,index)=>{
+   const key=String(x.route||'').trim().replace(/\s+/g,' ');
+   if(!(Number(x.exp)>0))return;
+   if(!table.has(key))table.set(key,[]);
+   table.get(key).push({index,exp:Number(x.exp)});
+  });
+  measuredTables.set(logs,table);
+ }
+ return table;
+}
 function measuredExp(path,s){
  const route=makeLabel(path),shortRoute=path.map(p=>p.letter).join(' → ');
- const matches=(s.logs||[]).filter(x=>[route,shortRoute].includes(String(x.route||'').trim().replace(/\s+/g,' '))&&Number(x.exp)>0);
- if(!matches.length)return null;
- return matches.reduce((a,x)=>a+Number(x.exp),0)/matches.length;
+ const table=measuredTable(s.logs||[]),full=table.get(route)||[],short=route===shortRoute?[]:table.get(shortRoute)||[];
+ if(!full.length&&!short.length)return null;
+ // 兩組依原始紀錄順序合併後再加總，與逐筆過濾的加總順序相同，平均值完全一致。
+ const matches=[];let i=0,j=0;
+ while(i<full.length||j<short.length)matches.push(j>=short.length||(i<full.length&&full[i].index<short[j].index)?full[i++]:short[j++]);
+ return matches.reduce((a,x)=>a+x.exp,0)/matches.length;
 }
 function bestRoutes(available,ship,buildKey,maxHours,s,requiredId=null,beamLimit=180){
  const rank=shipRank(ship);if(!validBuild(buildKey,rank))return [];
@@ -283,7 +310,8 @@ function renderItemPlanner(){
  if(search)search.oninput=()=>fillOptions(search.value);
  $('calc-item-routes').onclick=calculateItemRoutes;
 }
-function calculateItemRoutes(){
+function calculateItemRoutes(){return withWindowSnapshot(calculateItemRoutesNow)}
+function calculateItemRoutesNow(){
  const itemId=Number($('target-item')?.value),hours=Number($('target-item-hours')?.value)||24;
  const s=state(),open=unlockedSectors(s,145),ships=(s.ships||[]).map((ship,i)=>({...ship,index:i})).filter(x=>x.registered);
  if(!itemId){$('item-route-result').innerHTML='<p class="calc-warning">請先選擇想撈取的物品。</p>';return}
@@ -406,7 +434,8 @@ function estimatedFinishDays(plan,option,targetRank,daily){
  const futureRate=Math.max(baseline,bestKnown);
  return turns+Math.max(0,rem-option.route.actualXp)/futureRate;
 }
-function calculate(){
+function calculate(){return withWindowSnapshot(calculateNow)}
+function calculateNow(){
  if(!data)return;
  const s=state(),ships=s.ships||[],open=unlockedSectors(s,145),
   hours=Number($('calc-hours').value)||48,target=Math.max(2,Math.min(90,Number($('calc-target-rank').value)||85)),
@@ -653,7 +682,8 @@ async function init(){
    $(id)?.addEventListener('input',()=>plannerDrafts.add(id));
    $(id)?.addEventListener('change',()=>plannerDrafts.delete(id),true);
   }
-  window.addEventListener('storage',()=>{
+  window.addEventListener('storage',e=>{
+   if(e.key!==KEY&&e.key!==null)return;
    const drafts=[...plannerDrafts].map(id=>[id,$(id).type==='checkbox'?$(id).checked:$(id).value]);
    manuallySelectedDeparture=plannerControls(state().plannerSettings);
    refreshDepartureClock();

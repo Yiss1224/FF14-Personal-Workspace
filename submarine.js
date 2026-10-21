@@ -242,6 +242,11 @@ function renderUnlocks(){
 function renderLogs(){
  const runs=state.logs.length,fuelUsed=state.logs.reduce((a,l)=>a+(Number(l.fuel)||0),0),repairUsed=state.logs.reduce((a,l)=>a+(Number(l.repair)||0),0),xp=state.logs.reduce((a,l)=>a+(Number(l.exp)||0),0);
  $('log-summary').innerHTML='已記錄 <strong>'+runs+' 趟</strong>／累計 '+fuelUsed.toLocaleString()+' 燃料、'+repairUsed.toLocaleString()+' 修理材料、'+xp.toLocaleString()+' EXP。剩餘庫存：燃料 <strong>'+Number(state.fuel||0).toLocaleString()+'</strong>、修理材料 <strong>'+Number(state.repair||0).toLocaleString()+'</strong>。';
+ // 出航紀錄表收合時不重建（紀錄多時每次修改都要重建整張表）；展開時再依最新資料產生。
+ if(!logPanel||logPanel.open)renderLogTable();
+}
+function renderLogTable(){
+ const runs=state.logs.length;
  $('log-table').innerHTML=runs?'<table><thead><tr><th>日期</th><th>艇</th><th>航線</th><th>EXP</th><th>燃料</th><th>修理</th><th>備註</th><th></th></tr></thead><tbody>'+state.logs.slice().reverse().map((l,idx)=>'<tr><td>'+esc(l.date)+'</td><td>'+esc(shipLabel(Number(l.ship)-1,state.ships[Number(l.ship)-1]))+'</td><td>'+esc(l.route)+'</td><td>'+Number(l.exp||0).toLocaleString()+'</td><td>'+Number(l.fuel||0)+'</td><td>'+Number(l.repair||0)+'</td><td>'+(l.kind==='settlement'?'<strong>返航結算 · Rank '+esc(l.rankAfter)+' / EXP '+Number(l.expAfter||0).toLocaleString()+'</strong>；'+(l.openedSectors||[]).map(p=>esc(p.label)).join('、')+'<br>':'')+esc(l.note||'')+'</td><td><button type="button" data-delete="'+(runs-1-idx)+'">刪除</button></td></tr>').join('')+'</tbody></table>':'<div class="empty">還沒有出航紀錄。</div>';
  $('log-table').querySelectorAll('[data-delete]').forEach(el=>el.onclick=()=>{
   const index=+el.dataset.delete,entry=state.logs[index],shown=JSON.stringify(entry);
@@ -256,6 +261,8 @@ function renderLogs(){
   if(missing)alert('這筆紀錄已在其他分頁變更或刪除，畫面已更新為最新資料。');
  });
 }
+const logPanel=$('log-table').closest('details');
+logPanel?.addEventListener('toggle',()=>{if(logPanel.open)renderLogTable()});
 function render(){
  $('fuel-stock').value=Number(state.fuel)||0;$('repair-stock').value=Number(state.repair)||0;
  renderEstimate();renderFleet();renderFleetSummary();renderPartInventory();renderRoutes();renderLogs();
