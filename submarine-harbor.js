@@ -266,13 +266,16 @@
     nextScene=null;cleanup=null;
     sceneTimers.forEach(timer=>window.clearTimeout(timer));sceneTimers.clear();
   }
+  // The canvas harbor scene (has-scene) runs its own event system; these DOM vignettes
+  // remain the fallback when the canvas is unavailable.
+  const sceneEvents=()=>dock.classList.contains('has-scene')&&Boolean(window.HarborEvents);
   function schedule(delay){
-    if(!ambient||reduced()||document.hidden)return;
+    if(!ambient||reduced()||document.hidden||sceneEvents())return;
     nextScene=window.setTimeout(showScene,delay);
   }
   function showScene(){
     nextScene=null;
-    if(!ambient||reduced()||document.hidden)return;
+    if(!ambient||reduced()||document.hidden||sceneEvents())return;
     const scene=choose();lastScene=scene.type;
     const node=document.createElement('span');
     node.className='harbor-event harbor-event-'+scene.type;

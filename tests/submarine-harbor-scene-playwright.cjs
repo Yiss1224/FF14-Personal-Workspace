@@ -69,7 +69,7 @@ async function main(){
     :fs.existsSync('/opt/pw-browsers/chromium')?{executablePath:'/opt/pw-browsers/chromium'}:{});
 
   for(const [label,viewport] of [['桌面',{width:1440,height:900}],['手機',{width:390,height:844}]]){
-    await test(label+'：場景啟動、四艘船可見且提示框狀態正確',async()=>{
+    await test(label+'：場景啟動、四艘潛水艇可見且提示框狀態正確',async()=>{
       const {ctx,page}=await open(fleetSeed(),{viewport});
       assert.ok(await page.evaluate(()=>document.getElementById('mini-harbor').classList.contains('has-scene')),'場景未啟動');
       const painted=await page.evaluate(()=>{const c=document.querySelector('.harbor-scene'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i]>0)n++;return n/(c.width*c.height)});
@@ -85,12 +85,12 @@ async function main(){
       await ctx.close();
     });
 
-    await test(label+'：海上船隻各自分道、縮小，不重疊；停泊船回到泊位',async()=>{
+    await test(label+'：海上潛水艇各自分道、縮小，不重疊；停泊潛水艇回到泊位',async()=>{
       const {ctx,page}=await open(fleetSeed(),{viewport});
       const boxes=[];for(let i=0;i<4;i++)boxes.push(await boatBox(page,i));
       const atSea=[boxes[1],boxes[2]];
-      for(const b of atSea)assert.ok(b.width<40,'海上船應縮小：'+b.width);
-      assert.ok(Math.abs(atSea[0].cx-atSea[1].cx)>atSea[0].width,'海上兩艘船重疊：'+atSea.map(b=>b.cx));
+      for(const b of atSea)assert.ok(b.width<40,'海上潛水艇應縮小：'+b.width);
+      assert.ok(Math.abs(atSea[0].cx-atSea[1].cx)>atSea[0].width,'海上兩艘潛水艇重疊：'+atSea.map(b=>b.cx));
       for(const i of [0,3]){
         const berth=await page.evaluate(i=>{const walls=[...document.querySelectorAll('.harbor-slip-wall')].map(w=>{const r=w.getBoundingClientRect();return r.left+r.width/2});return (walls[i]+walls[i+1])/2},i);
         assert.ok(Math.abs(boxes[i].cx-berth)<3,'第 '+(i+1)+' 艘未停在泊位');
@@ -109,7 +109,7 @@ async function main(){
     await ctx.close();
   });
 
-  await test('確認出航後，船隻離開泊位並開始移動',async()=>{
+  await test('確認出航後，潛水艇離開泊位並開始移動',async()=>{
     const seed=fleetSeed();seed.ships[0].voyaging=false;
     const {ctx,page}=await open(seed);
     const before=await boatBox(page,0);
@@ -118,17 +118,71 @@ async function main(){
     await page.waitForTimeout(2500);
     const mid=await boatBox(page,0);
     assert.ok(mid.cls.includes('is-sailing'),'未標記為出航');
-    assert.ok(mid.bottom!==before.bottom||mid.cx!==before.cx,'出航後船隻未移動');
+    assert.ok(mid.bottom!==before.bottom||mid.cx!==before.cx,'出航後潛水艇未移動');
     await page.waitForTimeout(3000);
     const later=await boatBox(page,0);
-    assert.ok(later.cx>mid.cx,'船隻應向外海移動：'+mid.cx+' → '+later.cx);
+    assert.ok(later.cx>mid.cx,'潛水艇應向外海移動：'+mid.cx+' → '+later.cx);
     await ctx.close();
   });
 
-  await test('隨機事件仍會出現（既有 harbor-event）',async()=>{
+  await test('隨機事件：自動排程會播放畫布事件，舊版 DOM 事件不同時播放',async()=>{
     const {ctx,page}=await open(fleetSeed());
-    await page.waitForSelector('#harbor-ambient .harbor-event',{timeout:15000,state:'attached'});
+    let seen=null;
+    for(let i=0;i<40&&!seen;i++){await page.waitForTimeout(500);const st=await page.evaluate(()=>HarborScene.events.status());if(st.active.length)seen=st.active[0].id}
+    assert.ok(seen,'20 秒內沒有播放任何事件');
+    assert.strictEqual(await page.evaluate(()=>document.querySelectorAll('#harbor-ambient .harbor-event').length),0,'舊版 DOM 事件仍在播放');
+    assert.strictEqual(await page.evaluate(()=>Boolean(document.getElementById('harbor-dev-panel'))),false,'一般模式不應顯示開發面板');
+    assert.strictEqual(await page.evaluate(()=>typeof HarborScene.events.play),'undefined','一般模式不應提供播放控制');
+    assert.deepStrictEqual(page.errors,[]);
     await ctx.close();
+  });
+
+  await test('開發預覽：19 種事件皆可播放、結束後完整清理',async()=>{
+    const ctx=await browser.newContext({viewport:{width:1440,height:900}});
+    await ctx.route(/imgur|universalis/,route=>route.abort());
+    await ctx.addInitScript(([key,value])=>localStorage.setItem(key,value),[KEY,JSON.stringify(fleetSeed())]);
+    const page=await ctx.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    await page.goto(base+'/submarine.html?harbor-dev=1&harbor-hour=13');await page.waitForTimeout(1500);
+    assert.ok(await page.evaluate(()=>Boolean(document.getElementById('harbor-dev-panel'))));
+    const list=await page.evaluate(()=>HarborScene.events.list());
+    assert.ok(list.length>=15,'事件數量不足：'+list.length);
+    await page.evaluate(()=>HarborScene.events.setAuto(false));
+    for(const ev of list){
+      if(ev.time==='night')await page.evaluate(()=>HarborScene.events.setHour(22));else await page.evaluate(()=>HarborScene.events.setHour(13));
+      const r=await page.evaluate(id=>HarborScene.events.play(id,{seed:99}),ev.id);
+      assert.ok(r.ok,ev.id+' 無法播放：'+r.error);
+      await page.evaluate(d=>HarborScene.events.seek(d*.5),r.dur);await page.waitForTimeout(120);
+      assert.strictEqual((await page.evaluate(()=>HarborScene.events.status())).active.length,1,ev.id+' 未在播放');
+      await page.evaluate(d=>HarborScene.events.seek(d-.05),r.dur);await page.waitForTimeout(300);
+      assert.strictEqual((await page.evaluate(()=>HarborScene.events.status())).active.length,0,ev.id+' 結束後未清理');
+    }
+    assert.strictEqual(await page.evaluate(()=>document.querySelectorAll('#mini-harbor *').length)<120,true,'碼頭 DOM 節點異常增加');
+    assert.deepStrictEqual(errors,[]);
+    await ctx.close();
+  });
+
+  await test('事件播放時，潛水艇點擊區與提示框不受影響',async()=>{
+    const ctx=await browser.newContext({viewport:{width:1440,height:900}});
+    await ctx.route(/imgur|universalis/,route=>route.abort());
+    await ctx.addInitScript(([key,value])=>localStorage.setItem(key,value),[KEY,JSON.stringify(fleetSeed())]);
+    const page=await ctx.newPage();await page.goto(base+'/submarine.html?harbor-dev=1&harbor-hour=13');await page.waitForTimeout(1500);
+    for(const id of ['chocobo','inspect','gust']){
+      await page.evaluate(id=>{HarborScene.events.setAuto(false);HarborScene.events.play(id,{seed:7})},id);await page.waitForTimeout(600);
+      const hit=await page.evaluate(()=>{const b=document.querySelector('[data-harbor-ship="0"]').getBoundingClientRect();const el=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);return Boolean(el&&el.closest('[data-harbor-ship="0"]'))});
+      assert.ok(hit,id+' 播放時潛水艇 1 被遮擋');
+      const tip=await tooltipFor(page,0);assert.ok(tip&&tip.includes('停泊待命'),id+' 播放時提示框異常：'+tip);
+    }
+    await ctx.close();
+  });
+
+  await test('分頁隱藏時場景與事件停止運作',async()=>{
+    const {ctx,page}=await open(fleetSeed());
+    const before=await page.evaluate(()=>({f:HarborScene.stats().frames,c:HarborScene.events.status().clock}));
+    await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))});
+    const a=await page.evaluate(()=>HarborScene.events.status().clock);await page.waitForTimeout(1500);
+    const b=await page.evaluate(()=>HarborScene.events.status().clock);
+    assert.strictEqual(a,b,'隱藏分頁時事件時間仍在前進');
+    void before;await ctx.close();
   });
 
   await test('減少動態偏好：畫面為靜態圖，無動畫循環',async()=>{
@@ -140,6 +194,8 @@ async function main(){
     assert.ok(b-a<=1,'reduced motion 仍持續繪製：'+(b-a));
     assert.strictEqual(await page.evaluate(()=>document.getAnimations().filter(x=>x.playState==='running').length),0);
     assert.ok((await tooltipFor(page,1)).includes('出航中'));
+    await page.waitForTimeout(9000);
+    assert.strictEqual((await page.evaluate(()=>HarborScene.events.status())).active.length,0,'減少動態時不應播放事件');
     await ctx.close();
   });
 

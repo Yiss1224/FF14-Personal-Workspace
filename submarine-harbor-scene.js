@@ -16,7 +16,7 @@
   const FPS=20;
   const motion=window.matchMedia?window.matchMedia('(prefers-reduced-motion: reduce)'):null;
   const reduced=()=>Boolean(motion&&motion.matches);
-  const forcedHour=(()=>{const v=parseFloat(new URLSearchParams(location.search).get('harbor-hour'));return Number.isFinite(v)?((v%24)+24)%24:null})();
+  let forcedHour=(()=>{const v=parseFloat(new URLSearchParams(location.search).get('harbor-hour'));return Number.isFinite(v)?((v%24)+24)%24:null})();
 
   /* ---------- helpers ---------- */
   const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -57,34 +57,40 @@
   const nowHour=()=>{if(forcedHour!==null)return forcedHour;const d=new Date();return d.getHours()+d.getMinutes()/60};
 
   /* ---------- sprites (art pixels; '.' = transparent) ---------- */
+  // Submarines (bow to the right): cigar hull riding low, conning tower with periscope and
+  // sail planes, rudder and screw at the stern, a row of portholes, livery band at the tower base.
   const SUB_BIG=[
-    '..........pp..........',
-    '..........p...........',
-    '........oooooo........',
-    '........oTTwTo........',
-    '........oTTTTo........',
-    '...oooooSSSSSSoooo....',
-    '..oLLLLLLLLLLLLLLLLo..',
-    '.oHHHwHHHHwHHHHwHHHHo.',
-    'oHHHHHHHHHHHHHHHHHHHHo',
-    'oDDDDDDDDDDDDDDDDDDDDo',
-    '.oDDDDDDDDDDDDDDDDDDo.',
-    '..oooooooooooooooooo..'
+    '...........pp...........',
+    '............p...........',
+    '..........oooooo........',
+    '..........oTTTTo........',
+    '.........foTTTTof.......',
+    '..........oTTTTo........',
+    '..........oTTTTo........',
+    '..........oTTTTo........',
+    '....oooooooSSSSoooooo...',
+    '.r.oLLLLLLLLLLLLLLLLLoo.',
+    'rrrHHHwHHHHwHHHHwHHHHHHo',
+    '.rrDDDDDDDDDDDDDDDDDDDDo',
+    '..roDDDDDDDDDDDDDDDDDDo.',
+    '....ooooooooooooooooo...'
   ];
   const SUB_SMALL=[
-    '....oo......',
+    '.....p......',
+    '....ooo.....',
     '....oTo.....',
-    '.oooSSoooo..',
-    'oLLLLwLLLLo.',
-    'oHHHHHHHHHHo',
-    '.oDDDDDDDDo.'
+    '..oooSoooo..',
+    'r.oLLLLLLLo.',
+    'rrHHwHHwHHHo',
+    '.roDDDDDDDo.',
+    '...oooooo...'
   ];
   const DIGITS={1:['.#.','##.','.#.','.#.','###'],2:['##.','..#','.#.','#..','###'],3:['##.','..#','.#.','..#','##.'],4:['#.#','#.#','###','..#','..#']};
   const SHIP_COLORS=['#e8b04a','#5bbfae','#e07a5f','#a493e6'];
-  const BASE={o:'#1c3442',L:'#d6ece7',H:'#8db8c0',D:'#4e7b8d',T:'#a3c8cb',p:'#c9dcd6',w:'#cfe8ea'};
+  const BASE={o:'#1a2f3c',L:'#a7c6c8',H:'#709cab',D:'#41697b',T:'#4f7889',p:'#c9dcd6',w:'#e9e3b8',f:'#33586a',r:'#33586a'};
   const spriteCache=new Map();
   function sprite(rows,colors,flip){
-    const key=rows.length+':'+JSON.stringify(colors)+':'+flip;
+    const key=rows.join('|')+':'+JSON.stringify(colors)+':'+flip;
     if(spriteCache.has(key))return spriteCache.get(key);
     const c=document.createElement('canvas');c.width=rows[0].length;c.height=rows.length;
     const g=c.getContext('2d');
@@ -157,6 +163,9 @@
       g.fillStyle=mortar?'#5f6a66':(hash(brick,row)>.5?'#97a39a':'#8a968e');g.fillRect(x,y,1,1);
     }
     rect(g,'#c4c8b4',0,apronY-1,landR,2);
+    // Two dark crevices near the waterline (crabs hide here).
+    G.crevices=[Math.max(3,Math.round(landR*.25)),Math.max(8,Math.round(landR*.72))];
+    for(const cx of G.crevices){rect(g,'#2c3432',cx,waterline-4,3,2);rect(g,'#3f4a47',cx-1,waterline-3,1,1)}
     // Wooden deck: planks on top, boarded face, dark beam.
     rect(g,'#d8c08e',landR,apronY-1,dockR-landR,1);rect(g,'#b99a6a',landR,apronY,dockR-landR,1);
     for(let y=apronY+1;y<quayY-1;y++)for(let x=landR;x<dockR;x++){
@@ -164,8 +173,9 @@
     }
     rect(g,'#4a3828',landR,quayY-1,dockR-landR,2);
     // Bollards and berth plaques.
+    G.bollards=[];
     for(let i=0;i<piers.length-1;i++){
-      const cx=Math.round((piers[i]+piers[i+1])/2);
+      const cx=Math.round((piers[i]+piers[i+1])/2);G.bollards.push(piers[i+1]-3);
       rect(g,'#2f3337',piers[i+1]-4,apronY-3,3,2);rect(g,'#4a5056',piers[i+1]-4,apronY-3,3,1);
       rect(g,SHIP_COLORS[i],cx-3,apronY+1,7,7);rect(g,'#2e4a5a',cx-2,apronY+1,5,7);
       drawDigit(g,i+1,cx-1,apronY+2,'#efe2b8');
@@ -182,11 +192,11 @@
       G.office={x:bx,y:by,w:bw,win:[bx+bw-7,by+4],chimney:[bx+bw-4,by-8]};
     }else G.office=null;
     // Cargo: crates, barrels, rope coil, life ring.
-    const crateX=Math.round(landR+(dockR-landR)*.12);
+    const crateX=Math.round(landR+(dockR-landR)*.12);G.crateX=crateX;
     rect(g,'#7a5530',crateX,apronY-5,5,5);rect(g,'#a7773f',crateX+1,apronY-4,3,3);rect(g,'#7a5530',crateX+2,apronY-4,1,3);
     rect(g,'#7a5530',crateX+5,apronY-4,4,4);rect(g,'#b88848',crateX+6,apronY-3,2,2);
     rect(g,'#7a5530',crateX+2,apronY-9,4,4);rect(g,'#c09050',crateX+3,apronY-8,2,2);
-    const barrelX=Math.round(landR+(dockR-landR)*.62);
+    const barrelX=Math.round(landR+(dockR-landR)*.62);G.barrelX=barrelX;
     for(const dx of [0,4]){rect(g,'#6e4a2f',barrelX+dx,apronY-5,3,5);rect(g,'#9a6a40',barrelX+dx+1,apronY-5,1,5);rect(g,'#3a3a3a',barrelX+dx,apronY-4,3,1);rect(g,'#3a3a3a',barrelX+dx,apronY-2,3,1)}
     rect(g,'#c9a86b',barrelX+9,apronY-2,4,2);rect(g,'#a88a52',barrelX+10,apronY-2,2,1);
     // Lamp posts at the DOM lamp anchors (the tit perches on them).
@@ -295,7 +305,7 @@
   }
 
   /* ---------- dynamic actors ---------- */
-  let wind=1,windTarget=1,windTimer=0;
+  let wind=1,windTarget=1,windTimer=0,gust=0,gustLeft=0,seaT=0;
   const smoke=[],glints=[],ripples=[];
   const workers=[{x:0,dir:1,state:'idle',timer:2,target:0,frame:0,vest:'#d67e4b',carry:false},
                  {x:0,dir:-1,state:'idle',timer:5,target:0,frame:0,vest:'#5fa8a2',carry:false}];
@@ -318,9 +328,24 @@
       else{wk.x+=Math.sign(wk.target-wk.x)*step;wk.frame+=dt*8}
     }else if(wk.timer<=0){
       const r=Math.random();
-      if(r<.55){wk.target=clamp(lo+Math.random()*(hi-lo),lo,hi);wk.dir=Math.sign(wk.target-wk.x)||wk.dir;wk.state='walk'}
+      if(r<.55){
+        let target=clamp(lo+Math.random()*(hi-lo),lo,hi);
+        for(let k=0;k<6&&blockedAt(target);k++)target=clamp(lo+Math.random()*(hi-lo),lo,hi);
+        if(blockedAt(target)){wk.timer=2;return}
+        wk.target=target;wk.dir=Math.sign(wk.target-wk.x)||wk.dir;wk.state='walk'}
       else if(r<.8){wk.dir*=-1;wk.timer=1+Math.random()*3}      // glance the other way
       else{wk.state='idle';wk.timer=3+Math.random()*7}          // take a longer break
+    }
+  }
+  // Deck space held by an event: workers keep clear, and step aside if already inside.
+  let blocked=[];
+  const blockedAt=x=>blocked.some(([a,b])=>x>=a-3&&x<=b+3);
+  function setBlocked(list){
+    blocked=list;
+    const lo=G.landR+3,hi=G.dockR-5;
+    for(const wk of workers)for(const [a,b] of blocked)if(wk.x>=a-3&&wk.x<=b+3){
+      const left=a-6,right=b+6,target=(wk.x-left<right-wk.x&&left>=lo)||right>hi?left:right;
+      wk.target=clamp(target,lo,hi);wk.dir=Math.sign(wk.target-wk.x)||wk.dir;wk.state='walk';
     }
   }
   function drawWorker(g,wk){
@@ -364,53 +389,48 @@
   function drawBoat(g,lights,info,P,t,dt){
     const st=boatState[info.i],flip=info.returning;
     if(st.lastX!==null)st.vx=st.vx*.8+((info.x-st.lastX)/Math.max(dt,.001))*.2;st.lastX=info.x;
-    const moving=Math.abs(st.vx)>.6,atSea=info.dy<-2;
+    const moving=Math.abs(st.vx)>.6,atSea=info.dy<-2,moored=!info.sailing&&!atSea;
     const colors={...BASE,S:SHIP_COLORS[info.i],w:P.light>.3?'#ffd98a':BASE.w};
-    const rows=info.big?SUB_BIG:SUB_SMALL,spr=sprite(rows,colors,flip);
-    const wl=info.big?9.5:3.5;
-    const bob=Math.round(Math.sin(t*st.f+st.ph)*(atSea?.9:.6)+Math.sin(t*st.f*2.3+st.ph2)*.4);
-    const cx=Math.round(info.x),waterY=Math.round(G.waterline+info.dy+(G.big[info.i]?0:0));
+    const big=info.big||atSea,rows=big?SUB_BIG:SUB_SMALL,spr=sprite(rows,colors,flip);
+    // Surfaced and moored: hull and portholes above water, periscope retracted.
+    // Out at sea: periscope depth, only the tower, its number and the hull's crown show.
+    const top=moored&&big?2:0,wl=atSea?(big?8.5:4.5):moored?(big?12.5:6.5):(big?11.5:5.5),visible=atSea?(big?9:5):spr.height;
+    const bob=Math.round(Math.sin(t*st.f+st.ph)*(atSea?.5:.6)+Math.sin(t*st.f*2.3+st.ph2)*.4);
+    const cx=Math.round(info.x),waterY=Math.round(G.waterline+info.dy);
     const x0=cx-Math.floor(spr.width/2),y0=waterY-Math.ceil(wl)+bob;
-    // Wake and bow wave when under way; soft ripples when moored.
+    const towerX=x0+(flip?spr.width-1-12:12);
+    st.draw=null;
+    // Wake: from the stern when surfaced, from the conning tower at periscope depth.
     if(info.sailing&&!info.awaiting){
-      const dir=flip?-1:1,len=moving?8:4;
+      const dir=flip?-1:1,len=moving?8:5,from=atSea?towerX-dir*3:cx-dir*Math.floor(spr.width/2);
       g.fillStyle='rgba(225,247,245,.55)';
-      for(let k=1;k<=len;k++){if(hash(k,Math.floor(t*6))<.35)continue;g.fillRect(cx-dir*(spr.width/2+k),waterY+Math.round(k*.25),1,1);g.fillRect(cx-dir*(spr.width/2+k),waterY-Math.round(k*.15),1,1)}
-      g.fillRect(cx+dir*(spr.width/2),waterY,1,1);
-    }else if(Math.sin(t*.7+st.ph)>.6){g.fillStyle='rgba(225,247,245,.35)';g.fillRect(x0-1,waterY+1,1,1);g.fillRect(x0+spr.width,waterY+1,1,1)}
-    // Mooring line to the bollard when docked.
-    if(!atSea&&!info.sailing){
-      const bx=G.piers.find(px=>px>cx)||cx+10,by=G.apronY-3,sx=flip?x0:x0+spr.width-2,sy=y0+6;
+      for(let k=1;k<=len;k++){if(hash(k,Math.floor(t*6))<.35)continue;g.fillRect(from-dir*k,waterY+Math.round(k*.25),1,1);g.fillRect(from-dir*k,waterY-Math.round(k*.15),1,1)}
+      if(atSea){g.fillRect(towerX+dir*4,waterY,1,1);g.fillRect(towerX-dir*3,waterY-1,1,1)}
+      else g.fillRect(cx+dir*Math.floor(spr.width/2),waterY,1,1);
+    }else if(moored&&Math.sin(t*.7+st.ph)>.6){g.fillStyle='rgba(225,247,245,.35)';g.fillRect(x0-1,waterY+1,1,1);g.fillRect(x0+spr.width,waterY+1,1,1)}
+    // Mooring line from the bow to the bollard when docked.
+    if(moored){
+      const bx=G.piers.find(px=>px>cx)||cx+10,by=G.apronY-3,sx=flip?x0+1:x0+spr.width-3,sy=y0+9;
       g.fillStyle='#c9a86b';
       for(let s=0;s<=12;s++){const tt=s/12;g.fillRect(Math.round(sx+(bx-3-sx)*tt),Math.round(sy+(by-sy)*tt+Math.sin(tt*3.14)*2),1,1)}
     }
     if(st.hover){ // selection halo
-      g.globalAlpha=.9;for(const [ox,oy] of [[-1,0],[1,0],[0,-1],[0,1]])g.drawImage(sprite(rows,Object.fromEntries(Object.keys(colors).map(k=>[k,'#fff6d0'])),flip),x0+ox,y0+oy);g.globalAlpha=1;
+      const halo=sprite(rows,Object.fromEntries(Object.keys(colors).map(k=>[k,'#fff6d0'])),flip);
+      g.globalAlpha=.9;for(const [ox,oy] of [[-1,0],[1,0],[0,-1],[0,1]])g.drawImage(halo,0,top,spr.width,visible-top,x0+ox,y0+top+oy,spr.width,visible-top);g.globalAlpha=1;
     }
-    g.drawImage(spr,x0,y0);
-    // Submerged hull tint for boats out at sea (docked boats sit in the front-water band).
-    if(atSea){g.fillStyle=css(P.seaFar,.55);g.fillRect(x0,waterY+1,spr.width,spr.height)}
-    // Propeller blur when moving.
-    if(info.sailing&&!info.awaiting&&info.big){g.fillStyle=Math.floor(t*12)%2?'#3b5a68':'#86a8b0';g.fillRect(flip?x0+spr.width:x0-1,y0+8,1,2)}
-    // Pennant with the berth number.
-    // Moored boats lower the mast; the berth plaque (in the boat's colour) identifies them.
-    const moored=!info.sailing&&!atSea,tall=info.big&&!moored,poleX=x0+Math.floor(spr.width/2)+(flip?-1:1),poleTop=y0-(tall?8:moored?0:6);
-    if(!moored){g.fillStyle='#e6e1cf';g.fillRect(poleX,poleTop,1,tall?8:6)}
-    if(info.big&&(info.sailing||atSea)){
-      const flag=info.awaiting?'#ff9a6b':SHIP_COLORS[info.i],flut=Math.round((Math.sin(t*3*wind+st.ph)+1)*.7);
-      const fx0=flip?poleX-5:poleX+1;
-      g.fillStyle=flag;g.fillRect(fx0,poleTop,5,7);g.fillStyle=css(mix(hex(flag),[0,0,0],.25));g.fillRect(flip?fx0:fx0+4,poleTop+flut+1,1,7-flut-2);
-      drawDigit(g,info.i+1,fx0+1,poleTop+1,'#3a2a1c');
-    }else if(!moored){
-      const flut=Math.round((Math.sin(t*3*wind+st.ph)+1)*.5);
-      g.fillStyle=info.awaiting?'#ff9a6b':SHIP_COLORS[info.i];g.fillRect(flip?poleX-3:poleX+1,poleTop,3,2);g.fillRect(flip?poleX-4-flut:poleX+4,poleTop+flut,1+flut,1);
-    }
-    // Arrived and waiting for settlement: a small bobbing "!" marker.
-    if(info.awaiting){ // beside the bow when moored, above the mast at sea
-      const ax=moored?(flip?x0-4:x0+spr.width+1):poleX-1,ay=(moored?y0+1:poleTop-5)+Math.round(Math.sin(t*2.4)*.8);
+    g.drawImage(spr,0,top,spr.width,visible-top,x0,y0+top,spr.width,visible-top);
+    st.draw={i:info.i,x0,y0,w:spr.width,h:spr.height,flip,big,moored,waterY,cx,towerX};
+    if(atSea){g.fillStyle='rgba(225,247,245,.5)';g.fillRect(towerX-4,waterY,1,1);g.fillRect(towerX+3,waterY,1,1)}
+    // Hull number painted on the conning tower.
+    if(big)drawDigit(g,info.i+1,x0+(flip?10:11),y0+3,'#f3e7c4');
+    // Screw turning at the stern while under way on the surface.
+    if(info.sailing&&!info.awaiting&&big&&!atSea){g.fillStyle=Math.floor(t*12)%2?'#3b5a68':'#86a8b0';g.fillRect(flip?x0+spr.width:x0-1,y0+10,1,2)}
+    // Arrived and waiting for settlement: a small bobbing "!" beside the bow (or above the tower at sea).
+    if(info.awaiting){
+      const ax=moored?(flip?x0-4:x0+spr.width+1):towerX-1,ay=(moored?y0+5:y0-6)+Math.round(Math.sin(t*2.4)*.8);
       g.fillStyle='#fff3c4';g.fillRect(ax,ay-1,3,5);g.fillStyle='#b5452e';g.fillRect(ax+1,ay,1,2);g.fillRect(ax+1,ay+3,1,1);
     }
-    if(P.light>.3)lights.push([x0+(info.big?11:5),y0+(info.big?7:3),3,.5]);
+    if(P.light>.3&&!atSea)lights.push([x0+12,y0+(info.big?10:5),3,.5]);
   }
 
   /* ---------- frame ---------- */
@@ -419,17 +439,24 @@
     const t0=performance.now();
     if(performance.now()-paletteAt>30000||!paletteAt){P=palette(nowHour());paletteAt=performance.now();if(Math.abs(P.hour-staticHour)>.05)staticDirty=true}
     windTimer-=dt;if(windTimer<=0){windTarget=.4+Math.random()*1.1;windTimer=6+Math.random()*12}
-    wind+=(windTarget-wind)*Math.min(1,dt*.3);
+    gustLeft=Math.max(0,gustLeft-dt);const gustTarget=gustLeft>0?gust:0;
+    wind+=(windTarget+gustTarget-wind)*Math.min(1,dt*(gustLeft>0?1.6:.3));
+    seaT+=dt*(.75+wind*.25);
     if(staticDirty)drawStatic(P);
+    const env=events?eventEnv(dt):null;
+    if(events)events.update(dt,env);
     ctx.clearRect(0,0,w,h);
-    drawSea(P,t);
+    drawSea(P,seaT);
     drawSky(P,t,dt);
+    layer('far',env);
     ctx.drawImage(stat,0,0);
+    layer('underwater',env);
     // Actors are drawn on their own layer so the time-of-day tint applies to them too.
     const g=fx.getContext('2d'),lights=[];g.clearRect(0,0,w,h);
     for(const wk of workers){updateWorker(wk,dt);drawWorker(g,wk)}
     drawFisher(g,t,dt);drawSmoke(g,P,dt);
-    for(const info of boatsInfo())if(info)drawBoat(g,lights,info,P,t,dt);
+    for(const info of (env?env.boats:boatsInfo()))if(info)drawBoat(g,lights,info,P,t,dt);
+    if(events)events.draw('actors',g,env);
     if(P.tint[3]>0){g.globalCompositeOperation='source-atop';g.fillStyle=css(P.tint,P.tint[3]*.85);g.fillRect(0,0,w,h);g.globalCompositeOperation='source-over'}
     ctx.drawImage(fx,0,0);
     // Front water: the near band overlaps pilings and hulls so they read as floating.
@@ -444,6 +471,7 @@
     // Channel buoy with its night light.
     const bx=Math.round(G.dockR+Math.max(8,(w-G.dockR)*.08)),bwy=G.waterline-2+Math.round(Math.sin(t*1.7)*.7);
     rect(ctx,'#b84a3a',bx-1,bwy-3,3,3);rect(ctx,'#e6d6b4',bx-1,bwy-1,3,1);rect(ctx,'#3c3c3c',bx,bwy-6,1,3);
+    layer('surface',env);
     // Lights (additive): lamps, windows, lighthouse, buoy.
     if(P.light>.05){
       ctx.globalCompositeOperation='lighter';
@@ -457,9 +485,38 @@
       if(Math.sin(t*1.9)>.2)glow(bx,bwy-6,3,.7*P.light,[140,255,170]);
       ctx.globalCompositeOperation='source-over';
     }
+    if(events&&events.has('light')){ctx.globalCompositeOperation='lighter';events.draw('light',ctx,env);ctx.globalCompositeOperation='source-over'}
     t+=dt;
     frameMs.push(performance.now()-t0);if(frameMs.length>120)frameMs.shift();
   }
+  function eventEnv(dt){
+    // boatDraw is read live: events drawn after the submarines see this frame's positions.
+    return {G,P,t,dt,w,h,wind,night:P.light>.55,day:P.light<.3,boats:boatsInfo(),get boatDraw(){return boatState.map(s=>s.draw||null)},
+      workers:workers.map(wk=>({x:wk.x,dir:wk.dir,state:wk.state})),fisherX:G.dockR-3};
+  }
+  // Event layers that are not lights get the same time-of-day tint as the scene.
+  function layer(name,env){
+    if(!events||!events.has(name))return;
+    const g=fx.getContext('2d');g.clearRect(0,0,w,h);
+    events.draw(name,g,env);
+    if(P.tint[3]>0){g.globalCompositeOperation='source-atop';g.fillStyle=css(P.tint,P.tint[3]*.85);g.fillRect(0,0,w,h);g.globalCompositeOperation='source-over'}
+    ctx.drawImage(fx,0,0);
+  }
+  function glowOn(g,x,y,r,a,c){
+    const grd=g.createRadialGradient(x,y,0,x,y,r);
+    grd.addColorStop(0,'rgba('+c+','+a.toFixed(2)+')');grd.addColorStop(1,'rgba('+c+',0)');
+    g.fillStyle=grd;g.fillRect(x-r,y-r,r*2,r*2);
+  }
+  let frozen=false;
+  const sceneApi={
+    sprite,rect,hash,noise,mix,hex,css,clamp,drawDigit,glow:glowOn,SHIP_COLORS,
+    gust(strength,seconds){gust=strength;gustLeft=seconds},
+    setBlocked,
+    setHour(hourOrNull){forcedHour=hourOrNull===null?null:((hourOrNull%24)+24)%24;paletteAt=0;if(G&&!reduced())return;if(G)frame(0)},
+    freeze(on){frozen=Boolean(on)},
+    redraw(){if(G)frame(0)}
+  };
+  const events=window.HarborEvents&&typeof window.HarborEvents.create==='function'?window.HarborEvents.create(sceneApi):null;
   function glow(x,y,r,a,c){
     const grd=ctx.createRadialGradient(x,y,0,x,y,r);
     grd.addColorStop(0,'rgba('+c+','+a.toFixed(2)+')');grd.addColorStop(1,'rgba('+c+',0)');
@@ -470,7 +527,7 @@
     if(document.hidden||reduced())return;
     const dt=last?Math.min(.25,(ts-last)/1000):1/FPS;
     acc+=dt;last=ts;
-    if(acc>=1/FPS){frame(acc);acc=0}
+    if(acc>=1/FPS){frame(frozen?0:acc);acc=0}
     raf=requestAnimationFrame(loop);
   }
   function start(){
@@ -492,6 +549,6 @@
     .forEach(name=>window.addEventListener(name,()=>{if(reduced())setTimeout(()=>frame(0),50)}));
   window.setInterval(()=>{if(reduced()&&!document.hidden)frame(0)},10000);
   // Read-only diagnostics for performance checks.
-  window.HarborScene={stats:()=>{const s=frameMs.slice().sort((a,b)=>a-b);return {frames:s.length,medianMs:s[s.length>>1]||0,p95Ms:s[Math.floor(s.length*.95)]||0,artSize:[w,h]}}};
+  window.HarborScene={events:events?events.publicApi:null,stats:()=>{const s=frameMs.slice().sort((a,b)=>a-b);return {frames:s.length,medianMs:s[s.length>>1]||0,p95Ms:s[Math.floor(s.length*.95)]||0,artSize:[w,h]}}};
   if(document.readyState==='complete')start();else window.addEventListener('load',start);
 })();
