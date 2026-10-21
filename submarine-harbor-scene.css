@@ -1,0 +1,27 @@
+/* Harbor scene v4 (experimental). Loaded after submarine-harbor.css.
+   Rules apply only once submarine-harbor-scene.js has drawn the canvas (.has-scene),
+   so the previous harbor stays intact if the scene cannot start. */
+#mini-harbor{--horizon:90px}
+@media(max-width:700px){#mini-harbor{--horizon:80px}}
+.harbor-scene{position:absolute;inset:0;width:100%;height:100%;z-index:0;
+  image-rendering:pixelated;image-rendering:crisp-edges;pointer-events:none}
+
+/* Decorative DOM replaced by the canvas. Kept in layout (visibility) because
+   submarine-harbor.js measures the berth walls and the tit perches on the lamps. */
+#mini-harbor.has-scene .harbor-sea,
+#mini-harbor.has-scene .harbor-quay,
+#mini-harbor.has-scene .harbor-yard-props,
+#mini-harbor.has-scene .harbor-slips,
+#mini-harbor.has-scene .harbor-lamp,
+#mini-harbor.has-scene .harbor-goal{visibility:hidden}
+#mini-harbor.has-scene .harbor-sea:before,#mini-harbor.has-scene .harbor-sea:after,
+#mini-harbor.has-scene .harbor-yard-props *,#mini-harbor.has-scene .harbor-lamp-glow,
+#mini-harbor.has-scene .harbor-goal{animation:none}
+
+/* Boats are drawn on the canvas; the DOM boat stays as the hover/focus/tooltip target. */
+#mini-harbor.has-scene .harbor-submarine{filter:none;transform-origin:50% 100%}
+#mini-harbor.has-scene .harbor-sprite{visibility:hidden;animation:none}
+#mini-harbor.has-scene .harbor-sprite *{animation:none}
+#mini-harbor.has-scene .harbor-submarine:focus-visible{outline:2px dashed #fff3c4;outline-offset:2px}
+/* One boat size everywhere: matches the canvas sprite and gives touch screens a larger target. */
+#mini-harbor.has-scene .harbor-submarine{width:44px;height:38px}

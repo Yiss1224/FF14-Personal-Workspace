@@ -100,10 +100,27 @@
   }
   // Dock maneuvers are short visual transitions, never a percentage of a day-long trip.
   // The offshore leg still follows the saved departure/ETA timestamps.
-  function voyagePath(i,width,duration,down){
+  // With a horizon (scene v4), each boat heads to its own lane far out at sea and
+  // shrinks with distance, so boats at sea never stack on one spot.
+  function voyagePath(i,width,duration,down,rise){
     const exit=Math.min(12000,duration*.1)/duration;
     const offshore=Math.min(90,quayPercent+6+i*1.5),turnaround=Math.min(96,Math.max(offshore+2,89-i*2));
     const x=percent=>width*(percent-starts[i])/100;
+    if(rise>0){
+      const cruise=Math.min(.45,exit+Math.min(30000,duration*.15)/duration);
+      const lane=Math.min(97,quayPercent+(100-quayPercent)*(.1+.27*i)),far=-rise+(i%2)*3,s=.62;
+      return [
+        {phase:0,x:0,y:0,s:1},
+        {phase:exit*.25,x:0,y:down,s:1},
+        {phase:exit,x:x(offshore),y:down,s:1},
+        {phase:cruise,x:x(lane),y:far,s},
+        {phase:.5,x:x(Math.min(97,lane+2)),y:far,s},
+        {phase:1-cruise,x:x(lane),y:far,s},
+        {phase:1-exit,x:x(offshore),y:down,s:1},
+        {phase:1-exit*.25,x:0,y:down,s:1},
+        {phase:1,x:0,y:0,s:1}
+      ];
+    }
     return [
       {phase:0,x:0,y:0},
       {phase:exit*.25,x:0,y:down},
@@ -114,32 +131,36 @@
       {phase:1,x:0,y:0}
     ];
   }
-  function boatPosition(i,phase,width,duration,down){
-    const path=voyagePath(i,width,duration,down);
+  function boatPosition(i,phase,width,duration,down,rise){
+    const path=voyagePath(i,width,duration,down,rise);
     const p=Math.max(0,Math.min(1,phase));
     for(let n=1;n<path.length;n++){
       const a=path[n-1],b=path[n];
       if(p<=b.phase){
         const t=(p-a.phase)/(b.phase-a.phase);
-        return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t};
+        const sa=a.s??1,sb=b.s??1;
+        return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,s:sa+(sb-sa)*t};
       }
     }
-    return {x:0,y:0};
+    return {x:0,y:0,s:1};
   }
   function positionTransform(p){
-    return 'translate(calc(-50% + '+p.x.toFixed(2)+'px), '+p.y.toFixed(2)+'px)';
+    const scale=p.s!==undefined&&p.s!==1?' scale('+p.s.toFixed(3)+')':'';
+    return 'translate(calc(-50% + '+p.x.toFixed(2)+'px), '+p.y.toFixed(2)+'px)'+scale;
   }
   function animateBoat(i,depart,eta,now,ratio){
     const boat=boats[i],width=dock.getBoundingClientRect().width;
     // Keep the hull inside the water strip on desktop and mobile.
     const bottom=parseFloat(window.getComputedStyle(boat).bottom)||0;
-    const down=Math.max(0,bottom-(6+i*2)),duration=eta-depart;
-    const key=depart+':'+eta+':'+Math.round(width)+':'+down+':'+starts[i].toFixed(3);
+    const horizon=parseFloat(window.getComputedStyle(dock).getPropertyValue('--horizon'))||0;
+    const rise=horizon>0?Math.max(0,horizon-bottom-22):0;
+    const down=rise>0?Math.min(4,bottom):Math.max(0,bottom-(6+i*2)),duration=eta-depart;
+    const key=depart+':'+eta+':'+Math.round(width)+':'+down+':'+rise+':'+starts[i].toFixed(3);
     if(!reduced()&&typeof boat.animate==='function'&&width>0){
       if(!running[i]||running[i].key!==key){
         stop(i);
         boat.style.left=starts[i]+'%';
-        const frames=voyagePath(i,width,duration,down).map(p=>({
+        const frames=voyagePath(i,width,duration,down,rise).map(p=>({
           transform:positionTransform(p),offset:p.phase
         }));
         const animation=boat.animate(frames,{duration,easing:'linear',fill:'both'});
@@ -153,7 +174,7 @@
     }else{
       if(running[i])stop(i);
       boat.style.left=starts[i]+'%';
-      boat.style.transform=positionTransform(boatPosition(i,ratio,width,duration,down));
+      boat.style.transform=positionTransform(boatPosition(i,ratio,width,duration,down,rise));
     }
   }
   function render(){
