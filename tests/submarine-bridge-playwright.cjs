@@ -1,5 +1,5 @@
 // Bridge additions on submarine.html: overview countdown, settlement prefill, dialogs with undo,
-// fleet cards, sea-map tips, ledger insights and the harbor's fleet moments (crane, signals, salvage).
+// fleet cards, sea-map tips, ledger insights and the harbor's fleet moments (signals, salvage).
 // Run: node tests/submarine-bridge-playwright.cjs   (Playwright + Chromium; CHROMIUM_PATH optional)
 'use strict';
 const http=require('http');
@@ -180,9 +180,9 @@ async function main(){
   await test('海圖：圓點顯示字母，滑鼠移上顯示代碼與中文點名',async()=>{
     const {ctx,page}=await open(seed());
     assert.strictEqual(await page.evaluate(()=>document.querySelector('[data-sector="10"]').textContent),'J');
-    // 乾淨海圖：依遊戲座標繪製，不再依賴外部底圖；第 3 張海圖每個點都有座標。
-    assert.ok(await page.evaluate(()=>document.querySelector('.map-stage.is-chart svg.map-chart')&&!document.querySelector('.map-stage img')));
-    assert.strictEqual(await page.evaluate(()=>document.querySelector('[data-sector="10"]').style.left),'90%');
+    // 灰機 wiki 海圖：底圖放在本站，圓點對齊圖上的圈；第 3 張海圖每個點都有座標。
+    assert.ok(await page.evaluate(()=>/submarine-maps\/sea-1\.jpg$/.test(document.querySelector('.map-stage.is-wiki img').src)));
+    assert.strictEqual(await page.evaluate(()=>document.querySelector('[data-sector="10"]').style.left),'89.5%');
     await page.click('[data-map-tab="3"]');
     assert.ok(await page.evaluate(()=>[...document.querySelectorAll('.map-point')].every(b=>!(b.style.left==='50%'&&b.style.top==='50%'))),'有航點落在預設位置');
     await page.click('[data-map-tab="1"]');
@@ -203,18 +203,6 @@ async function main(){
     const rows=await page.$$eval('.route-efficiency-table tbody tr',trs=>trs.map(t=>t.textContent));
     const ikj=rows.find(r=>r.includes('I → K → J'));
     assert.ok(ikj&&ikj.includes('6,480'),'EXP／小時應為 180000／(100000/3600)：'+ikj);
-    await ctx.close();
-  });
-
-  await test('碼頭：換裝時吊車送部件，送達前維持舊外形',async()=>{
-    const {ctx,page}=await open(seed(),'?harbor-hour=13');
-    await page.waitForTimeout(800);
-    await page.selectOption('[data-installed="2"]','1123');
-    await page.waitForFunction(()=>HarborScene.fleet().crane.stage!==null);
-    assert.deepStrictEqual(await page.evaluate(()=>[HarborScene.time().builds[2],HarborScene.time().shown[2]]),['1123','1121']);
-    await page.waitForFunction(()=>HarborScene.time().shown[2]==='1123',null,{timeout:30000});
-    await page.waitForFunction(()=>HarborScene.fleet().crane.stage===null,null,{timeout:30000});
-    assert.deepStrictEqual(page.errors,[]);
     await ctx.close();
   });
 
@@ -240,15 +228,14 @@ async function main(){
     await ctx.close();
   });
 
-  await test('減少動態偏好：不排吊車與出航動畫，外形立即更新',async()=>{
+  await test('減少動態偏好：換裝後外形立即更新',async()=>{
     const ctx=await browser.newContext({viewport:{width:1440,height:900},reducedMotion:'reduce'});
     await ctx.route(/imgur|universalis/,route=>route.abort());
     await ctx.addInitScript(([key,value])=>{if(!sessionStorage.getItem('s')){sessionStorage.setItem('s','1');localStorage.setItem(key,value)}},[KEY,JSON.stringify(seed())]);
     const page=await ctx.newPage();await page.goto(base+'/submarine.html');
     await page.waitForSelector('[data-installed="2"]',{timeout:20000});
     await page.selectOption('[data-installed="2"]','1123');await page.waitForTimeout(300);
-    assert.strictEqual(await page.evaluate(()=>HarborScene.time().shown[2]),'1123');
-    assert.strictEqual(await page.evaluate(()=>HarborScene.fleet().crane.stage),null);
+    assert.strictEqual(await page.evaluate(()=>HarborScene.time().builds[2]),'1123');
     await ctx.close();
   });
 

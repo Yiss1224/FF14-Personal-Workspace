@@ -2,11 +2,13 @@
 'use strict';
 const KEY='ff14_submarine_planner_v1';
 const maps={1:'溺沒海',2:'灰海',3:'翠浪海'};
-const mapImages={1:'https://i.imgur.com/Paa93VG.png',2:'https://i.imgur.com/bAReiKQ.png',3:'https://i.imgur.com/Y545lQE.png'};
+const mapImages={1:'submarine-maps/sea-1.jpg',2:'submarine-maps/sea-2.jpg',3:'submarine-maps/sea-3.jpg'};
+// Image size (width/height) of each chart, and point centres in percent measured on those images.
+const mapAspect={1:820/801,2:686/680,3:684/683};
 const mapPositions={
-1:{A:[36.7,88.2],B:[32.9,75.3],C:[42.2,69.7],D:[23.6,83.7],E:[37.5,61.1],F:[48.5,85.8],G:[19.8,79.1],H:[7.6,83.7],I:[22.1,67.4],J:[51.2,60.3],K:[31.4,55.5],L:[14.2,57.3],M:[5.7,64.2],N:[45.1,54.7],O:[36.6,52.2],P:[17,38.2],Q:[6.8,35.6],R:[9.5,54.7],S:[18.9,24.5],T:[8.9,20],U:[27.1,34.4],V:[31.9,23.7],W:[41.1,35.9],X:[51.5,36.1],Y:[12.7,10.2],Z:[24,10.4],AA:[47.5,22.6],AB:[43.1,10.4],AC:[53,10.2],AD:[34,10.2]},
-2:{A:[16.6,74.9],B:[8.7,83.5],C:[16.7,57.1],D:[26.1,69.8],E:[34,76.1],F:[11.9,41.6],G:[21,44.4],H:[19.4,33.2],I:[29.1,58.6],J:[27.4,43.7],K:[6.8,28.7],L:[26.1,22.1],M:[47.2,57.6],N:[49.2,43.9],O:[45,69],P:[32.6,20.6],Q:[41.7,87.3],R:[45.7,14],S:[38.8,37.1],T:[10,15]},
-3:{A:[12,46.2],B:[14.3,70.3],C:[15.4,28.7],D:[6.3,20.3],E:[27.2,9.1],F:[13,11.2],G:[38.7,24.9],H:[39.6,8.9],I:[47.5,18.5],J:[41.3,40.1],K:[49.5,8.6],L:[50.5,30.2],M:[38,65]}
+1:{A:[64.3,88.3],B:[57.5,74.6],C:[74,69.9],D:[40.5,85.7],E:[65.3,61.4],F:[84.6,85.3],G:[27.5,76.1],H:[13.5,84.6],I:[38.8,66.2],J:[89.5,60.3],K:[52.3,55.5],L:[27.5,57.1],M:[10.8,63.2],N:[79.7,55.5],O:[63,49.6],P:[28.6,35],Q:[12.4,35.9],R:[17,53.2],S:[33.4,23.7],T:[13.5,19.3],U:[47.3,32.2],V:[56.1,22],W:[70.9,37.6],X:[89.5,33.5],Y:[23.4,9.2],Z:[43.2,11.4],AA:[82.3,20.7],AB:[75.1,9.3],AC:[89,11],AD:[60.6,10.2]},
+2:{A:[29.2,75.7],B:[15.5,84.3],C:[28.9,57.9],D:[45.1,70.1],E:[60,77.7],F:[21.1,42],G:[36.7,47.6],H:[34.2,33.6],I:[51.2,60.8],J:[47.9,43.9],K:[11.9,28.9],L:[45,22.3],M:[82.6,58.5],N:[85.9,45.7],O:[77.6,69.3],P:[58.2,21.1],Q:[73.3,88.3],R:[80.2,12.9],S:[68.1,29.3],T:[17.6,15.1]},
+3:{A:[20.5,46.4],B:[24.6,70.6],C:[27,29],D:[10.7,19.6],E:[47.5,10.8],F:[22.7,11],G:[68.1,25.3],H:[68.7,9.1],I:[83.5,18.9],J:[71.9,40],K:[86.4,8.9],L:[88.7,30.7],M:[66.5,64.4],N:[63.2,80.5],O:[93.7,19.2],P:[48.5,89.5],Q:[89,45.5],R:[73.5,77.2],S:[85.2,61.9],T:[83.8,88.9]}
 };
 const builds={
  auto:{label:'自動擇優（可換裝）'},
@@ -190,33 +192,7 @@ function renderBuilds(){
 }
 
 function sectorName(map,letter){return window.SubmarineSectorNames?.[map]?.[letter]||''}
-// Game chart coordinates (0–1000) when available; otherwise the positions measured on the forum image.
-const chartPoints=()=>window.SubmarineSectorPoints||null;
-function pointAt(map,letter){
- const c=chartPoints()?.[map]?.[letter];
- return c?[c[0]/10,c[1]/10]:(mapPositions[map][letter]||[50,50]);
-}
-// A clean sea chart drawn in the game's 1000×1000 chart space, so every point lands where the game puts it:
-// depth texture, grid, islets under island sectors, dashed lines from each sector to the one that unlocks it.
-function chartSvg(map,items){
- const pts=chartPoints()[map]||{},byId=new Map(items.map(p=>[p.id,p]));
- const at=p=>pts[p.letter]||null;
- let grid='';for(let v=100;v<1000;v+=100)grid+='<path d="M'+v+' 0V1000M0 '+v+'H1000"/>';
- const links=items.map(p=>{const parent=byId.get(Number(p.unlockedBy)),a=at(p),b=parent&&at(parent);return a&&b?'<path d="M'+b[0]+' '+b[1]+'L'+a[0]+' '+a[1]+'"/>':''}).join('');
- const isles=items.map(p=>{
-  const c=at(p),name=sectorName(map,p.letter);if(!c||!/島|礁|港|祭壇/.test(name))return '';
-  const r=26+(p.id*7%10),k=p.id%3;
-  return '<path class="chart-isle" d="M'+(c[0]-r)+' '+(c[1]+4)+'q'+(r*.3)+' '+(-r*(.9+k*.1))+' '+r+' '+(-r*.8)+'q'+(r*.8)+' '+(-r*.1)+' '+r+' '+(r*.7)+'q'+(-r*.2)+' '+(r*.7)+' '+(-r)+' '+(r*.6)+'q'+(-r*.7)+' '+(r*.1)+' '+(-r)+' '+(-r*.5)+'z"/>';
- }).join('');
- const id='chart'+map;
- return '<svg class="map-chart" viewBox="0 0 1000 1000" preserveAspectRatio="none" role="img" aria-label="'+esc(maps[map])+'示意海圖">'
-  +'<defs><radialGradient id="'+id+'-sea" cx="42%" cy="55%" r="78%"><stop offset="0" stop-color="#226f8a"/><stop offset=".65" stop-color="#16506b"/><stop offset="1" stop-color="#0c2d44"/></radialGradient>'
-  +'<filter id="'+id+'-depth" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.0045" numOctaves="4" seed="'+(map*13)+'"/><feColorMatrix values="0 0 0 0 0.8 0 0 0 0 0.95 0 0 0 0 1 0 0 0 0.55 -0.2"/></filter></defs>'
-  +'<rect width="1000" height="1000" fill="url(#'+id+'-sea)"/><rect width="1000" height="1000" filter="url(#'+id+'-depth)"/>'
-  +'<g class="chart-grid">'+grid+'</g><g class="chart-isles">'+isles+'</g><g class="chart-links">'+links+'</g>'
-  +'<g class="chart-compass" transform="translate(945 945)"><circle r="34"/><path d="M0 -30L7 0L0 30L-7 0Z"/><path class="n" d="M0 -30L7 0L-7 0Z"/><text y="-40" text-anchor="middle">N</text></g>'
-  +'</svg>';
-}
+const pointAt=(map,letter)=>mapPositions[map][letter]||[50,50];
 // Hover or keyboard focus on a map point shows its code and Chinese name beside the point.
 function bindMapTips(host){
  const tip=host.querySelector('.map-tip');if(!tip)return;
@@ -245,7 +221,7 @@ function renderSectors(){
   const name=sectorName(map,p.letter);
   return '<button type="button" class="map-point '+(on?'is-open':'is-closed')+'" style="left:'+xy[0]+'%;top:'+xy[1]+'%" data-sector="'+p.id+'" data-tip-code="'+esc(p.letter)+'" data-tip-name="'+esc(name)+'" data-tip-meta="'+esc('Rank '+p.rank+' · '+(on?'已開啟':'未開啟')+' · 點擊切換')+'" aria-pressed="'+on+'" aria-label="'+esc(label+(name?' '+name:'')+'，Rank '+p.rank+'，'+(on?'已開啟':'未開啟')+'；點擊切換')+'">'+esc(p.letter)+'</button>'
  }).join('');
- $('sector-unlocks').innerHTML='<div class="map-tabs" role="tablist" aria-label="海圖">'+tabs+'</div><div class="map-heading"><strong>'+maps[map]+'</strong><span>'+opened+' / '+items.length+' 個海域已開</span><small>滑鼠移到圓點上可看中文點名</small></div><div class="map-stage'+(chartPoints()?' is-chart':'')+'">'+(chartPoints()?chartSvg(map,items):'<img src="'+mapImages[map]+'" alt="'+maps[map]+'潛水艇海域地圖" loading="lazy" referrerpolicy="no-referrer">')+'<div class="map-points">'+points+'</div><div class="map-tip" role="tooltip" hidden></div></div><div class="map-legend"><span><i class="legend-dot is-open"></i>已開啟</span><span><i class="legend-dot is-closed"></i>未開啟</span>'+(chartPoints()?'<span><i class="legend-line"></i>解鎖前置</span><small>依遊戲內航點座標繪製的示意海圖</small>':'<small>玩家整理圖，來源：<a href="https://forum.square-enix.com/ffxiv/threads/357591-Submersible-Information-Thread" target="_blank" rel="noreferrer">FFXIV 官方論壇潛水艇資訊串</a></small>')+'</div>';
+ $('sector-unlocks').innerHTML='<div class="map-tabs" role="tablist" aria-label="海圖">'+tabs+'</div><div class="map-heading"><strong>'+maps[map]+'</strong><span>'+opened+' / '+items.length+' 個海域已開</span><small>滑鼠移到圓點上可看中文點名</small></div><div class="map-stage is-wiki" style="aspect-ratio:'+mapAspect[map]+'"><img src="'+mapImages[map]+'" alt="'+maps[map]+'潛水艇海域地圖" loading="lazy"><div class="map-points">'+points+'</div><div class="map-tip" role="tooltip" hidden></div></div><div class="map-legend"><span><i class="legend-dot is-open"></i>已開啟</span><span><i class="legend-dot is-closed"></i>未開啟</span><small>海圖來源：<a href="https://ff14.huijiwiki.com/wiki/%E9%83%A8%E9%98%9F%E6%BD%9C%E6%B0%B4%E8%89%87" target="_blank" rel="noreferrer">灰機 wiki · 部隊潛水艇</a></small></div>';
  $('sector-unlocks').querySelectorAll('[data-map-tab]').forEach(el=>el.onclick=()=>{persist(s=>{s.activeSectorMap=Number(el.dataset.mapTab)});renderSectors()});
  bindMapTips($('sector-unlocks'));
  $('sector-unlocks').querySelectorAll('[data-sector]').forEach(el=>el.onclick=()=>{

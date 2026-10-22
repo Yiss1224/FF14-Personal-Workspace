@@ -23,78 +23,13 @@
 .harbor-quay:after{content:"";position:absolute;left:0;right:0;top:-3px;height:2px;
   background:#f1d5a4;opacity:.7}
 
-
-
-
 .harbor-yard-props{position:absolute;left:0;bottom:66px;width:31%;height:35px;z-index:4}
 .harbor-crate{position:absolute;bottom:0;width:17px;height:15px;border:2px solid #78583e;
   background:repeating-linear-gradient(45deg,#bd8b51 0 5px,#d5a66c 6px 9px);border-radius:1px}
 .harbor-crate.a{left:4%}.harbor-crate.b{left:9%;height:20px}.harbor-crate.c{left:17%;height:12px}
-/* Tall quay crane: the crane and ALL decorative descendants remain click-through. */
+
 .harbor-yard-props{height:110px}
-.harbor-crane,.harbor-crane *{pointer-events:none!important}
-.harbor-crane{position:absolute;left:1.4%;bottom:0;width:126px;height:102px;z-index:1}
-.harbor-crane-mast{position:absolute;left:16px;top:9px;bottom:0;width:12px;
-  border:2px solid #597e80;background:
-  repeating-linear-gradient(55deg,transparent 0 9px,#3c646b 10px 12px,transparent 13px 22px),
-  linear-gradient(90deg,#8cb2ab,#5d888c 65%,#426974);
-  box-shadow:3px 0 0 #2b5360,0 3px 0 #394e4f}
-.harbor-crane-mast:after{content:"";position:absolute;bottom:-3px;left:-9px;width:29px;height:5px;
-  border-radius:2px;background:#53757a;border:1px solid #294e56}
-.harbor-crane-jib{position:absolute;top:5px;left:9px;width:116px;height:9px;
-  border:2px solid #456f75;background:
-  repeating-linear-gradient(115deg,transparent 0 11px,#50777a 12px 14px,transparent 15px 24px),
-  linear-gradient(#c0ccae 0 3px,#7da8a0 4px 100%);
-  box-shadow:0 3px 0 #284e5b;z-index:2}
-.harbor-crane-jib:before{content:"";position:absolute;top:-6px;left:7px;width:53px;height:5px;
-  border-top:2px solid #719495;transform:rotate(9deg);transform-origin:left center}
-.harbor-crane-trolley{position:absolute;left:14px;top:5px;width:13px;height:8px;z-index:3;
-  border:2px solid #304f59;border-radius:2px;background:#dfb875;
-  animation:harbor-crane-travel 24s ease-in-out infinite}
-.harbor-crane-trolley:after{content:"";position:absolute;left:2px;top:-5px;width:4px;height:4px;
-  border-radius:50%;background:#384d55;border:1px solid #e1c58e;
-  animation:none}
-.harbor-crane-cable{position:absolute;left:4px;top:6px;width:2px;height:66px;
-  background:#d2ddd1;transform-origin:top center;
-  animation:harbor-crane-lift 24s ease-in-out infinite}
-.harbor-crane-hook{position:absolute;left:-3px;bottom:-7px;width:8px;height:10px;
-  border:2px solid #f0d29d;border-top:0;border-radius:0 0 6px 6px}
-.harbor-crane-load{position:absolute;left:-8px;bottom:-19px;width:19px;height:16px;
-  border:2px solid #71523d;border-radius:2px;
-  background:repeating-linear-gradient(45deg,#bd925b 0 5px,#d7ac75 6px 8px);
-  box-shadow:inset 0 2px #e0b983,0 2px 1px #193d4e66;
-  animation:harbor-crane-sway 6s ease-in-out infinite alternate}
-.harbor-crane-load:after{content:"";position:absolute;left:7px;top:0;bottom:0;width:2px;background:#8c6647}
-.harbor-crane-cab{position:absolute;left:27px;top:16px;width:21px;height:18px;z-index:4;
-  border:2px solid #476d71;border-radius:3px 3px 5px 3px;
-  background:linear-gradient(145deg,#d5e2d0 0 42%,#79b6b3 43% 78%,#507a81 79%);
-  box-shadow:0 2px 1px #274857}
-.harbor-crane-cab:after{content:"";position:absolute;right:3px;top:3px;width:4px;height:6px;
-  background:#eddbc0;border-radius:1px}
-.harbor-crane-wheel{position:absolute;left:12px;top:0;width:20px;height:20px;border-radius:50%;
-  border:3px solid #678985;background:repeating-conic-gradient(#a6c5b4 0deg 28deg,#426973 29deg 59deg);
-  z-index:1;animation:none}
-.harbor-crane-counterweight{position:absolute;left:0;top:16px;width:14px;height:13px;
-  background:#c49f6b;border:2px solid #7e684e;box-shadow:0 2px #4a5b5e}
-/* Shared phase marks: lift, traverse, lower, pause, lift, return, lower. */
-@keyframes harbor-crane-travel{
-  0%,20%,100%{transform:translateX(0)}
-  40%,70%{transform:translateX(75px)}
-  90%{transform:translateX(0)}
-}
-@keyframes harbor-crane-lift{
-  0%,8%,50%,60%,100%{transform:scaleY(1)}
-  20%,40%,70%,90%{transform:scaleY(.38)}
-}
-@keyframes harbor-crane-hoist{
-  0%,8%,50%,60%,100%{transform:translateY(66px)}
-  20%,40%,70%,90%{transform:translateY(25.08px)}
-}
-@keyframes harbor-crane-sway{
-  from{transform:rotate(-3deg)}
-  to{transform:rotate(3deg)}
-}
-@keyframes harbor-crane-pulley{to{transform:rotate(360deg)}}
+
 .harbor-worker{position:absolute;left:20%;bottom:0;width:8px;height:24px;
   animation:harbor-worker-move 13s ease-in-out infinite alternate}
 .harbor-worker .helmet{position:absolute;left:1px;top:0;width:7px;height:7px;background:#e2bb75;
@@ -142,16 +77,13 @@ body{padding-bottom:85px}
  .harbor-sea{height:42px}
  .harbor-quay{bottom:44px;height:12px}
  .harbor-yard-props{bottom:56px}
- 
  .harbor-goal{bottom:35px}
  .harbor-submarine{bottom:var(--boat-bottom-mobile,30px)}
- .harbor-crane{transform:scale(.8);transform-origin:left bottom}
  .harbor-sub-flag span{width:14px;height:13px;font-size:9px}
  body{padding-bottom:72px}
 }
 @media(max-width:420px){
  .harbor-yard-props{width:40%}.harbor-quay{width:34%}
- 
  .harbor-worker.second{display:none}
  .harbor-crate.c{display:none}
 }
@@ -177,8 +109,7 @@ body{padding-bottom:85px}
 .harbor-night{--sea-edge:#79b4c4;--sea-top:#17485c;--sea-bottom:#0b283d}
 .harbor-night .harbor-quay{filter:brightness(.74)}
 .harbor-night .harbor-crate{filter:brightness(.78)}
-.harbor-night .harbor-crane-cab{box-shadow:0 0 8px #f7da8a70,0 2px 1px #274857}
-.harbor-night .harbor-crane-load{filter:brightness(.85)}
+
 .harbor-night .harbor-worker{filter:brightness(.88)}
 .harbor-night .harbor-goal:after{background:#d5a063}
 .harbor-night .harbor-sub-window{background:#f5d28a;border-color:#f7dca4;box-shadow:0 0 6px #f6d18f}
@@ -365,7 +296,6 @@ body{padding-bottom:85px}
   .harbor-sub-flag{bottom:22px}
 }
 @media(max-width:420px){
-  
   .harbor-submarine{width:20px}
   .harbor-tooltip{min-width:210px}
 }
@@ -374,21 +304,14 @@ body{padding-bottom:85px}
 @media(max-width:700px){
  #mini-harbor{height:157px}
  .harbor-yard-props{height:96px}
- .harbor-crane{transform:scale(.82);transform-origin:bottom left}
 }
 @media(max-width:420px){
  #mini-harbor{height:142px}
- .harbor-crane{transform:scale(.66);transform-origin:bottom left}
 }
-@media(prefers-reduced-motion:reduce){
- .harbor-crane-trolley,.harbor-crane-cable,.harbor-crane-wheel,
- .harbor-crane-load,.harbor-crane-trolley:after{animation:none!important}
-}
-/* No element of the crane captures pointer events. Submarines remain hoverable. */
-#mini-harbor{pointer-events:none}
-.harbor-sea,.harbor-quay,.harbor-yard-props,.harbor-crane,.harbor-crane *,
-.harbor-worker,.harbor-ambient,.harbor-goal{pointer-events:none!important}
 
+#mini-harbor{pointer-events:none}
+.harbor-sea,.harbor-quay,.harbor-yard-props,
+.harbor-worker,.harbor-ambient,.harbor-goal{pointer-events:none!important}
 
 /* Finger-pier harbor based on the owner's four-slip sketch:
    a single horizontal quay across the top, five vertical dividers down into the
@@ -467,7 +390,6 @@ body{padding-bottom:85px}
 }
 @media(max-width:700px){.harbor-event-tit{transform-origin:center center}}
 @media(prefers-reduced-motion:reduce){.harbor-event-tit,.tit-wing{animation:none!important}}
-
 
 /* Harbor wildlife vignette additions: miniature, non-interactive, single-scene animations. */
 .harbor-event-seal{left:var(--event-x);bottom:30px;width:29px;height:25px;animation:harbor-seal-pop var(--event-duration) ease-in-out both}
@@ -561,7 +483,6 @@ body{padding-bottom:85px}
  .harbor-event-teleport,.teleport-character,.teleport-rays,.teleport-rays:after,.teleport-particles{animation:none!important}
 }
 
-
 /* Pixel-art polish pass: crisp silhouettes, small highlights, and readable faces. */
 .harbor-event,.harbor-event *{image-rendering:pixelated}
 .harbor-event-gull{filter:drop-shadow(1px 2px 0 #35546666)}
@@ -647,25 +568,19 @@ body{padding-bottom:85px}
   .cat-tail,.jelly-tentacles i{animation:none!important}
 }
 
-
 /* Pixel silhouettes: motion is independent from the pixel treatment. */
 #mini-harbor,#mini-harbor *{image-rendering:pixelated}
 .harbor-sea{background:linear-gradient(180deg,var(--sea-edge) 0 2%,var(--sea-top) 2% 34%,var(--sea-mid,#155c77) 34% 70%,var(--sea-bottom) 70% 100%)}
 .harbor-sea:before{opacity:.8}
 .harbor-sea:after{background:repeating-linear-gradient(90deg,transparent 0 30px,#b9edf044 30px 34px,transparent 34px 76px)}
 .harbor-quay{box-shadow:0 3px 0 #314d53,0 6px 0 #263f45}
-.harbor-crane-mast,.harbor-crane-jib,.harbor-crane-cab,.harbor-crane-counterweight,
-.harbor-crane-trolley,.harbor-crane-load,.harbor-crane-hook,.harbor-crane-wheel,
 .harbor-crate,.harbor-lamp:before,.harbor-lamp:after,.harbor-goal:before,
 .harbor-slip-wall,.harbor-slip-foreground,.harbor-worker .helmet,.harbor-worker .vest,
 .harbor-worker .legs,.harbor-sub-hull,.harbor-sub-fin,.harbor-conning,.harbor-periscope,
 .harbor-sub-window,.harbor-sub-flag span,.cart-box,.cart-wheel,.teleport-head,.teleport-torso{
   border-radius:0!important
 }
-.harbor-crane-mast,.harbor-crane-jib{box-shadow:2px 2px 0 #294955}
-.harbor-crane-cab{box-shadow:2px 2px 0 #274857}
-.harbor-crane-wheel{border-width:3px}
-.harbor-crane-load{box-shadow:inset 0 2px #e0b983,2px 2px 0 #193d4e66}
+
 .harbor-crate{box-shadow:2px 2px 0 #543f35}
 .harbor-submarine{filter:drop-shadow(2px 2px 0 #092f4766)}
 .harbor-sub-hull{filter:drop-shadow(1px 2px 0 #0d3649)}
@@ -695,12 +610,9 @@ body{padding-bottom:85px}
 /* Performance trim: remove per-frame raster filters and keep one compositor hint per scene. */
 .harbor-event{filter:none!important;will-change:auto;contain:layout style}
 .harbor-event *,.harbor-event *:before,.harbor-event *:after{filter:none!important}
-.harbor-submarine,.harbor-submarine .harbor-sprite,.harbor-sub-hull,.harbor-goal,
-.harbor-crane,.harbor-crane *,.harbor-worker{filter:none!important}
-.harbor-submarine,.harbor-submarine .harbor-sprite,.harbor-crane-load,
-.harbor-crane-trolley,.harbor-crane-cable,.harbor-worker{will-change:auto}
-.harbor-night .harbor-crane-cab{box-shadow:2px 2px 0 #274857}
-.harbor-night .harbor-crane-load{filter:none}
+.harbor-submarine,.harbor-submarine .harbor-sprite,.harbor-sub-hull,.harbor-goal,.harbor-worker{filter:none!important}
+.harbor-submarine,.harbor-submarine .harbor-sprite,.harbor-worker{will-change:auto}
+
 .harbor-night .harbor-sub-window{box-shadow:0 0 0 2px #f6d18f88}
 .harbor-night .harbor-lamp:after{box-shadow:0 0 0 2px #ffdb89aa}
 .harbor-event-meteor .meteor-star{box-shadow:0 0 0 2px #ffe9a277}
@@ -710,14 +622,9 @@ body{padding-bottom:85px}
 .harbor-event .jelly-tentacles i{box-shadow:none}
 .harbor-tooltip{backdrop-filter:none;-webkit-backdrop-filter:none}
 
-
-
-
-
 /* Harbor detail and motion system · 2026-10-19 */
 .harbor-night{--sea-mid:#10364a}
-.harbor-crane-hoist{position:absolute;left:4px;top:6px;width:2px;height:0;animation:harbor-crane-hoist 24s ease-in-out infinite}
-.harbor-crane-load{transform-origin:50% 0}
+
 .harbor-submarine:nth-child(2) .harbor-sprite{animation-delay:-.8s}
 .harbor-submarine:nth-child(3) .harbor-sprite{animation-delay:-1.7s}
 .harbor-submarine:nth-child(4) .harbor-sprite{animation-delay:-2.4s}
@@ -753,7 +660,7 @@ body{padding-bottom:85px}
 .harbor-quay{width:var(--dock-width);bottom:var(--quay-level);height:20px;z-index:3;border:0;border-top:3px solid #dfd1ad;border-bottom:5px solid #516565;border-radius:0 5px 2px 0;background:repeating-linear-gradient(90deg,transparent 0 38px,#8a918044 38px 39px),linear-gradient(#b2b59b 0 6px,#969f8a 6px 11px,#758578 11px);box-shadow:0 2px #233f49,0 5px #153e4a44}
 .harbor-quay:after{top:auto;bottom:1px;height:2px;background:repeating-linear-gradient(90deg,#dfc580 0 8px,#536869 8px 16px);opacity:.65}
 .harbor-yard-props{width:var(--dock-width);bottom:var(--apron-top)}
-.harbor-crane{left:3%;transform:scale(.78);transform-origin:bottom left}
+
 .harbor-crate.a{left:4%}.harbor-crate.b{left:9%}.harbor-crate.c{left:16%}
 .harbor-worker{left:38%}.harbor-worker.second{left:71%}
 .harbor-boathouse{position:absolute;left:49%;bottom:0;width:44px;height:27px;background:repeating-linear-gradient(0deg,#688f91 0 4px,#5a7f83 4px 5px);border:2px solid #48666f;box-shadow:2px 1px #294e59;z-index:0}
@@ -780,7 +687,6 @@ body{padding-bottom:85px}
 .harbor-event-cat,.harbor-event-cart,.harbor-event-catnap,.harbor-event-crab,.harbor-event-interaction,.harbor-event-teleport{bottom:var(--apron-top)}
 @media(max-width:700px){
  #mini-harbor{--quay-level:44px;--apron-top:64px;--pier-bottom:17px}
- .harbor-crane{transform:scale(.65)}
  .harbor-yard-props{width:var(--dock-width)}
  .harbor-quay{width:var(--dock-width);height:20px}
  .harbor-berth-number{bottom:49px}

@@ -160,16 +160,12 @@
   }
   // Installed parts per submarine, read-only from the planner data (same fallback as the calculator).
   let builds=['1111','1111','1111','1111'],buildsRead=false;
-  // held[i]: the old build still shown while the crane brings the new part; departed[i]: last seen departure time.
-  const held=[null,null,null,null],departed=[0,0,0,0];
-  const shownBuild=i=>held[i]||builds[i];
+  // departed[i]: last seen departure time, so a fresh departure plays its moment once.
+  const departed=[0,0,0,0];
   function readBuilds(){
     try{
       const ships=(JSON.parse(localStorage.getItem('ff14_submarine_planner_v1')||'{}').ships)||[];
       const next=[0,1,2,3].map(i=>{const s=ships[i]||{},b=String(s.currentBuild||'');return /^[1-5]{4}$/.test(b)?b:((Number(s.rank)||1)<15?'1111':'1121')});
-      const changed=next.map((b,i)=>b!==builds[i]&&!ships[i]?.voyaging?i:-1).filter(i=>i>=0);
-      // A part swap on one or two moored boats plays the crane; bulk changes (imports) just repaint.
-      if(buildsRead&&changed.length<=2&&animated())for(const i of changed)queueSwap(i,held[i]||builds[i],next[i]);
       builds=next;
       ships.forEach((s,i)=>{
         if(i>3)return;
@@ -323,8 +319,7 @@
     rect(g,'#c9a86b',barrelX+9,apronY-2,4,2);rect(g,'#a88a52',barrelX+10,apronY-2,2,1);
     // Aetheryte: the first free gap on the deck wide enough for its pedestal.
     G.aetheryte=null;
-    // The crane's parking spot is reserved too, so the parked gantry never stands over the crystal.
-    {const park=craneParkX(),busy=[[crateX-2,crateX+10],[barrelX-2,barrelX+14],[dockR-10,dockR+2],[park-13,park+17]].concat(lamps.map(x=>[x-3,x+3])).concat(G.bollards.map(x=>[x-3,x+2]));
+    {const busy=[[crateX-2,crateX+10],[barrelX-2,barrelX+14],[dockR-10,dockR+2]].concat(lamps.map(x=>[x-3,x+3])).concat(G.bollards.map(x=>[x-3,x+2]));
      for(let x=landR+2;x<dockR-20;x++){if(!busy.some(([a,b])=>x+8>=a&&x<=b)){G.aetheryte={x:x+4,y:apronY-1};break}}}
     if(G.aetheryte){const ax=G.aetheryte.x;rect(g,'#6d7a80',ax-3,apronY-3,7,2);rect(g,'#9aa8ad',ax-2,apronY-4,5,1);rect(g,'#4f5b60',ax-3,apronY-2,7,1)}
     // Lamp posts at the DOM lamp anchors (the tit perches on them).
@@ -498,7 +493,7 @@
     for(const wk of workers){if(wk.state==='walk'){wk.target=wk.x;wk.state='idle'}wk.dir=Math.sign(x-wk.x)||wk.dir;wk.wave=seconds;wk.timer=Math.max(wk.timer,seconds+.5)}
   }
 
-  /* ---------- fleet moments: berth signals, horn steam, crane part swaps ---------- */
+  /* ---------- fleet moments: berth signals, horn steam ---------- */
   const animated=()=>!reduced()&&!document.hidden;
   const signals=[],puffs=[];
   function signalAt(i,color,seconds){for(let k=signals.length-1;k>=0;k--)if(signals[k].i===i)signals.splice(k,1);signals.push({i,color,left:seconds})}
@@ -529,82 +524,6 @@
     for(const q of puffs){q.life+=dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy*=.97}
     for(let k=puffs.length-1;k>=0;k--)if(puffs[k].life>=puffs[k].max)puffs.splice(k,1);
     for(const q of puffs){const a=(1-q.life/q.max)*.75,sz=1+Math.floor(q.life*1.6);g.fillStyle='rgba(240,244,246,'+a.toFixed(2)+')';g.fillRect(Math.round(q.x),Math.round(q.y),sz,sz)}
-  }
-  // Gantry crane by the workshop: picks a part crate off the deck, rolls to the berth and lowers it into the hull.
-  const CRANE_H=24,CRANE_SPEED=20,HOIST_SPEED=12;
-  const crane={x:null,hookY:null,load:null,job:null,queue:[],sparks:[]};
-  const craneParkX=()=>G?Math.round((G.piers[0]||G.landR+3)+9):0;
-  const toward=(v,target,step)=>Math.abs(target-v)<=step?target:v+Math.sign(target-v)*step;
-  function queueSwap(i,from,to){
-    if(from===to)return;
-    const slot=[0,1,2,3].find(k=>from[k]!==to[k]);
-    held[i]=from;
-    crane.queue=crane.queue.filter(j=>j.i!==i);
-    if(crane.job&&crane.job.i===i)crane.job.cls=to[slot];
-    else crane.queue.push({i,cls:to[slot]});
-  }
-  function updateCrane(dt){
-    const c=crane,park=craneParkX(),top=G.apronY-1-CRANE_H,rest=top+9,pickY=G.apronY-6;
-    if(c.x===null){c.x=park;c.hookY=rest}
-    for(const q of c.sparks){q.life+=dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=30*dt}
-    for(let k=c.sparks.length-1;k>=0;k--)if(c.sparks[k].life>=c.sparks[k].max)c.sparks.splice(k,1);
-    if(!c.job){
-      if(c.queue.length){c.job=c.queue.shift();c.job.stage='pick';c.job.age=0}
-      else{c.x=toward(c.x,park,dt*CRANE_SPEED);c.hookY=toward(c.hookY,rest,dt*HOIST_SPEED);return}
-    }
-    const j=c.job,d=boatState[j.i]?.draw;
-    j.age+=dt;
-    if(j.age>60&&j.stage!=='back')j.stage='back';
-    if((j.stage==='travel'||j.stage==='lower')&&(!d||!d.moored))j.stage='back';
-    if(j.stage==='pick'){
-      c.x=toward(c.x,park,dt*CRANE_SPEED);
-      if(c.x===park){c.hookY=toward(c.hookY,pickY,dt*HOIST_SPEED);if(c.hookY===pickY){c.load=j.cls;j.stage='lift'}}
-    }else if(j.stage==='lift'){
-      c.hookY=toward(c.hookY,rest,dt*HOIST_SPEED);if(c.hookY===rest)j.stage='travel';
-    }else if(j.stage==='travel'){
-      c.x=toward(c.x,d.cx,dt*CRANE_SPEED);if(c.x===d.cx)j.stage='lower';
-    }else if(j.stage==='lower'){
-      const hull=d.y0+(d.big?8:4),target=hull-5;
-      c.hookY=toward(c.hookY,target,dt*HOIST_SPEED*.8);
-      if(c.hookY===target){
-        held[j.i]=null;c.load=null;boatState[j.i].flash=.6;j.stage='rise';j.wait=.5;
-        for(let k=0;k<10;k++)c.sparks.push({x:d.cx+(Math.random()-.5)*6,y:hull-1,vx:(Math.random()-.5)*16,vy:-8-Math.random()*8,life:0,max:.5+Math.random()*.4});
-      }
-    }else if(j.stage==='rise'){
-      if((j.wait-=dt)<=0){c.hookY=toward(c.hookY,rest,dt*HOIST_SPEED);if(c.hookY===rest)j.stage='back'}
-    }else{
-      // Aborted or finished: never leave a boat showing its old parts.
-      held[j.i]=null;c.load=null;
-      c.hookY=toward(c.hookY,rest,dt*HOIST_SPEED);c.x=toward(c.x,park,dt*CRANE_SPEED);
-      if(c.x===park&&c.hookY===rest)c.job=null;
-    }
-  }
-  function drawCraneBody(g,lights,P,t){
-    const c=crane;if(c.x===null)return;
-    const x=Math.round(c.x),y=G.apronY-1,top=y-CRANE_H,Y='#e0a83a',Y2='#b9862c',dk='#3a3f44';
-    rect(g,dk,x-8,y-1,4,2);rect(g,dk,x+5,y-1,4,2);
-    rect(g,Y2,x-7,top+3,2,y-1-(top+3));rect(g,Y,x-7,top+3,1,y-1-(top+3));
-    rect(g,Y2,x+6,top+3,2,y-1-(top+3));rect(g,Y,x+6,top+3,1,y-1-(top+3));
-    g.fillStyle=Y2;for(let k=0;k<12;k++){g.fillRect(x-5+k,top+4+k,1,1);g.fillRect(x+5-k,top+4+k,1,1)}
-    rect(g,Y,x-11,top,23,2);rect(g,Y2,x-11,top+2,23,1);for(let k=-10;k<=10;k+=3)rect(g,dk,x+k,top+1,1,1);
-    rect(g,'#3f6f96',x-11,top+3,5,4);rect(g,'#bfe3e6',x-10,top+4,2,2);
-    rect(g,dk,x-2,top-1,5,2);
-    const on=Math.floor(t*1.4)%2===0;rect(g,on?'#ff5a40':'#6a2a20',x,top-2,1,1);
-    if(on&&P.light>.3)lights.push([x,top-2,3,.6]);
-    // Part crate waiting on the deck for the hook.
-    if(c.job&&c.job.stage==='pick'&&!c.load)drawCrate(g,craneParkX()-2,G.apronY-5,c.job.cls);
-  }
-  function drawCrate(g,x,y,cls){
-    const pal=CLASS_PAL[cls]||CLASS_PAL[1];
-    rect(g,pal.o,x,y,5,4);rect(g,pal.H,x+1,y+1,3,2);rect(g,pal.L,x+1,y+1,3,1);
-  }
-  function drawCraneRig(g){
-    const c=crane;if(c.x===null)return;
-    const x=Math.round(c.x),top=G.apronY-1-CRANE_H,hy=Math.round(c.hookY);
-    rect(g,'#2a2d30',x,top+1,1,Math.max(0,hy-top-1));
-    rect(g,'#5a6066',x-1,hy,3,1);rect(g,'#5a6066',x+1,hy+1,1,1);
-    if(c.load){rect(g,'#2a2d30',x-2,hy+1,1,1);rect(g,'#2a2d30',x+2,hy+1,1,1);drawCrate(g,x-2,hy+2,c.load)}
-    for(const q of c.sparks){g.fillStyle='rgba(255,238,170,'+(1-q.life/q.max).toFixed(2)+')';g.fillRect(Math.round(q.x),Math.round(q.y),1,1)}
   }
   // Two short low notes (only with sound on), same voice as the return chime.
   function horn(){
@@ -703,7 +622,7 @@
     if(st.lastX!==null)st.vx=st.vx*.8+((info.x-st.lastX)/Math.max(dt,.001))*.2;st.lastX=info.x;
     const moving=Math.abs(st.vx)>.6,atSea=info.dy<-2,moored=!info.sailing&&!atSea;
     const colors={...BASE,S:SHIP_COLORS[info.i],w:P.light>.3?'#ffd98a':BASE.w};
-    const big=info.big||atSea,rows=big?SUB_BIG:SUB_SMALL,spr=big?subSprite(shownBuild(info.i),SHIP_COLORS[info.i],P.light>.3,flip):sprite(rows,colors,flip);
+    const big=info.big||atSea,rows=big?SUB_BIG:SUB_SMALL,spr=big?subSprite(builds[info.i],SHIP_COLORS[info.i],P.light>.3,flip):sprite(rows,colors,flip);
     // Surfaced and moored: hull and portholes above water, periscope retracted.
     // Out at sea: periscope depth, only the tower, its number and the hull's crown show.
     const top=moored&&big?2:0,wl=atSea?(big?8.5:4.5):moored?(big?12.5:6.5):(big?11.5:5.5),visible=atSea?(big?9:5):spr.height;
@@ -726,8 +645,7 @@
       g.fillStyle='#c9a86b';
       for(let s=0;s<=12;s++){const tt=s/12;g.fillRect(Math.round(sx+(bx-3-sx)*tt),Math.round(sy+(by-sy)*tt+Math.sin(tt*3.14)*2),1,1)}
     }
-    if(st.flash>0)st.flash-=dt;
-    if(st.hover||st.flash>0){ // selection halo; also a brief flash when the crane fits a new part
+    if(st.hover){ // selection halo
       const halo=haloOf(spr);
       g.globalAlpha=.9;for(const [ox,oy] of [[-1,0],[1,0],[0,-1],[0,1]])g.drawImage(halo,0,top,spr.width,visible-top,x0+ox,y0+top+oy,spr.width,visible-top);g.globalAlpha=1;
     }
@@ -780,11 +698,10 @@
     // Actors are drawn on their own layer so the time-of-day tint applies to them too.
     const g=fx.getContext('2d'),lights=[];g.clearRect(0,0,w,h);
     drawAetheryte(g,t);
-    updateCrane(dt);drawCraneBody(g,lights,P,t);
     for(const wk of workers){if(wk.wave>0)wk.wave-=dt;updateWorker(wk,dt);drawWorker(g,wk)}
     drawFisher(g,t,dt);drawSmoke(g,P,dt);
     for(const info of (env?env.boats:boatsInfo()))if(info)drawBoat(g,lights,info,P,t,dt);
-    drawCraneRig(g);drawSignals(g,lights,dt,t);drawPuffs(g,dt);
+    drawSignals(g,lights,dt,t);drawPuffs(g,dt);
     if(events)events.draw('actors',g,env);
     if(P.tint[3]>0){g.globalCompositeOperation='source-atop';g.fillStyle=css(P.tint,P.tint[3]*.85);g.fillRect(0,0,w,h);g.globalCompositeOperation='source-over'}
     ctx.drawImage(fx,0,0);
@@ -951,8 +868,8 @@
   window.setInterval(()=>{if(reduced()&&!document.hidden)frame(0)},10000);
   // Read-only diagnostics for performance checks.
   window.HarborScene={events:events?events.publicApi:null,
-    time:()=>{const E=window.HarborEorzea;return {et:E?E.eorzeaTime(Date.now()):null,hour:nowHour(),weather:weatherId,zone:prefs.zone,sound:Boolean(prefs.sound),builds:builds.slice(),shown:[0,1,2,3].map(shownBuild)}},
-    fleet:()=>({crane:{x:crane.x,stage:crane.job?crane.job.stage:null,queued:crane.queue.length,load:crane.load},signals:signals.map(s=>({i:s.i,color:s.color})),waving:workers.some(wk=>wk.wave>0),puffs:puffs.length}),
+    time:()=>{const E=window.HarborEorzea;return {et:E?E.eorzeaTime(Date.now()):null,hour:nowHour(),weather:weatherId,zone:prefs.zone,sound:Boolean(prefs.sound),builds:builds.slice()}},
+    fleet:()=>({signals:signals.map(s=>({i:s.i,color:s.color})),waving:workers.some(wk=>wk.wave>0),puffs:puffs.length}),
     stats:()=>{const s=frameMs.slice().sort((a,b)=>a-b);return {frames:s.length,medianMs:s[s.length>>1]||0,p95Ms:s[Math.floor(s.length*.95)]||0,artSize:[w,h]}}};
   if(document.readyState==='complete')start();else window.addEventListener('load',start);
 })();
