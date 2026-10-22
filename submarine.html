@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="submarine-ui.css?v=20261019-feedback">
   <link rel="stylesheet" href="submarine-harbor.css?v=20261019-marina">
   <link rel="stylesheet" href="submarine-harbor-scene.css?v=20261021-ff1">
+  <link rel="stylesheet" href="submarine-bridge.css?v=20261022-ux1">
 </head>
 <body>
   <header>
@@ -38,7 +39,8 @@
       <div class="ops-metric"><span class="ops-metric-label">已登記潛水艇</span><strong class="ops-metric-value" id="ui-active-ships">—</strong><span class="ops-metric-note">艦隊啟用狀態</span></div>
       <div class="ops-metric"><span class="ops-metric-label">最高船隻等級</span><strong class="ops-metric-value" id="ui-max-rank">—</strong><span class="ops-metric-note">依已儲存 Rank</span></div>
       <div class="ops-metric"><span class="ops-metric-label">累計出航紀錄</span><strong class="ops-metric-value" id="ui-voyages">—</strong><span class="ops-metric-note">已登記航次</span></div>
-      <div class="ops-metric"><span class="ops-metric-label">可用青燐水燃料</span><strong class="ops-metric-value" id="ui-fuel">—</strong><span class="ops-metric-note">現有庫存（罐）</span></div>
+      <div class="ops-metric"><span class="ops-metric-label">可用青燐水燃料</span><strong class="ops-metric-value" id="ui-fuel">—</strong><span class="ops-metric-note" id="ui-fuel-note">現有庫存（罐）</span></div>
+      <a class="ops-metric ops-metric-link" id="ui-next-return-card" href="#fleet-panel"><span class="ops-metric-label">下一艘返航</span><strong class="ops-metric-value" id="ui-next-return">—</strong><span class="ops-metric-note" id="ui-next-return-note">目前沒有記錄時間的航程</span></a>
     </section>
     <section class="panel" id="overview-panel">
       <h2>物資與養成目標</h2>
@@ -60,6 +62,7 @@
       <p class="hint">潛水艇 Rank、名稱、登記狀態與部件庫存集中在管理視窗。</p>
       <button type="button" data-open-inventory>管理潛水艇與部件庫存</button>
       <div id="fleet-summary" class="fleet-summary"></div>
+      <div id="fleet-cards" class="fleet-cards" aria-live="off"></div>
     </section>
     <dialog id="sub-inventory-dialog" class="sub-inventory-dialog" aria-labelledby="sub-inventory-title">
       <div class="inventory-dialog-shell">
@@ -122,6 +125,7 @@
           
         </div>
       </div>
+      <p id="settle-prefill-note" class="settle-prefill-note" role="status" hidden></p>
       <div class="settlement-form" id="settle-form">
         <label>返航日期 <input id="settle-date" type="date" required></label>
         <label>潛水艇
@@ -184,6 +188,12 @@
           <button type="button" id="ledger-price-save">儲存單價</button>
         </div>
         <p id="ledger-price-status" class="hint"></p>
+        <section class="ledger-insights" aria-label="收益與航線分析">
+          <h3>近 6 個月打撈估值</h3>
+          <div id="ledger-trend"></div>
+          <h3>航線實測效率</h3>
+          <div id="route-efficiency" class="table-wrap"></div>
+        </section>
         <div class="market-prices">
           <h3>材料市價（Universalis）</h3>
           
@@ -276,13 +286,17 @@
     <span id="harbor-clock" class="harbor-screenreader" aria-live="off"></span>
   </aside>
   <div id="harbor-tooltip" class="harbor-tooltip" role="tooltip" hidden></div>
-  <script src="submarine.js?v=20261021-stage2"></script>
-  <script src="submarine-calculator.js?v=20261021-stage2"></script>
-  <script src="submarine-settlement.js?v=20261021-stage1"></script>
-  <script defer src="submarine-ledger.js?v=20261012-9"></script>
+  <script src="submarine-dialog.js?v=20261022-ux1"></script>
+  <script src="submarine-sector-names.js?v=20261022-ux1"></script>
+  <script src="submarine.js?v=20261022-ux1"></script>
+  <script src="submarine-calculator.js?v=20261022-ux1"></script>
+  <script src="submarine-settlement.js?v=20261022-ux1"></script>
+  <script defer src="submarine-ledger.js?v=20261022-ux1"></script>
   <script defer src="submarine-drop-select.js?v=20261012-8"></script>
   <script defer src="submarine-prices.js?v=20261012-7"></script>
   <script defer src="submarine-ui.js?v=20261019-feedback"></script>
+  <script defer src="submarine-bridge.js?v=20261022-ux1"></script>
+  <script defer src="submarine-insights.js?v=20261022-ux1"></script>
   <script defer src="submarine-harbor.js?v=20261021-ff1"></script>
   <script defer src="submarine-harbor-eorzea.js?v=20261021-ff1"></script>
   <script defer src="submarine-harbor-events.js?v=20261021-ff1"></script>

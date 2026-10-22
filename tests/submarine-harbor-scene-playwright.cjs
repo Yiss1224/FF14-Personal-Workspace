@@ -116,6 +116,7 @@ async function main(){
     const before=await boatBox(page,0);
     await page.waitForSelector('[data-depart-ship="0"]',{timeout:20000});
     await page.click('[data-depart-ship="0"]');
+    await page.click('#sub-dialog [data-dialog-ok]');
     await page.waitForTimeout(2500);
     const mid=await boatBox(page,0);
     assert.ok(mid.cls.includes('is-sailing'),'未標記為出航');
