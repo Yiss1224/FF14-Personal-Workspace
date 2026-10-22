@@ -187,7 +187,7 @@ function init(){
  // On load, prefill if the selected ship has already returned.
  const selected=Number($('settle-ship')?.value)-1;
  if(selected>=0&&voyage(fleet(read())[selected],Date.now()).status==='awaiting')prefill(selected);
- fetch('submarine-route-data.json?v=20261022-seas').then(r=>r.ok?r.json():null).then(data=>{
+ fetch('submarine-route-data.json?v=20261022-seas2').then(r=>r.ok?r.json():null).then(data=>{
   if(!data)return;rankXp={};for(const r of data.ranks||[])rankXp[r.rank]=Number(r.xp)||0;render();
  }).catch(()=>{});
 }

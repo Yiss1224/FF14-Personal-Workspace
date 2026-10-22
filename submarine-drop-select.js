@@ -59,7 +59,7 @@ async function load(){
  });
  return loading;
 }
-fetch('submarine-route-data.json?v=20261022-seas').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(result=>{
+fetch('submarine-route-data.json?v=20261022-seas2').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(result=>{
  fuelData={};
  for(const sector of result.sectors||[]){
   const map=String(sector.map),letter=String(sector.letter).toUpperCase();

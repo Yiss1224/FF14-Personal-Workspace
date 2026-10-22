@@ -156,7 +156,7 @@ function init(){
  });
  window.addEventListener('submarine-data-imported',()=>{justSaved=false;refreshShipOptions();clearForm();status('已載入備份；返航結算已切換到匯入的船隊資料。')});
  refreshShip();refreshPoints();
- fetch('submarine-route-data.json?v=20261022-seas').then(r=>{
+ fetch('submarine-route-data.json?v=20261022-seas2').then(r=>{
   if(!r.ok)throw new Error('HTTP '+r.status);
   return r.json();
  }).then(data=>{

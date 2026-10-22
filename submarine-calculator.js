@@ -244,13 +244,13 @@ function unlockedSectors(s,rank){
  });
 }
 function makeLabel(path){return path.map((p,i)=>i===0||p.map!==path[i-1].map?(maps[p.map]||('海圖'+p.map))+' '+p.letter:p.letter).join(' → ')}
+// Voyage timing as in SubmarineTracker: distance is the straight-line gap between sector coordinates,
+// sd the sector's survey duration in minutes.
 function travelSeconds(distance,speed){
- const scaled=distance/40;
- return Math.floor(scaled*3990/speed*60/100);
+ return Math.floor(distance*3990/(speed*100)*60);
 }
 function surveySeconds(point,speed){
- const surveyMinutes=point.sd/60;
- return Math.floor(surveyMinutes*7000/speed*60/100);
+ return Math.floor(point.sd*7000/(speed*100)*60);
 }
 function routeMetrics(path,speed,buildRange){
  let range=0,time=43200,fuel=0,xp=0,prev=0;
@@ -723,7 +723,7 @@ function savePlannerSettings(manualDeparture){
 }
 async function init(){
  try{
-  const [res,lootRes]=await Promise.all([fetch('submarine-route-data.json?v=20261022-seas'),fetch('submarine-loot-data.json?v=20261022-seas')]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
+  const [res,lootRes]=await Promise.all([fetch('submarine-route-data.json?v=20261022-seas2'),fetch('submarine-loot-data.json?v=20261022-seas')]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
   data=await res.json();lootData=await lootRes.json();
   renderBuilds();renderSectors();renderItemPlanner();
   let manuallySelectedDeparture=plannerControls(state().plannerSettings);
