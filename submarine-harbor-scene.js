@@ -323,7 +323,8 @@
     rect(g,'#c9a86b',barrelX+9,apronY-2,4,2);rect(g,'#a88a52',barrelX+10,apronY-2,2,1);
     // Aetheryte: the first free gap on the deck wide enough for its pedestal.
     G.aetheryte=null;
-    {const busy=[[crateX-2,crateX+10],[barrelX-2,barrelX+14],[dockR-10,dockR+2]].concat(lamps.map(x=>[x-3,x+3])).concat(G.bollards.map(x=>[x-3,x+2]));
+    // The crane's parking spot is reserved too, so the parked gantry never stands over the crystal.
+    {const park=craneParkX(),busy=[[crateX-2,crateX+10],[barrelX-2,barrelX+14],[dockR-10,dockR+2],[park-13,park+17]].concat(lamps.map(x=>[x-3,x+3])).concat(G.bollards.map(x=>[x-3,x+2]));
      for(let x=landR+2;x<dockR-20;x++){if(!busy.some(([a,b])=>x+8>=a&&x<=b)){G.aetheryte={x:x+4,y:apronY-1};break}}}
     if(G.aetheryte){const ax=G.aetheryte.x;rect(g,'#6d7a80',ax-3,apronY-3,7,2);rect(g,'#9aa8ad',ax-2,apronY-4,5,1);rect(g,'#4f5b60',ax-3,apronY-2,7,1)}
     // Lamp posts at the DOM lamp anchors (the tit perches on them).
