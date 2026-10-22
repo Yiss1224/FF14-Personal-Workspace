@@ -82,9 +82,8 @@
 /* ---------- settlement prefill ---------- */
 .settle-prefill-note{margin:0 0 12px;padding:9px 12px;border-radius:11px;background:var(--ui-teal-soft);border:1px solid var(--ui-border);color:var(--ui-ink);font-size:13px}
 
-/* ---------- sea map: plain points with a tip ---------- */
-.map-point{width:clamp(14px,1.7vw,20px);height:clamp(14px,1.7vw,20px);min-height:0;padding:0;font-size:0}
-@media(max-width:620px){.map-point{width:18px;height:18px}}
+/* ---------- sea map: point tips ---------- */
+.map-point{min-height:0;padding:0}
 .map-tip{position:absolute;z-index:3;transform:translate(-50%,calc(-100% - 16px));pointer-events:none;display:grid;gap:1px;min-width:96px;max-width:200px;padding:7px 10px;border-radius:10px;background:var(--ui-navy-deep);color:#f2f8fa;font-size:12px;line-height:1.4;box-shadow:0 6px 18px rgba(0,0,0,.3);text-align:center}
 .map-tip strong{font-size:15px;letter-spacing:.04em}
 .map-tip small{color:#a9c4cf;font-size:11px}

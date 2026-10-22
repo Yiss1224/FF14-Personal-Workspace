@@ -177,9 +177,9 @@ async function main(){
     await ctx.close();
   });
 
-  await test('海圖：圓點不顯示字母，滑鼠移上顯示代碼與中文點名',async()=>{
+  await test('海圖：圓點顯示字母，滑鼠移上顯示代碼與中文點名',async()=>{
     const {ctx,page}=await open(seed());
-    assert.strictEqual(await page.evaluate(()=>[...document.querySelectorAll('.map-point')].map(b=>b.textContent).join('')),'');
+    assert.strictEqual(await page.evaluate(()=>document.querySelector('[data-sector="10"]').textContent),'J');
     // 乾淨海圖：依遊戲座標繪製，不再依賴外部底圖；第 3 張海圖每個點都有座標。
     assert.ok(await page.evaluate(()=>document.querySelector('.map-stage.is-chart svg.map-chart')&&!document.querySelector('.map-stage img')));
     assert.strictEqual(await page.evaluate(()=>document.querySelector('[data-sector="10"]').style.left),'90%');
