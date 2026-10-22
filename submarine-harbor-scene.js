@@ -71,25 +71,29 @@
   const WEATHER_LOOK={
     clearSkies:{overcast:0,fog:0,rain:0,stars:1,glitter:1,clouds:2},
     fairSkies:{overcast:.12,fog:0,rain:0,stars:.75,glitter:.8,clouds:4},
-    clouds:{overcast:.55,fog:0,rain:0,stars:0,glitter:0,clouds:8},
+    clouds:{overcast:.65,fog:0,rain:0,stars:0,glitter:0,clouds:8},
     fog:{overcast:.45,fog:1,rain:0,stars:0,glitter:0,clouds:3},
-    rain:{overcast:.7,fog:.25,rain:1,stars:0,glitter:0,clouds:8}
+    rain:{overcast:.75,fog:.25,rain:1,stars:0,glitter:0,clouds:8}
   };
-  let weatherId='clearSkies',wxReady=false;
+  let weatherId='clearSkies',wxReady=false,wxFastUntil=0;
   const WX={overcast:0,fog:0,rain:0,stars:1,glitter:1,clouds:2};
   function updateWeather(){
     const E=window.HarborEorzea;
     weatherId=forcedWeather&&WEATHER_LOOK[forcedWeather]?forcedWeather:E?E.weather(Date.now(),prefs.zone):'clearSkies';
   }
   function stepWeather(dt){
-    const target=WEATHER_LOOK[weatherId]||WEATHER_LOOK.clearSkies,k=dt>0?Math.min(1,dt*.15):1;
+    const fast=performance.now()<wxFastUntil,target=WEATHER_LOOK[weatherId]||WEATHER_LOOK.clearSkies,k=dt>0?Math.min(1,dt*(fast?1.5:.15)):1;
     for(const key of ['overcast','fog','rain','stars','glitter'])WX[key]+=(target[key]-WX[key])*k;
     WX.clouds=target.clouds;
   }
   function applyWeather(P){
     const o=WX.overcast,grey=P.light>.5?[44,52,66]:[150,160,168];
     P.skyTop=mix(P.skyTop,grey,o*.7);P.skyBot=mix(P.skyBot,mix(grey,[220,224,226],.4),o*.6);
-    P.seaFar=mix(P.seaFar,mix(grey,P.seaFar,.5),o*.5);P.seaNear=mix(P.seaNear,[30,44,56],o*.25);P.hl=mix(P.hl,[200,210,214],o*.5);
+    // Under cloud the water goes slate and flat: muted colour, low-contrast and fewer wave crests.
+    const slate=c=>{const l=(c[0]*.3+c[1]*.59+c[2]*.11)*.9;return [l*.94,l*.98,l*1.05]};
+    const so=Math.min(1,o*1.15);
+    P.seaFar=mix(P.seaFar,slate(P.seaFar),so);P.seaNear=mix(P.seaNear,mix(slate(P.seaNear),[0,0,0],.18),so);
+    P.hl=mix(P.hl,mix(P.seaFar,P.seaNear,.3),so*.75);P.calm=o;
     const t=P.tint;P.tint=[t[0]*(1-o*.5)+60*o*.5,t[1]*(1-o*.5)+70*o*.5,t[2]*(1-o*.5)+86*o*.5,Math.min(.75,t[3]+o*.18)];
     P.stars*=WX.stars;P.glitter=WX.glitter;P.overcast=o;P.weather=weatherId;
     return P;
@@ -211,6 +215,25 @@
     for(let x=4;x<Math.min(w*.5,G.dockR+40);x+=4+Math.floor(srand()*5))far.town.push({x,hgt:2+Math.floor(srand()*4),wd:3+Math.floor(srand()*3),win:srand()<.45});
     for(let i=0;i<45;i++)far.stars.push({x:Math.floor(srand()*w),y:G.horizonY-G.skyRows+Math.floor(srand()*(G.skyRows-6)),ph:srand()*6.28,sp:.6+srand()*1.8});
     for(let i=0;i<4;i++)far.clouds.push(newCloud(srand()*w));
+    // Low cloud deck: long flat streaks hugging the horizon, shown only under heavy cloud.
+    far.stratus=[];
+    for(let i=0,n=Math.ceil(w/12);i<n;i++)far.stratus.push({x:srand()*(w+60)-30,y:G.horizonY-3-Math.floor(Math.pow(srand(),1.6)*(G.skyRows-8)),wd:18+Math.floor(srand()*56),hg:1+Math.floor(srand()*3),a:.35+srand()*.45,speed:.15+srand()*.35});
+  }
+  // Clouds wanted on screen: the weather's count, scaled up for wide stages.
+  const cloudsWanted=()=>Math.round(WX.clouds*Math.max(1,w/600));
+  // snap: fill to the wanted count at once (first paint / forced weather) instead of drifting in.
+  function syncClouds(dt,snap){
+    const want=cloudsWanted(),live=far.clouds.filter(c=>!c.out);
+    if(snap){
+      far.clouds=live.slice(0,want);for(const c of far.clouds)c.f=1;
+      while(far.clouds.length<want){const c=newCloud(Math.random()*w);c.f=1;far.clouds.push(c)}
+      return;
+    }
+    if(live.length<want){
+      const lack=want-live.length;
+      if(lack>2&&Math.random()<dt*.6){const c=newCloud(Math.random()*(w-20));c.f=0;far.clouds.push(c)}       // form in place
+      else if(Math.random()<dt*(lack>1?.25:.04)){const c=newCloud(wind<0?w+4:-30);far.clouds.push(c)}         // drift in
+    }else if(live.length>want+1&&Math.random()<dt*.4)live[Math.floor(Math.random()*live.length)].out=true;  // thin out
   }
   function newCloud(x){
     const parts=[],n=3+Math.floor(Math.random()*4);
@@ -305,7 +328,7 @@
   function drawSea(P,t){
     const top=G.horizonY,rows=h-top;if(rows<=0)return;
     if(!seaImg||seaImg.width!==w||seaImg.height!==rows)seaImg=ctx.createImageData(w,rows);
-    const data=seaImg.data,glitX=Math.round(w*(P.hour<12?.72:.8));
+    const calm=.48+(P.calm||0)*.22,data=seaImg.data,glitX=Math.round(w*(P.hour<12?.72:.8));
     const lampRefl=P.light>.2?G.lamps:[];
     const glitter=(P.glitter??1)>.4&&(P.light>.25||(P.hour>5.5&&P.hour<8.5)||(P.hour>16.5&&P.hour<19.5));
     const px32=new Uint32Array(data.buffer),pack=c=>(255<<24|(c[2]&255)<<16|(c[1]&255)<<8|(c[0]&255))>>>0;
@@ -324,7 +347,7 @@
       for(let x=0;x<w;x++){
         const k=x>>3,fr=(x&7)/8,m=noiseRow[k]+(noiseRow[k+1]-noiseRow[k])*fr;
         let c=cCol;
-        if(sv>.95-.06*m&&m>.48)c=cHl;else if(sv<-.975&&m<.36)c=cDk;
+        if(sv>.95-.06*m&&m>calm)c=cHl;else if(sv<-.975&&m<.36)c=cDk;
         if(glitter&&sv>.5&&Math.abs(x-glitX)<gw)c=cGl;
         px32[rowBase+x]=c;
         const ns=sv*cf+cv*sf;cv=cv*cf-sv*sf;sv=ns;
@@ -369,16 +392,26 @@
     }
     // Clouds drift with a slowly wandering wind; new ones form at random.
     const cloudCol=mix(mix(P.skyBot,[255,255,255],P.light>.6?.08:.45),[120,128,136],WX.overcast*.5),shadow=mix(cloudCol,P.skyTop,.35);
+    const deck=clamp((WX.overcast-.15)/.35,0,1);
+    if(deck>0){
+      ctx.fillStyle=css(mix(cloudCol,P.skyTop,.2));const k=deck*(P.light>.6?.7:1);
+      for(const s of far.stratus){
+        s.x+=s.speed*wind*dt;if(s.x>w+10)s.x=-s.wd-10;else if(s.x<-s.wd-12)s.x=w+8;
+        ctx.globalAlpha=k*s.a*clamp((s.y-skyTop)/(G.skyRows*.35),0,1);ctx.fillRect(Math.round(s.x),s.y,s.wd,s.hg);
+      }
+      ctx.globalAlpha=1;
+    }
     for(const c of far.clouds){
       c.x+=c.speed*wind*dt;
+      c.f=clamp((c.f??1)+(c.out?-dt*.3:dt*.25),0,1);
       for(const p of c.parts){
-        const a=clamp((c.y+p.dy-skyTop)/(G.skyRows*.5),0,1)*(P.light>.6?.55:.8);
+        const a=clamp((c.y+p.dy-skyTop)/(G.skyRows*.5),0,1)*(P.light>.6?.55:.8)*c.f;
         ctx.fillStyle=css(shadow,a);ctx.fillRect(Math.round(c.x+p.dx),c.y+p.dy+1,p.wd,p.hg);
         ctx.fillStyle=css(cloudCol,a);ctx.fillRect(Math.round(c.x+p.dx+1),c.y+p.dy,p.wd-2,p.hg);
       }
     }
-    far.clouds=far.clouds.filter(c=>c.x<w+10);
-    if(far.clouds.length<WX.clouds&&Math.random()<dt*(far.clouds.length<WX.clouds-2?.25:.04))far.clouds.push(newCloud(-30));
+    far.clouds=far.clouds.filter(c=>c.x<w+10&&c.x>-60&&!(c.out&&c.f<=0));
+    syncClouds(dt,false);
     // Distant ridge and harbor town.
     const ridge=mix(P.skyBot,P.seaFar,.55),town=mix(ridge,[20,30,40],.25);
     ctx.fillStyle=css(ridge);
@@ -571,9 +604,9 @@
   let last=0,acc=0,raf=0,t=Math.random()*100,frameMs=[],P=palette(nowHour()),paletteAt=0;
   function frame(dt){
     const t0=performance.now();
-    if(performance.now()-paletteAt>3000||!paletteAt){
+    if(performance.now()-paletteAt>(performance.now()<wxFastUntil?250:3000)||!paletteAt){
       paletteAt=performance.now();updateWeather();
-      if(!wxReady){Object.assign(WX,WEATHER_LOOK[weatherId]);wxReady=true}   // no fade on first paint
+      if(!wxReady){Object.assign(WX,WEATHER_LOOK[weatherId]);syncClouds(0,true);wxReady=true}   // no fade on first paint
       P=applyWeather(palette(nowHour()));
       if(Math.abs(P.hour-staticHour)>.25||Math.abs((P.overcast||0)-staticOvercast)>.08)staticDirty=true;
     }
@@ -607,7 +640,7 @@
     for(let x=0;x<w;x++)if(noise(x*.35,t*1.6)>.68)ctx.fillRect(x,G.waterline,1,1);
     for(const px of G.piers)if(hash(px,Math.floor(t*5))>.4){ctx.fillStyle='rgba(235,250,248,.6)';ctx.fillRect(px-2,G.waterline,1,1);ctx.fillRect(px+2,G.waterline,1,1)}
     // Daytime sparkles on the open water.
-    if(P.light<.5&&Math.random()<dt*6)glints.push({x:G.dockR+Math.floor(Math.random()*(w-G.dockR)),y:G.horizonY+2+Math.floor(Math.random()*(h-G.horizonY-3)),life:.25+Math.random()*.4});
+    if(P.light<.5&&Math.random()<dt*6*(P.glitter??1))glints.push({x:G.dockR+Math.floor(Math.random()*(w-G.dockR)),y:G.horizonY+2+Math.floor(Math.random()*(h-G.horizonY-3)),life:.25+Math.random()*.4});
     for(const s of glints){s.life-=dt;ctx.fillStyle='rgba(255,255,245,.9)';ctx.fillRect(s.x,s.y,1,1);if(s.life>.2){ctx.fillRect(s.x-1,s.y,3,1)}}
     for(let i=glints.length-1;i>=0;i--)if(glints[i].life<=0)glints.splice(i,1);
     // Channel buoy with its night light.
@@ -660,7 +693,7 @@
     setBlocked,
     setHour(hourOrNull){forcedHour=hourOrNull===null?null:((hourOrNull%24)+24)%24;paletteAt=0;if(G&&!reduced())return;if(G)frame(0)},
     freeze(on){frozen=Boolean(on)},
-    setWeather(id){forcedWeather=id&&WEATHER_LOOK[id]?id:null;paletteAt=0;if(G){updateWeather();const target=WEATHER_LOOK[weatherId];Object.assign(WX,target);staticDirty=true}},
+    setWeather(id){forcedWeather=id&&WEATHER_LOOK[id]?id:null;paletteAt=0;if(G){updateWeather();const target=WEATHER_LOOK[weatherId];Object.assign(WX,target);syncClouds(0,true);staticDirty=true}},
     weather:()=>weatherId,
     redraw(){if(G)frame(0)}
   };
@@ -737,7 +770,7 @@
       +'<select class="harbor-zone" aria-label="天氣依據的住宅區">'+Object.entries(E.ZONES).map(([id,z])=>'<option value="'+id+'">'+z.name+'</option>').join('')+'</select>'
       +'<button type="button" class="harbor-sound" aria-label="返航提示音"></button>';
     dock.appendChild(controls);
-    controls.querySelector('.harbor-zone').addEventListener('change',e=>{prefs.zone=e.target.value;writePrefs(prefs);paletteAt=0;syncControls()});
+    controls.querySelector('.harbor-zone').addEventListener('change',e=>{prefs.zone=e.target.value;writePrefs(prefs);paletteAt=0;wxFastUntil=performance.now()+4000;syncControls();if(reduced())frame(0)});
     controls.querySelector('.harbor-sound').addEventListener('click',()=>{prefs.sound=!prefs.sound;writePrefs(prefs);syncControls()});
     syncControls();
     window.setInterval(()=>{if(!document.hidden)syncControls()},1000);

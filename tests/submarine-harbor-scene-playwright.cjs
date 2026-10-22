@@ -46,7 +46,7 @@ async function open(seed,opts={}){
   const page=await ctx.newPage();page.errors=[];
   page.on('pageerror',e=>page.errors.push(e.message));
   page.on('dialog',d=>d.accept());
-  await page.goto(base+'/submarine.html');
+  await page.goto(base+'/submarine.html'+(opts.query||''));
   await page.waitForFunction(()=>document.readyState==='complete');
   await page.waitForTimeout(800);
   return {ctx,page};
@@ -223,6 +223,23 @@ async function main(){
     assert.strictEqual(t.builds[0],'3124');assert.strictEqual(t.builds[3],'5555');assert.strictEqual(t.weather,'rain');
     assert.strictEqual(await page.evaluate(()=>document.querySelector('.harbor-wx').textContent),'小雨');
     await ctx.close();
+  });
+
+  await test('陰雲時海面明顯比碧空灰暗（白天與黃昏）',async()=>{
+    const seaSat=async(hour,wx)=>{
+      const {ctx,page}=await open(fleetSeed(),{query:'?harbor-hour='+hour+'&harbor-weather='+wx});
+      const s=await page.evaluate(()=>{
+        const c=document.querySelector('.harbor-scene'),x0=Math.floor(c.width*.6),y0=Math.floor(c.height*.7);
+        const d=c.getContext('2d').getImageData(x0,y0,c.width-x0,c.height-y0).data;let sum=0,n=0;
+        for(let i=0;i<d.length;i+=4){if(d[i+3]<255)continue;const mx=Math.max(d[i],d[i+1],d[i+2]),mn=Math.min(d[i],d[i+1],d[i+2]);sum+=mx?(mx-mn)/mx:0;n++}
+        return n?sum/n:null});
+      await ctx.close();return s;
+    };
+    for(const hour of [13,19.2]){
+      const clear=await seaSat(hour,'clearSkies'),cloudy=await seaSat(hour,'clouds');
+      assert.ok(clear>0&&cloudy!==null,'海面取樣失敗');
+      assert.ok(cloudy<clear*.6,'ET '+hour+' 陰雲海面飽和度 '+cloudy.toFixed(3)+' 未明顯低於碧空 '+clear.toFixed(3));
+    }
   });
 
   await test('計算器變更實際配置後，碼頭潛水艇外形即時更新',async()=>{
