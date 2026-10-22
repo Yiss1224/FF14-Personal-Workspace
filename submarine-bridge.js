@@ -7,7 +7,7 @@ const $=id=>document.getElementById(id);
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const CLASS=['','鯊','雲鯨','鯨','腔棘魚','希爾德里昂'];
 const SHIP_COLORS=['#e8b04a','#5bbfae','#e07a5f','#a493e6'];
-const MAP_IDS={'溺沒海':1,'灰海':2,'翠浪海':3};
+const MAP_IDS=Object.fromEntries(Object.entries(window.SubmarineMapNames||{1:'溺沒海',2:'灰海',3:'翠浪海',4:'塞壬海',5:'紫礁海',6:'南蒼茫洋',7:'北洋'}).map(([id,name])=>[name,Number(id)]));
 const BASE_TITLE=document.title;
 let rankXp=null;
 
@@ -187,7 +187,7 @@ function init(){
  // On load, prefill if the selected ship has already returned.
  const selected=Number($('settle-ship')?.value)-1;
  if(selected>=0&&voyage(fleet(read())[selected],Date.now()).status==='awaiting')prefill(selected);
- fetch('submarine-route-data.json').then(r=>r.ok?r.json():null).then(data=>{
+ fetch('submarine-route-data.json?v=20261022-seas').then(r=>r.ok?r.json():null).then(data=>{
   if(!data)return;rankXp={};for(const r of data.ranks||[])rankXp[r.rank]=Number(r.xp)||0;render();
  }).catch(()=>{});
 }

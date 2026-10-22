@@ -92,7 +92,7 @@
         <label>回航時間上限
           <select id="calc-hours"><option value="24">24 小時</option><option value="36">36 小時</option><option value="48">48 小時</option><option value="50">50 小時</option><option value="52">52 小時</option><option value="72" selected>72 小時（完整比較）</option></select>
         </label>
-        <label>估算目標 Rank <input id="calc-target-rank" type="number" min="2" max="90" value="85"></label>
+        <label>估算目標 Rank <input id="calc-target-rank" type="number" min="2" max="145" value="85"></label>
         <label class="build-check"><input id="daily-pickup" type="checkbox" checked>依每日可收船時段最佳化</label>
         <label>每天可收船開始 <input id="pickup-start" type="time" value="19:00"></label>
         <label>每天可收船結束 <input id="pickup-end" type="time" value="22:00"></label>
@@ -135,7 +135,7 @@
           </select>
         </label>
         <div class="settle-route-select">
-          <label>航線海圖 <select id="loot-map"><option value="1">溺沒海</option><option value="2">灰海</option><option value="3">翠浪海</option></select></label>
+          <label>航線海圖 <select id="loot-map"><option value="1">溺沒海</option><option value="2">灰海</option><option value="3">翠浪海</option><option value="4">塞壬海</option><option value="5">紫礁海</option><option value="6">南蒼茫洋</option><option value="7">北洋</option></select></label>
           <label>航線代碼 <input id="loot-route-input" type="text" maxlength="30" placeholder="ABE、OJ 或 A,AA,AB" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
           <div class="settle-route-summary" id="loot-points" aria-live="polite"></div>
           <input id="settle-route" type="hidden" value="">
@@ -276,15 +276,15 @@
   </aside>
   <div id="harbor-tooltip" class="harbor-tooltip" role="tooltip" hidden></div>
   <script src="submarine-dialog.js?v=20261022-ux2"></script>
-  <script src="submarine-sector-names.js?v=20261022-ux2"></script>
+  <script src="submarine-sector-names.js?v=20261022-seas"></script>
   <script src="submarine.js?v=20261022-ux2"></script>
-  <script src="submarine-calculator.js?v=20261022-ux2"></script>
-  <script src="submarine-settlement.js?v=20261022-ux2"></script>
+  <script src="submarine-calculator.js?v=20261022-seas"></script>
+  <script src="submarine-settlement.js?v=20261022-seas"></script>
   <script defer src="submarine-ledger.js?v=20261022-ux2"></script>
-  <script defer src="submarine-drop-select.js?v=20261012-8"></script>
+  <script defer src="submarine-drop-select.js?v=20261022-seas"></script>
   <script defer src="submarine-prices.js?v=20261012-7"></script>
   <script defer src="submarine-ui.js?v=20261019-feedback"></script>
-  <script defer src="submarine-bridge.js?v=20261022-ux2"></script>
+  <script defer src="submarine-bridge.js?v=20261022-seas"></script>
   <script defer src="submarine-insights.js?v=20261022-ux2"></script>
   <script defer src="submarine-harbor.js?v=20261021-ff1"></script>
   <script defer src="submarine-harbor-eorzea.js?v=20261021-ff1"></script>

@@ -183,8 +183,16 @@ async function main(){
     // 灰機 wiki 海圖：底圖放在本站，圓點對齊圖上的圈；第 3 張海圖每個點都有座標。
     assert.ok(await page.evaluate(()=>/submarine-maps\/sea-1\.jpg$/.test(document.querySelector('.map-stage.is-wiki img').src)));
     assert.strictEqual(await page.evaluate(()=>document.querySelector('[data-sector="10"]').style.left),'89.5%');
-    await page.click('[data-map-tab="3"]');
-    assert.ok(await page.evaluate(()=>[...document.querySelectorAll('.map-point')].every(b=>!(b.style.left==='50%'&&b.style.top==='50%'))),'有航點落在預設位置');
+    // 七張海圖都有分頁、底圖與完整點位（翠浪海到 T、北洋 13 點）。
+    assert.strictEqual(await page.locator('[data-map-tab]').count(),7);
+    for(const [m,n] of [[3,20],[4,20],[5,20],[6,20],[7,13]]){
+      await page.click('[data-map-tab="'+m+'"]');
+      assert.strictEqual(await page.locator('.map-point').count(),n,'海圖 '+m+' 點數');
+      assert.ok(await page.evaluate(m=>document.querySelector('.map-stage.is-wiki img').src.endsWith('sea-'+m+'.jpg'),m));
+      assert.ok(await page.evaluate(()=>[...document.querySelectorAll('.map-point')].every(b=>!(b.style.left==='50%'&&b.style.top==='50%'))),'海圖 '+m+' 有航點落在預設位置');
+    }
+    await page.hover('[data-sector="137"]');
+    assert.ok((await page.textContent('.map-tip')).includes('黑血域東'));
     await page.click('[data-map-tab="1"]');
     await page.hover('[data-sector="10"]');
     const tip=await page.textContent('.map-tip');

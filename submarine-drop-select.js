@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
-const labels={1:'溺沒海',2:'灰海',3:'翠浪海'};
+const labels=window.SubmarineMapNames||{1:'溺沒海',2:'灰海',3:'翠浪海',4:'塞壬海',5:'紫礁海',6:'南蒼茫洋',7:'北洋'};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let data=null,loading=null,points=[],fuelData=null,lastAutoFuel=null;
 function parseRoute(value,known){
@@ -53,13 +53,13 @@ function update(){
 }
 async function load(){
  if(loading)return loading;
- loading=fetch('submarine-drop-data.json?v=20261012-3').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(result=>{data=result;update()}).catch(e=>{
+ loading=fetch('submarine-drop-data.json?v=20261022-seas').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(result=>{data=result;update()}).catch(e=>{
   $('loot-select-status').textContent='航點掉落資料載入失敗，可手動新增物品：'+e.message;
   loading=null;update();
  });
  return loading;
 }
-fetch('submarine-route-data.json').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(result=>{
+fetch('submarine-route-data.json?v=20261022-seas').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(result=>{
  fuelData={};
  for(const sector of result.sectors||[]){
   const map=String(sector.map),letter=String(sector.letter).toUpperCase();

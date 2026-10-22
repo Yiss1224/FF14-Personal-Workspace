@@ -1,14 +1,21 @@
 (function(){
 'use strict';
 const KEY='ff14_submarine_planner_v1';
-const maps={1:'溺沒海',2:'灰海',3:'翠浪海'};
-const mapImages={1:'submarine-maps/sea-1.jpg',2:'submarine-maps/sea-2.jpg',3:'submarine-maps/sea-3.jpg'};
+const maps=window.SubmarineMapNames||{1:'溺沒海',2:'灰海',3:'翠浪海',4:'塞壬海',5:'紫礁海',6:'南蒼茫洋',7:'北洋'};
+const mapIds=Object.keys(maps).map(Number);
+// Home port (start point) of each sea in the game's SubmarineExploration sheet.
+const mapHomes={1:0,2:31,3:52,4:73,5:94,6:115,7:136};
+const mapImages=Object.fromEntries(mapIds.map(m=>[m,'submarine-maps/sea-'+m+'.jpg']));
 // Image size (width/height) of each chart, and point centres in percent measured on those images.
-const mapAspect={1:820/801,2:686/680,3:684/683};
+const mapAspect={1:820/801,2:686/680,3:684/683,4:683/686,5:1,6:1,7:1};
 const mapPositions={
 1:{A:[64.3,88.3],B:[57.5,74.6],C:[74,69.9],D:[40.5,85.7],E:[65.3,61.4],F:[84.6,85.3],G:[27.5,76.1],H:[13.5,84.6],I:[38.8,66.2],J:[89.5,60.3],K:[52.3,55.5],L:[27.5,57.1],M:[10.8,63.2],N:[79.7,55.5],O:[63,49.6],P:[28.6,35],Q:[12.4,35.9],R:[17,53.2],S:[33.4,23.7],T:[13.5,19.3],U:[47.3,32.2],V:[56.1,22],W:[70.9,37.6],X:[89.5,33.5],Y:[23.4,9.2],Z:[43.2,11.4],AA:[82.3,20.7],AB:[75.1,9.3],AC:[89,11],AD:[60.6,10.2]},
 2:{A:[29.2,75.7],B:[15.5,84.3],C:[28.9,57.9],D:[45.1,70.1],E:[60,77.7],F:[21.1,42],G:[36.7,47.6],H:[34.2,33.6],I:[51.2,60.8],J:[47.9,43.9],K:[11.9,28.9],L:[45,22.3],M:[82.6,58.5],N:[85.9,45.7],O:[77.6,69.3],P:[58.2,21.1],Q:[73.3,88.3],R:[80.2,12.9],S:[68.1,29.3],T:[17.6,15.1]},
-3:{A:[20.5,46.4],B:[24.6,70.6],C:[27,29],D:[10.7,19.6],E:[47.5,10.8],F:[22.7,11],G:[68.1,25.3],H:[68.7,9.1],I:[83.5,18.9],J:[71.9,40],K:[86.4,8.9],L:[88.7,30.7],M:[66.5,64.4],N:[63.2,80.5],O:[93.7,19.2],P:[48.5,89.5],Q:[89,45.5],R:[73.5,77.2],S:[85.2,61.9],T:[83.8,88.9]}
+3:{A:[20.5,46.4],B:[24.6,70.6],C:[27,29],D:[10.7,19.6],E:[47.5,10.8],F:[22.7,11],G:[68.1,25.3],H:[68.7,9.1],I:[83.5,18.9],J:[71.9,40],K:[86.4,8.9],L:[88.7,30.7],M:[66.5,64.4],N:[63.2,80.5],O:[93.7,19.2],P:[48.5,89.5],Q:[89,45.5],R:[73.5,77.2],S:[85.2,61.9],T:[83.8,88.9]},
+4:{A:[21.2,75.6],B:[43.7,70.8],C:[34.2,52],D:[45.6,25.7],E:[61.6,56.2],F:[67.9,65.4],G:[7.4,41.2],H:[35.1,13],I:[57.9,18.7],J:[75,55.9],K:[80.7,42.9],L:[62.2,81.3],M:[13.4,13.3],N:[54.4,6.9],O:[89.5,38.4],P:[49.4,90],Q:[88.4,12.3],R:[68.2,29.8],S:[92.3,65.4],T:[71.7,89.3]},
+5:{A:[18.4,88],B:[20,73.7],C:[49.2,77],D:[9.8,53.4],E:[53.7,91.6],F:[36.4,55.5],G:[73.3,82],H:[88.8,91.8],I:[18.6,42.1],J:[52.8,47.7],K:[65.5,70.5],L:[55.3,33.5],M:[80,60.7],N:[69.5,26.2],O:[73.1,46.7],P:[6.9,12.8],Q:[34.8,34],R:[90.3,36.8],S:[79.7,7.5],T:[49.2,9.4]},
+6:{A:[82.6,17.9],B:[67.4,40.9],C:[61.6,19.9],D:[89.9,49.5],E:[45.4,9.5],F:[48,43.8],G:[37.8,25.9],H:[30.4,37.7],I:[49.9,62],J:[10.9,11.2],K:[10,31.9],L:[70.9,77],M:[33.5,67.3],N:[21.6,65.7],O:[90,91.1],P:[10,51],Q:[46.9,82.1],R:[20.9,77.6],S:[50.9,92.1],T:[10,91.1]},
+7:{A:[87,87.2],B:[89,58.6],C:[80.1,78.4],D:[71.9,64.6],E:[83.9,37.5],F:[54.3,65.3],G:[46.9,44.3],H:[34.6,58.6],I:[64.1,32.4],J:[49.1,16.9],K:[38.8,82.1],L:[65.2,17.2],M:[32.9,40.2]}
 };
 const builds={
  auto:{label:'自動擇優（可換裝）'},
@@ -113,6 +120,7 @@ function state(){
 }
 function persist(mutator){const s=state();mutator(s);localStorage.setItem(KEY,JSON.stringify(s));window.dispatchEvent(new Event('submarine-build-state-updated'))}
 let data=null,lootData=[],pendingItemDeparture=null;
+function maxRank(){return data?.ranks?.at(-1)?.rank||90}
 function rankRec(rank){return data.ranks.find(x=>x.rank===rank)||data.ranks.filter(x=>x.rank<=rank).at(-1)}
 function shipRank(ship){return Math.max(1,Number(ship.rank)||1)}
 function shipLabel(index,ship){
@@ -212,10 +220,10 @@ function bindMapTips(host){
  });
 }
 function renderSectors(){
- const s=state(),map=Math.max(1,Math.min(3,Number(s.activeSectorMap)||1));
+ const s=state(),map=mapIds.includes(Number(s.activeSectorMap))?Number(s.activeSectorMap):1;
  const items=data.sectors.filter(x=>x.map===map);
  const opened=items.filter(p=>{const d=map===1&&(p.letter==='A'||p.letter==='B');return Boolean(s.unlocks?.[sectorUnlockKey(p.id)]??d)}).length;
- const tabs=[1,2,3].map(m=>'<button type="button" class="map-tab '+(m===map?'active':'')+'" data-map-tab="'+m+'" aria-pressed="'+(m===map)+'">'+maps[m]+'</button>').join('');
+ const tabs=mapIds.map(m=>'<button type="button" class="map-tab '+(m===map?'active':'')+'" data-map-tab="'+m+'" aria-pressed="'+(m===map)+'">'+maps[m]+'</button>').join('');
  const points=items.map(p=>{
   const d=map===1&&(p.letter==='A'||p.letter==='B'),on=Boolean(s.unlocks?.[sectorUnlockKey(p.id)]??d),xy=pointAt(map,p.letter),label=maps[map]+' '+p.letter;
   const name=sectorName(map,p.letter);
@@ -285,8 +293,8 @@ function bestRoutes(available,ship,buildKey,maxHours,s,requiredId=null,beamLimit
  const rank=shipRank(ship);if(!validBuild(buildKey,rank))return [];
  const stats=buildStats(buildKey,rank),daily=Boolean($('daily-pickup')?.checked);
  let results=[];
- // The three seas have different home ports, so search separately.
- for(const [map,home] of [[1,0],[2,31],[3,52]]){
+ // Each sea has its own home port, so search separately.
+ for(const [map,home] of Object.entries(mapHomes).map(([m,h])=>[Number(m),h])){
   const eligible=available.filter(p=>p.map===map&&p.rank<=rank);
   if(!eligible.length||(requiredId!==null&&!eligible.some(p=>p.id===requiredId)))continue;
   let beam=[{path:[],prev:home,range:0,time:43200,fuel:0,xp:0,used:new Set()}];
@@ -325,7 +333,7 @@ function bestItemRoutes(available,ship,key,maxHours,s,itemId,beamLimit=400){
  const stats=buildStats(key,rank),daily=Boolean($('daily-pickup')?.checked),itemRows=lootData.filter(x=>x.itemId===itemId),bySector=new Map(itemRows.map(x=>[x.sectorId,x]));
  if(!bySector.size)return [];
  const results=[];
- for(const [map,home] of [[1,0],[2,31],[3,52]]){
+ for(const [map,home] of Object.entries(mapHomes).map(([m,h])=>[Number(m),h])){
   const eligible=available.filter(p=>p.map===map&&p.rank<=rank&&bySector.has(p.id));
   if(!eligible.length)continue;
   let beam=[{path:[],prev:home,range:0,time:43200,fuel:0,used:new Set(),yield:0,miss:1}];
@@ -432,7 +440,7 @@ function fmtTime(sec){
 }
 function nextMapProgress(open){
  const openIds=new Set(open.map(p=>p.id));
- const target=[2,3].map(m=>data.sectors.find(p=>p.map===m&&p.letter==='A')).find(p=>p&&!openIds.has(p.id));
+ const target=mapIds.filter(m=>m>1).map(m=>data.sectors.find(p=>p.map===m&&p.letter==='A')).find(p=>p&&!openIds.has(p.id));
  if(!target)return null;
  const reverse=[],seen=new Set();let cursor=target;
  while(cursor&&!openIds.has(cursor.id)&&!seen.has(cursor.id)){
@@ -504,7 +512,7 @@ function calculate(){return withWindowSnapshot(calculateNow)}
 function calculateNow(){
  if(!data)return;
  const s=state(),ships=s.ships||[],open=unlockedSectors(s,145),
-  hours=Number($('calc-hours').value)||48,target=Math.max(2,Math.min(90,Number($('calc-target-rank').value)||85)),
+  hours=Number($('calc-hours').value)||48,target=Math.max(2,Math.min(maxRank(),Number($('calc-target-rank').value)||85)),
   daily=Boolean($('daily-pickup')?.checked),total=stock(s),available0003=Math.max(0,Number(total['0003:3'])||0);
  const w=windowSettings();
  if(daily&&!w.valid){$('calc-result').innerHTML='<p class="calc-warning">收船窗口結束時間必須晚於開始時間，且在同一天內。</p>';return}
@@ -633,7 +641,7 @@ function calculateNow(){
   +'<p class="hint">本輪建議消耗約 '+fuel+' 罐燃料（庫存 '+(Number(s.fuel)||0)+'）。'
   +(daily?'每天可收／派船窗口 '+fmtClock(windowSettings().start*60)+'～'+fmtClock(windowSettings().end*60)+'；考慮實際預計出航時間與下一次可收船時間。':'以 EXP／實際時間比較。')
   +' 智慧分配屬逐趟前瞻估算，不是保證全球最短畢業日；實際開圖 RNG、EXP 獎勵及未來航點變化仍會改變最佳選擇。</p>'
-  +(registered.some(x=>shipRank(x)>80)?'<p class="hint calc-warning">航線資料目前只到海圖 3、Rank 80 的海域；Rank 81 以上使用現有海域預估。</p>':'');
+  +(registered.some(x=>shipRank(x)>maxRank())?'<p class="hint calc-warning">航線資料目前收錄到 Rank '+maxRank()+'；更高 Rank 使用現有海域預估。</p>':'');
  if(pendingItemDeparture){
   const pending=pendingItemDeparture,ship=ships[pending.shipIndex];
   if(!ship||!ship.registered||ship.voyaging){
@@ -697,7 +705,7 @@ function plannerControls(settings){
  // 舊版 48h 是預設限制；首次開放長航線後升到 72h。使用者日後可自行改回 48h。
  if(settings&&Number(settings.maxHours)===48&&settings.expandedLongRoutes!==true)s.maxHours=72;
  $('calc-hours').value=[24,36,48,50,52,72].includes(Number(s.maxHours))?String(s.maxHours):'72';
- $('calc-target-rank').value=Number.isInteger(Number(s.targetRank))&&Number(s.targetRank)>=2&&Number(s.targetRank)<=90?String(s.targetRank):'85';
+ $('calc-target-rank').value=Number.isInteger(Number(s.targetRank))&&Number(s.targetRank)>=2&&Number(s.targetRank)<=maxRank()?String(s.targetRank):'85';
  $('daily-pickup').checked=s.dailyPickup!==false;
  $('pickup-start').value=validClock(s.pickupStart,'19:00');
  $('pickup-end').value=validClock(s.pickupEnd,'22:00');
@@ -715,7 +723,7 @@ function savePlannerSettings(manualDeparture){
 }
 async function init(){
  try{
-  const [res,lootRes]=await Promise.all([fetch('submarine-route-data.json'),fetch('submarine-loot-data.json?v=20261017-4')]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
+  const [res,lootRes]=await Promise.all([fetch('submarine-route-data.json?v=20261022-seas'),fetch('submarine-loot-data.json?v=20261022-seas')]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
   data=await res.json();lootData=await lootRes.json();
   renderBuilds();renderSectors();renderItemPlanner();
   let manuallySelectedDeparture=plannerControls(state().plannerSettings);
