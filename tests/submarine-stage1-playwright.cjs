@@ -72,6 +72,14 @@ async function setField(page,selector,value){
     el.dispatchEvent(new Event('change',{bubbles:true}));
   },[selector,value]);
 }
+// 出航、刪除結算等確認改用頁面內對話框；點按鈕後按「確認」，並記下訊息內容。
+async function depart(page,selector){
+  await page.click(selector);
+  await page.waitForSelector('#sub-dialog[open]');
+  page.dialogs.push(await page.evaluate(()=>[...document.querySelectorAll('#sub-dialog-message p')].map(p=>p.textContent).join('\n')));
+  await page.click('#sub-dialog [data-dialog-ok]');
+  await page.waitForFunction(()=>!document.querySelector('#sub-dialog[open]'));
+}
 async function tooltip(page,index){
   await page.hover('[data-harbor-ship="'+index+'"]',{force:true});
   await page.waitForTimeout(100);
@@ -93,7 +101,7 @@ async function main(){
 
   await test('1. 出航後修改燃料、修理材料、Rank、EXP、船名、登記、部件，voyage 都保留',async()=>{
     const ctx=await context(baseSeed()),page=await open(ctx);
-    await page.click('[data-depart-ship="0"]');
+    await depart(page,'[data-depart-ship="0"]');
     const voyage=(await stored(page)).ships[0].voyage;
     assert.ok(voyage&&voyage.etaAt>voyage.departedAt,'出航後應寫入 voyage');
     const edits=[
@@ -128,7 +136,7 @@ async function main(){
 
   await test('2. 確認出航對話框使用真正換行，不顯示字面 \\n',async()=>{
     const ctx=await context(baseSeed()),page=await open(ctx);
-    await page.click('[data-depart-ship="0"]');
+    await depart(page,'[data-depart-ship="0"]');
     const message=page.dialogs.at(-1);
     assert.ok(message.includes('嗎？\n確認後開始計時'),'應含換行：'+JSON.stringify(message));
     assert.ok(!message.includes('\\n'),'不應含字面 \\n');
@@ -152,7 +160,7 @@ async function main(){
 
   await test('3b. 進行中航程誤取消再勾回，計時保留',async()=>{
     const ctx=await context(baseSeed()),page=await open(ctx);
-    await page.click('[data-depart-ship="0"]');
+    await depart(page,'[data-depart-ship="0"]');
     const voyage=(await stored(page)).ships[0].voyage;
     await page.uncheck('[data-voyaging="0"]');
     await page.check('[data-voyaging="0"]');
@@ -164,7 +172,7 @@ async function main(){
 
   await test('3c. 返航結算後，航程移至 lastVoyage；再手動勾選不會顯示舊航程',async()=>{
     const ctx=await context(baseSeed()),page=await open(ctx);
-    await page.click('[data-depart-ship="0"]');
+    await depart(page,'[data-depart-ship="0"]');
     const voyage=(await stored(page)).ships[0].voyage;
     await page.fill('#settle-rank','21');await page.fill('#settle-exp','0');
     await page.click('#settle-save');
@@ -194,7 +202,7 @@ async function main(){
 
   await test('4b. 雙分頁：B 出航後，A 改 Rank 不會清掉 B 的 voyage',async()=>{
     const ctx=await context(baseSeed()),a=await open(ctx),b=await open(ctx);
-    await b.click('[data-depart-ship="0"]');
+    await depart(b,'[data-depart-ship="0"]');
     const voyage=(await stored(b)).ships[0].voyage;
     await a.waitForTimeout(200);
     await setField(a,'[data-rank="1"]',15);

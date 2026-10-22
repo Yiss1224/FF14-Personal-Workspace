@@ -84,7 +84,12 @@ async function capture(browser,base,name,seed){
     if(variant.apply){
       await page.evaluate(apply=>{for(const [id,value] of Object.entries(apply)){const el=document.getElementById(id);el.value=value;el.dispatchEvent(new Event('change'))}},variant.apply);
     }
-    out[variant.name]={calc:await page.evaluate(()=>document.getElementById('calc-result').innerHTML),
+    out[variant.name]={calc:await page.evaluate(()=>{
+      // The departure step list is presentation only; recommendations are compared without it.
+      const copy=document.getElementById('calc-result').cloneNode(true);
+      copy.querySelectorAll('.depart-steps').forEach(x=>x.remove());
+      return copy.innerHTML;
+    }),
       builds:await page.evaluate(()=>document.getElementById('ship-builds').innerHTML)};
   }
   // Timing: full refresh triggered by a state change (renderBuilds + renderSectors + calculate), median of 7.

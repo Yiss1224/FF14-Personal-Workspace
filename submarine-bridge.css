@@ -1,0 +1,119 @@
+/* Bridge additions · 2026-10-22: next-return metric, fleet cards, departure steps, dialogs and toasts,
+   map point tips, ledger insights. Uses the --ui-* tokens from submarine-ui.css (light and dark). */
+:root{--bridge-warn:#b86a12;--bridge-alert:#c2522f;--bridge-alert-soft:#fdf0e8;--bridge-ok:#1d8a5d}
+@media (prefers-color-scheme:dark){:root{--bridge-warn:#f0b35c;--bridge-alert:#ff9a7a;--bridge-alert-soft:#3a2a24;--bridge-ok:#6fd3a4}}
+
+/* ---------- overview ---------- */
+.ops-overview{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:1100px){.ops-overview{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:620px){.ops-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.ops-overview .ops-metric-link{grid-column:1/-1}}
+.ops-metric-link{display:block;color:inherit;text-decoration:none;transition:border-color .15s,box-shadow .15s}
+.ops-metric-link::before{background:#3f9bd0!important}
+.ops-metric-link:hover{border-color:#8dbab9}
+.ops-metric-link:focus-visible{outline:3px solid var(--ui-ring);outline-offset:2px}
+.ops-metric-link.is-alert{background:var(--bridge-alert-soft);border-color:var(--bridge-alert)}
+.ops-metric-link.is-alert::before{background:var(--bridge-alert)!important}
+.ops-metric-link.is-alert .ops-metric-value{color:var(--bridge-alert)}
+.ops-metric.is-warn .ops-metric-note{color:var(--bridge-warn);font-weight:700}
+
+/* ---------- fleet cards ---------- */
+.fleet-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:14px}
+.fleet-card{position:relative;background:var(--ui-surface-soft);border:1px solid var(--ui-border);border-radius:15px;padding:14px 15px 13px;display:grid;gap:8px;align-content:start;min-width:0}
+.fleet-card-head{display:flex;align-items:center;gap:8px;min-width:0}
+.fleet-card h3{margin:0;font-size:15px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fleet-card-dot{width:11px;height:11px;border-radius:50%;background:var(--ship-color);flex:none;box-shadow:0 0 0 2px var(--ui-surface)}
+.fleet-chip{flex:none;font-size:11px;font-weight:750;padding:3px 8px;border-radius:999px;background:var(--ui-surface);border:1px solid var(--ui-border);color:var(--ui-muted)}
+.fleet-card.is-exploring .fleet-chip,.fleet-card.is-returning .fleet-chip{color:var(--ui-teal);border-color:currentColor}
+.fleet-card.is-awaiting{border-color:var(--bridge-alert);background:var(--bridge-alert-soft)}
+.fleet-card.is-awaiting .fleet-chip{color:var(--bridge-alert);border-color:currentColor}
+.fleet-card.is-empty{opacity:.7}
+.fleet-card.is-empty p{margin:0}
+.fleet-card-rank{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px}
+.fleet-card-rank span{color:var(--ui-muted);font-size:12px;font-variant-numeric:tabular-nums}
+.fleet-bar{position:relative;height:6px;border-radius:999px;background:var(--ui-border);overflow:hidden}
+.fleet-bar>span{position:absolute;inset:0 auto 0 0;background:var(--ship-color);border-radius:inherit}
+.fleet-bar.is-voyage>span{background:var(--ui-teal)}
+.fleet-card.is-awaiting .fleet-bar.is-voyage>span{background:var(--bridge-alert)}
+.fleet-bar>i{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--ui-surface)}
+.fleet-card-build{margin:0;font-size:12px;color:var(--ui-muted)}
+.fleet-card-build strong{color:var(--ui-ink);margin-right:4px}
+.fleet-voyage{display:grid;gap:5px;padding-top:6px;border-top:1px dashed var(--ui-border)}
+.fleet-voyage-route{font-size:13px;font-weight:700;color:var(--ui-ink);overflow-wrap:anywhere}
+.fleet-voyage-phases{display:flex;justify-content:space-between;font-size:10px;color:var(--ui-muted)}
+.fleet-voyage-eta{margin:0;font-size:12px;color:var(--ui-muted)}
+.fleet-card-actions{display:flex;gap:8px;flex-wrap:wrap}
+.fleet-card-actions button{min-height:34px;padding:7px 12px}
+
+/* ---------- departure steps ---------- */
+.depart-steps{list-style:none;display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 4px;padding:0;font-size:12px;color:var(--ui-muted)}
+.depart-steps li{display:flex;align-items:center;gap:6px}
+.depart-steps li span{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--ui-border);font-size:11px;font-weight:800;background:var(--ui-surface)}
+.depart-steps li.is-done{color:var(--bridge-ok)}
+.depart-steps li.is-done span{border-color:var(--bridge-ok);background:var(--bridge-ok);color:#fff}
+.depart-steps li.is-current{color:var(--ui-ink);font-weight:700}
+.depart-steps li.is-current span{border-color:var(--ui-teal);color:var(--ui-teal)}
+
+/* ---------- dialog & toasts ---------- */
+.sub-dialog{border:1px solid var(--ui-border);border-radius:18px;padding:0;max-width:min(460px,calc(100vw - 32px));width:100%;background:var(--ui-surface);color:var(--ui-ink);box-shadow:0 24px 60px rgba(0,0,0,.28)}
+.sub-dialog::backdrop{background:rgba(8,20,32,.45)}
+.sub-dialog-shell{display:grid;gap:12px;padding:20px 22px 18px}
+.sub-dialog h2{margin:0;font-size:18px}
+.sub-dialog-message p{margin:0 0 6px;line-height:1.6;color:var(--ui-ink)}
+.sub-dialog-details{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0;padding:10px 12px;border-radius:12px;background:var(--ui-surface-soft);font-size:13px}
+.sub-dialog-details dt{color:var(--ui-muted);font-weight:650}
+.sub-dialog-details dd{margin:0;overflow-wrap:anywhere}
+.sub-dialog-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.sub-dialog-actions [hidden]{display:none}
+.sub-dialog .is-danger{background:var(--ui-danger);border-color:var(--ui-danger);color:#fff}
+.sub-toasts{position:fixed;left:50%;bottom:196px;transform:translateX(-50%);z-index:60;display:grid;gap:8px;width:min(520px,calc(100vw - 32px));pointer-events:none}
+.sub-toast{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:10px 10px 10px 14px;border-radius:13px;background:var(--ui-navy-deep);color:#eef6f8;box-shadow:0 10px 30px rgba(0,0,0,.25);font-size:13px;animation:sub-toast-in .2s ease-out}
+.sub-toast>span{flex:1;min-width:0}
+.sub-toast.is-success{border-left:4px solid #5dd6a0}
+.sub-toast.is-error{border-left:4px solid #ff8a7a}
+.sub-toast button{min-height:32px;padding:5px 11px;background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.3)}
+.sub-toast button:hover{background:rgba(255,255,255,.22)}
+.sub-toast .sub-toast-close{padding:5px 9px;background:transparent;border-color:transparent}
+.sub-toast.is-leaving{opacity:0;transition:opacity .2s}
+@media(max-width:700px){.sub-toasts{bottom:168px}}
+@media(max-width:420px){.sub-toasts{bottom:152px}}
+@keyframes sub-toast-in{from{opacity:0;transform:translateY(8px)}}
+@media (prefers-reduced-motion:reduce){.sub-toast{animation:none}}
+
+/* ---------- settlement prefill ---------- */
+.settle-prefill-note{margin:0 0 12px;padding:9px 12px;border-radius:11px;background:var(--ui-teal-soft);border:1px solid var(--ui-border);color:var(--ui-ink);font-size:13px}
+
+/* ---------- sea map: point tips ---------- */
+.map-point{min-height:0;padding:0}
+.map-tip{position:absolute;z-index:3;transform:translate(-50%,calc(-100% - 16px));pointer-events:none;display:grid;gap:1px;min-width:96px;max-width:200px;padding:7px 10px;border-radius:10px;background:var(--ui-navy-deep);color:#f2f8fa;font-size:12px;line-height:1.4;box-shadow:0 6px 18px rgba(0,0,0,.3);text-align:center}
+.map-tip strong{font-size:15px;letter-spacing:.04em}
+.map-tip small{color:#a9c4cf;font-size:11px}
+.map-tip.is-below{transform:translate(-50%,16px)}
+.map-tip.is-left{transform:translate(calc(-100% + 18px),calc(-100% - 16px))}
+.map-tip.is-left.is-below{transform:translate(calc(-100% + 18px),16px)}
+.map-tip.is-right{transform:translate(-18px,calc(-100% - 16px))}
+.map-tip.is-right.is-below{transform:translate(-18px,16px)}
+
+/* ---------- ledger insights ---------- */
+.ledger-insights{margin-top:18px;display:grid;gap:8px}
+.ledger-insights h3{margin:8px 0 0;font-size:15px}
+.trend-chart{position:relative;max-width:640px}
+.trend-chart svg{display:block;width:100%;height:auto;overflow:visible}
+.trend-base{stroke:var(--ui-border);stroke-width:1}
+.trend-hit{fill:transparent;cursor:default}
+.trend-mark{fill:var(--ui-teal)}
+.trend-bar.is-hover .trend-mark,.trend-bar:focus .trend-mark{filter:brightness(1.15)}
+.trend-bar:focus{outline:none}
+.trend-bar:focus-visible .trend-hit{stroke:var(--ui-ring);stroke-width:3}
+.trend-value{fill:var(--ui-ink);font-size:13px;font-weight:700}
+.trend-axis{fill:var(--ui-muted);font-size:12px}
+.trend-tip{position:absolute;top:0;transform:translate(-50%,-6px);padding:6px 9px;border-radius:9px;background:var(--ui-navy-deep);color:#f2f8fa;font-size:12px;white-space:nowrap;pointer-events:none}
+.route-efficiency-table td small{color:var(--ui-muted)}
+.route-best{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;background:var(--ui-teal-soft);color:var(--ui-teal)}
+/* Elements toggled with the hidden attribute keep their display rules above, so restore hiding. */
+.map-tip[hidden],.sub-dialog-details[hidden],.trend-tip[hidden],.settle-prefill-note[hidden]{display:none}
+
+/* ---------- sea map: wiki chart images with status points over the printed circles ---------- */
+.map-stage.is-wiki{max-width:min(680px,100%);container-type:inline-size;background:#cbb98f}
+.map-stage.is-wiki .map-point{width:8.6%;height:auto;aspect-ratio:1;border-width:2px;font-size:3.6cqw}
+.map-stage.is-wiki .map-point.is-closed{background:#2a7fc4}
+@media(max-width:620px){.map-stage.is-wiki .map-point{width:8.6%;height:auto;font-size:3.6cqw;border-width:1.5px}}

@@ -2,11 +2,13 @@
 'use strict';
 const KEY='ff14_submarine_planner_v1';
 const maps={1:'溺沒海',2:'灰海',3:'翠浪海'};
-const mapImages={1:'https://i.imgur.com/Paa93VG.png',2:'https://i.imgur.com/bAReiKQ.png',3:'https://i.imgur.com/Y545lQE.png'};
+const mapImages={1:'submarine-maps/sea-1.jpg',2:'submarine-maps/sea-2.jpg',3:'submarine-maps/sea-3.jpg'};
+// Image size (width/height) of each chart, and point centres in percent measured on those images.
+const mapAspect={1:820/801,2:686/680,3:684/683};
 const mapPositions={
-1:{A:[36.7,88.2],B:[32.9,75.3],C:[42.2,69.7],D:[23.6,83.7],E:[37.5,61.1],F:[48.5,85.8],G:[19.8,79.1],H:[7.6,83.7],I:[22.1,67.4],J:[51.2,60.3],K:[31.4,55.5],L:[14.2,57.3],M:[5.7,64.2],N:[45.1,54.7],O:[36.6,52.2],P:[17,38.2],Q:[6.8,35.6],R:[9.5,54.7],S:[18.9,24.5],T:[8.9,20],U:[27.1,34.4],V:[31.9,23.7],W:[41.1,35.9],X:[51.5,36.1],Y:[12.7,10.2],Z:[24,10.4],AA:[47.5,22.6],AB:[43.1,10.4],AC:[53,10.2],AD:[34,10.2]},
-2:{A:[16.6,74.9],B:[8.7,83.5],C:[16.7,57.1],D:[26.1,69.8],E:[34,76.1],F:[11.9,41.6],G:[21,44.4],H:[19.4,33.2],I:[29.1,58.6],J:[27.4,43.7],K:[6.8,28.7],L:[26.1,22.1],M:[47.2,57.6],N:[49.2,43.9],O:[45,69],P:[32.6,20.6],Q:[41.7,87.3],R:[45.7,14],S:[38.8,37.1],T:[10,15]},
-3:{A:[12,46.2],B:[14.3,70.3],C:[15.4,28.7],D:[6.3,20.3],E:[27.2,9.1],F:[13,11.2],G:[38.7,24.9],H:[39.6,8.9],I:[47.5,18.5],J:[41.3,40.1],K:[49.5,8.6],L:[50.5,30.2],M:[38,65]}
+1:{A:[64.3,88.3],B:[57.5,74.6],C:[74,69.9],D:[40.5,85.7],E:[65.3,61.4],F:[84.6,85.3],G:[27.5,76.1],H:[13.5,84.6],I:[38.8,66.2],J:[89.5,60.3],K:[52.3,55.5],L:[27.5,57.1],M:[10.8,63.2],N:[79.7,55.5],O:[63,49.6],P:[28.6,35],Q:[12.4,35.9],R:[17,53.2],S:[33.4,23.7],T:[13.5,19.3],U:[47.3,32.2],V:[56.1,22],W:[70.9,37.6],X:[89.5,33.5],Y:[23.4,9.2],Z:[43.2,11.4],AA:[82.3,20.7],AB:[75.1,9.3],AC:[89,11],AD:[60.6,10.2]},
+2:{A:[29.2,75.7],B:[15.5,84.3],C:[28.9,57.9],D:[45.1,70.1],E:[60,77.7],F:[21.1,42],G:[36.7,47.6],H:[34.2,33.6],I:[51.2,60.8],J:[47.9,43.9],K:[11.9,28.9],L:[45,22.3],M:[82.6,58.5],N:[85.9,45.7],O:[77.6,69.3],P:[58.2,21.1],Q:[73.3,88.3],R:[80.2,12.9],S:[68.1,29.3],T:[17.6,15.1]},
+3:{A:[20.5,46.4],B:[24.6,70.6],C:[27,29],D:[10.7,19.6],E:[47.5,10.8],F:[22.7,11],G:[68.1,25.3],H:[68.7,9.1],I:[83.5,18.9],J:[71.9,40],K:[86.4,8.9],L:[88.7,30.7],M:[66.5,64.4],N:[63.2,80.5],O:[93.7,19.2],P:[48.5,89.5],Q:[89,45.5],R:[73.5,77.2],S:[85.2,61.9],T:[83.8,88.9]}
 };
 const builds={
  auto:{label:'自動擇優（可換裝）'},
@@ -122,6 +124,48 @@ function buildStats(build,rank){
  return {speed:b.speed+(rec.v||0),range:b.range+(rec.d||0)};
 }
 function sectorUnlockKey(id){return 'sector-'+id}
+const dialogs=()=>window.SubDialog||{confirm:o=>Promise.resolve(window.confirm(o.message||o)),alert:o=>{window.alert(o.message||o);return Promise.resolve(true)},toast:()=>({close(){}})};
+const fmtEta=ms=>new Date(ms).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
+// Records a departure, then offers a short undo that restores the ship's previous voyage fields.
+function recordDeparture(i,route,routeText,key){
+ const now=Date.now(),duration=Math.round(Number(route.time)),before=state().ships?.[i]||{};
+ const previous={voyaging:before.voyaging,voyage:before.voyage};
+ let started=false;
+ persist(st=>{
+  const target=st.ships?.[i];if(!target||target.voyaging)return;
+  target.voyaging=true;
+  target.voyage={departedAt:now,etaAt:now+duration*1000,durationSeconds:duration,route:routeText,build:key,fuelEstimate:Number(route.fuel)||0};
+  started=true;
+ });
+ if(!started)return;
+ window.dispatchEvent(new CustomEvent('submarine-voyage-started',{detail:{index:i}}));
+ dialogs().toast(shipLabel(i,before)+' 已出航，預計 '+fmtEta(now+duration*1000)+' 返航。',{tone:'success',action:{label:'復原出航',run(){
+  let undone=false;
+  persist(st=>{
+   const target=st.ships?.[i];
+   if(!target||Number(target.voyage?.departedAt)!==now)return;
+   target.voyaging=previous.voyaging;
+   if(previous.voyage)target.voyage=previous.voyage;else delete target.voyage;
+   undone=true;
+  });
+  if(undone){dialogs().toast('已復原：'+shipLabel(i,before)+' 回到出航前狀態。');renderBuilds();calculate()}
+  else dialogs().toast('這趟航程已在其他地方變更，未復原。',{tone:'error'});
+ }}});
+}
+// Updates the recorded build, with an undo back to the previous one.
+function recordBuildChange(i,next){
+ const prev=state().ships?.[i]?.currentBuild;
+ let changed=false;
+ persist(st=>{const ship=st.ships?.[i];if(!ship||ship.voyaging)return;ship.currentBuild=next;changed=true});
+ if(!changed)return;
+ dialogs().toast(shipLabel(i,state().ships[i])+' 的配置已更新為 '+next+'。',{action:{label:'復原',run(){
+  persist(st=>{const ship=st.ships?.[i];if(!ship||ship.voyaging||ship.currentBuild!==next)return;if(prev===undefined)delete ship.currentBuild;else ship.currentBuild=prev});
+  renderBuilds();calculate();
+ }}});
+}
+function stepBar(steps){
+ return '<ol class="depart-steps" aria-label="出航步驟">'+steps.map((x,n)=>'<li class="'+(x.done?'is-done':x.current?'is-current':'')+'"'+(x.current?' aria-current="step"':'')+'><span>'+(x.done?'✓':n+1)+'</span>'+esc(x.label)+'</li>').join('')+'</ol>';
+}
 function renderBuilds(){
  const ships=state().ships||[];
  $('ship-builds').innerHTML=ships.map((ship,i)=>{
@@ -147,17 +191,39 @@ function renderBuilds(){
  });
 }
 
+function sectorName(map,letter){return window.SubmarineSectorNames?.[map]?.[letter]||''}
+const pointAt=(map,letter)=>mapPositions[map][letter]||[50,50];
+// Hover or keyboard focus on a map point shows its code and Chinese name beside the point.
+function bindMapTips(host){
+ const tip=host.querySelector('.map-tip');if(!tip)return;
+ const show=el=>{
+  tip.innerHTML='<strong>'+esc(el.dataset.tipCode)+'</strong>'+(el.dataset.tipName?'<span>'+esc(el.dataset.tipName)+'</span>':'')+'<small>'+esc(el.dataset.tipMeta)+'</small>';
+  tip.style.left=el.style.left;tip.style.top=el.style.top;
+  tip.classList.toggle('is-below',parseFloat(el.style.top)<22);
+  tip.classList.toggle('is-left',parseFloat(el.style.left)>78);
+  tip.classList.toggle('is-right',parseFloat(el.style.left)<12);
+  tip.hidden=false;
+ };
+ const hide=()=>{tip.hidden=true};
+ host.querySelector('.map-stage')?.addEventListener('mouseleave',hide);
+ host.querySelectorAll('[data-tip-code]').forEach(el=>{
+  el.addEventListener('mouseenter',()=>show(el));el.addEventListener('focus',()=>show(el));
+  el.addEventListener('mouseleave',hide);el.addEventListener('blur',hide);
+ });
+}
 function renderSectors(){
  const s=state(),map=Math.max(1,Math.min(3,Number(s.activeSectorMap)||1));
  const items=data.sectors.filter(x=>x.map===map);
  const opened=items.filter(p=>{const d=map===1&&(p.letter==='A'||p.letter==='B');return Boolean(s.unlocks?.[sectorUnlockKey(p.id)]??d)}).length;
  const tabs=[1,2,3].map(m=>'<button type="button" class="map-tab '+(m===map?'active':'')+'" data-map-tab="'+m+'" aria-pressed="'+(m===map)+'">'+maps[m]+'</button>').join('');
  const points=items.map(p=>{
-  const d=map===1&&(p.letter==='A'||p.letter==='B'),on=Boolean(s.unlocks?.[sectorUnlockKey(p.id)]??d),xy=mapPositions[map][p.letter]||[50,50],label=maps[map]+' '+p.letter;
-  return '<button type="button" class="map-point '+(on?'is-open':'is-closed')+'" style="left:'+xy[0]+'%;top:'+xy[1]+'%" data-sector="'+p.id+'" aria-pressed="'+on+'" aria-label="'+esc(label+'，Rank '+p.rank+'，'+(on?'已開啟':'未開啟')+'；點擊切換')+'" title="'+esc(label+' · Rank '+p.rank+' · '+(on?'已開啟':'未開啟')+'（點擊切換）')+'">'+esc(p.letter)+'</button>'
+  const d=map===1&&(p.letter==='A'||p.letter==='B'),on=Boolean(s.unlocks?.[sectorUnlockKey(p.id)]??d),xy=pointAt(map,p.letter),label=maps[map]+' '+p.letter;
+  const name=sectorName(map,p.letter);
+  return '<button type="button" class="map-point '+(on?'is-open':'is-closed')+'" style="left:'+xy[0]+'%;top:'+xy[1]+'%" data-sector="'+p.id+'" data-tip-code="'+esc(p.letter)+'" data-tip-name="'+esc(name)+'" data-tip-meta="'+esc('Rank '+p.rank+' · '+(on?'已開啟':'未開啟')+' · 點擊切換')+'" aria-pressed="'+on+'" aria-label="'+esc(label+(name?' '+name:'')+'，Rank '+p.rank+'，'+(on?'已開啟':'未開啟')+'；點擊切換')+'">'+esc(p.letter)+'</button>'
  }).join('');
- $('sector-unlocks').innerHTML='<div class="map-tabs" role="tablist" aria-label="海圖">'+tabs+'</div><div class="map-heading"><strong>'+maps[map]+'</strong><span>'+opened+' / '+items.length+' 個海域已開</span><small>點海圖上的圓點切換狀態</small></div><div class="map-stage"><img src="'+mapImages[map]+'" alt="'+maps[map]+'潛水艇海域地圖" loading="lazy" referrerpolicy="no-referrer"><div class="map-points">'+points+'</div></div><div class="map-legend"><span><i class="legend-dot is-open"></i>已開啟</span><span><i class="legend-dot is-closed"></i>未開啟</span><small>玩家整理圖，來源：<a href="https://forum.square-enix.com/ffxiv/threads/357591-Submersible-Information-Thread" target="_blank" rel="noreferrer">FFXIV 官方論壇潛水艇資訊串</a></small></div>';
+ $('sector-unlocks').innerHTML='<div class="map-tabs" role="tablist" aria-label="海圖">'+tabs+'</div><div class="map-heading"><strong>'+maps[map]+'</strong><span>'+opened+' / '+items.length+' 個海域已開</span><small>滑鼠移到圓點上可看中文點名</small></div><div class="map-stage is-wiki" style="aspect-ratio:'+mapAspect[map]+'"><img src="'+mapImages[map]+'" alt="'+maps[map]+'潛水艇海域地圖" loading="lazy"><div class="map-points">'+points+'</div><div class="map-tip" role="tooltip" hidden></div></div><div class="map-legend"><span><i class="legend-dot is-open"></i>已開啟</span><span><i class="legend-dot is-closed"></i>未開啟</span><small>海圖來源：<a href="https://ff14.huijiwiki.com/wiki/%E9%83%A8%E9%98%9F%E6%BD%9C%E6%B0%B4%E8%89%87" target="_blank" rel="noreferrer">灰機 wiki · 部隊潛水艇</a></small></div>';
  $('sector-unlocks').querySelectorAll('[data-map-tab]').forEach(el=>el.onclick=()=>{persist(s=>{s.activeSectorMap=Number(el.dataset.mapTab)});renderSectors()});
+ bindMapTips($('sector-unlocks'));
  $('sector-unlocks').querySelectorAll('[data-sector]').forEach(el=>el.onclick=()=>{
   const id=Number(el.dataset.sector),p=data.sectors.find(x=>x.id===id),d=p.map===1&&(p.letter==='A'||p.letter==='B'),was=Boolean(state().unlocks?.[sectorUnlockKey(id)]??d);
   persist(s=>{s.unlocks=s.unlocks||{};s.unlocks[sectorUnlockKey(id)]=!was});renderSectors();calculate()
@@ -547,6 +613,7 @@ function calculateNow(){
    +(deltaRate!==null?'<span>相較目前配置 '+(deltaRate>=0?'+':'')+deltaRate+'% EXP／收船週期</span>':'')+'</div>'
    +'<div class="route-meta">至 Rank '+target+' 尚需 '+remaining.toLocaleString()+' EXP；若一直跑這條約 '+runs+' 趟（升級與開圖後會改變）。</div>'
    +(opening?'<div class="route-meta">本輪探索 '+esc(maps[progress.step.map]+' '+progress.step.letter)+' 的前置點；成功開圖後請點地圖更新。</div>':'')
+   +stepBar([{label:switching?'遊戲內換裝 '+current+' → '+key+'，再按「更新紀錄」':'配置符合（'+key+'）',done:!switching,current:switching},{label:'遊戲內派往這條航線',current:!switching},{label:'按「確認出航」開始計時'}])
    +'<div class="voyage-depart-actions"><span class="route-meta">預計實際航行 '+esc(fmtTime(route.time))+'；完成遊戲內出航後再按下按鈕。</span>'
    +'<button class="voyage-depart-button" type="button" data-depart-ship="'+ship.index+'">⚓ 確認出航</button></div>'
    +'</article>');
@@ -576,47 +643,46 @@ function calculateNow(){
    const switchControl=currentBuild===pending.key
     ?'<p class="route-meta">目前紀錄配置已符合，可直接確認出航。</p>'
     :'<div class="switch-advice"><strong>請先在遊戲內換裝：'+esc(currentBuild)+' → '+esc(pending.key)+'</strong><span>'+esc(changes(currentBuild,pending.key))+'</span><button type="button" data-sync-item-build>已在遊戲換裝，更新紀錄</button></div>';
-   $('calc-result').insertAdjacentHTML('beforeend','<article class="route-card item-route-confirm" style="border:2px solid #36a6a0"><h3>指定物品航線已套用至出航確認</h3><div class="route-meta">'+esc(shipLabel(pending.shipIndex,ship))+' · '+esc(pending.itemLabel)+' · '+esc(routeText)+'</div><div class="route-meta">配置 '+esc(pending.key)+' · '+fmtTime(pending.route.time)+' · '+pending.route.fuel+' 罐燃料</div>'+switchControl+'<div class="voyage-depart-actions"><span class="route-meta">確認前請確定遊戲內已派往此航線。</span><button type="button" class="voyage-depart-button" data-depart-item-route>⚓ 確認出航</button><button type="button" data-clear-item-route>取消此選擇</button></div></article>');
-   $('calc-result').querySelector('[data-sync-item-build]')?.addEventListener('click',()=>{
-    if(!window.confirm('請確認已在 FF14 遊戲內將「'+shipLabel(pending.shipIndex,ship)+'」換成 '+pending.key+'。確認後只更新本工具的配置紀錄。'))return;
-    persist(st=>{if(st.ships?.[pending.shipIndex]&&!st.ships[pending.shipIndex].voyaging)st.ships[pending.shipIndex].currentBuild=pending.key});
+   $('calc-result').insertAdjacentHTML('beforeend','<article class="route-card item-route-confirm" style="border:2px solid #36a6a0"><h3>指定物品航線已套用至出航確認</h3><div class="route-meta">'+esc(shipLabel(pending.shipIndex,ship))+' · '+esc(pending.itemLabel)+' · '+esc(routeText)+'</div><div class="route-meta">配置 '+esc(pending.key)+' · '+fmtTime(pending.route.time)+' · '+pending.route.fuel+' 罐燃料</div>'+switchControl+stepBar([{label:currentBuild===pending.key?'配置符合（'+pending.key+'）':'遊戲內換裝 '+currentBuild+' → '+pending.key+'，再按「更新紀錄」',done:currentBuild===pending.key,current:currentBuild!==pending.key},{label:'遊戲內派往這條航線',current:currentBuild===pending.key},{label:'按「確認出航」開始計時'}])+'<div class="voyage-depart-actions"><span class="route-meta">確認前請確定遊戲內已派往此航線。</span><button type="button" class="voyage-depart-button" data-depart-item-route>⚓ 確認出航</button><button type="button" data-clear-item-route>取消此選擇</button></div></article>');
+   $('calc-result').querySelector('[data-sync-item-build]')?.addEventListener('click',async()=>{
+    const ok=await dialogs().confirm({title:'更新配置紀錄',message:'請確認已在 FF14 遊戲內將「'+shipLabel(pending.shipIndex,ship)+'」換成 '+pending.key+'。確認後只更新本工具的配置紀錄。',ok:'已換裝，更新紀錄'});
+    if(!ok)return;
+    recordBuildChange(pending.shipIndex,pending.key);
     renderBuilds();calculate();
    });
-   $('calc-result').querySelector('[data-depart-item-route]')?.addEventListener('click',()=>{
+   $('calc-result').querySelector('[data-depart-item-route]')?.addEventListener('click',async()=>{
     const current=state(),latest=current.ships?.[pending.shipIndex];
-    if(!latest||!latest.registered||latest.voyaging){alert('潛艇狀態已變更，請重新計算。');calculate();return}
-    if(installed(latest)!==pending.key){alert('請先在遊戲內換裝並更新配置紀錄。');return}
+    if(!latest||!latest.registered||latest.voyaging){await dialogs().alert('潛艇狀態已變更，請重新計算。');calculate();return}
+    if(installed(latest)!==pending.key){dialogs().alert('請先在遊戲內換裝並更新配置紀錄。');return}
     const duration=Math.round(Number(pending.route.time));
-    if(!Number.isFinite(duration)||duration<=0){alert('航程時間無效，請重新計算。');return}
-    if(!window.confirm('已在 FF14 中將「'+shipLabel(pending.shipIndex,latest)+'」實際派往「'+routeText+'」嗎？確認後開始計時；燃料與物資會在返航結算時扣除。'))return;
-    const now=Date.now();
-    persist(st=>{const target=st.ships?.[pending.shipIndex];if(!target||target.voyaging)return;target.voyaging=true;target.voyage={departedAt:now,etaAt:now+duration*1000,durationSeconds:duration,route:routeText,build:pending.key,fuelEstimate:Number(pending.route.fuel)||0}});
-    pendingItemDeparture=null;window.dispatchEvent(new Event('submarine-voyage-started'));renderBuilds();calculate();
+    if(!Number.isFinite(duration)||duration<=0){dialogs().alert('航程時間無效，請重新計算。');return}
+    const ok=await dialogs().confirm({title:'確認出航',message:'已在 FF14 中將「'+shipLabel(pending.shipIndex,latest)+'」實際派往「'+routeText+'」嗎？\n確認後開始計時；燃料與物資會在返航結算時扣除。',
+     details:[['航線',routeText],['配置',pending.key],['航行時間',fmtTime(pending.route.time)],['預計返航',fmtEta(Date.now()+duration*1000)],['燃料',pending.route.fuel+' 罐']],ok:'⚓ 確認出航'});
+    if(!ok)return;
+    const route=pending.route,key=pending.key,index=pending.shipIndex;
+    pendingItemDeparture=null;recordDeparture(index,route,routeText,key);renderBuilds();calculate();
    });
   }
   $('calc-result').querySelectorAll('[data-clear-item-route]').forEach(btn=>btn.onclick=()=>{pendingItemDeparture=null;calculate()});
  }
  $('calc-result').querySelectorAll('[data-depart-ship]').forEach(btn=>btn.onclick=()=>{
   const i=Number(btn.dataset.departShip),choice=selected.get(i),current=state(),ship=current.ships?.[i];
-  if(!ship||!ship.registered||ship.voyaging||!choice){alert('船隻狀態已變更，請重新計算航線。');calculate();return;}
-  if(installed(ship)!==choice.key){alert('請先在遊戲中完成換裝，並點選「已在遊戲換裝，更新紀錄」。');return;}
+  if(!ship||!ship.registered||ship.voyaging||!choice){dialogs().alert('船隻狀態已變更，請重新計算航線。').then(calculate);return;}
+  if(installed(ship)!==choice.key){dialogs().alert('請先在遊戲中完成換裝，並點選「已在遊戲換裝，更新紀錄」。');return;}
   const duration=Math.round(Number(choice.route.time));
-  if(!Number.isFinite(duration)||duration<=0){alert('航程時間無效，請重新計算。');return;}
+  if(!Number.isFinite(duration)||duration<=0){dialogs().alert('航程時間無效，請重新計算。');return;}
   const routeText=makeLabel(choice.route.path),label=shipLabel(i,ship);
-  if(!window.confirm('已在 FF14 中將「'+label+'」實際派往「'+routeText+'」嗎？\n確認後開始計時；燃料與物資會在返航結算時扣除。'))return;
-  const now=Date.now();
-  persist(st=>{
-   if(!st.ships?.[i]||st.ships[i].voyaging)return;
-   st.ships[i].voyaging=true;
-   st.ships[i].voyage={departedAt:now,etaAt:now+duration*1000,durationSeconds:duration,route:routeText,build:choice.key,fuelEstimate:Number(choice.route.fuel)||0};
+  dialogs().confirm({title:'確認出航',message:'已在 FF14 中將「'+label+'」實際派往「'+routeText+'」嗎？\n確認後開始計時；燃料與物資會在返航結算時扣除。',
+   details:[['航線',routeText],['配置',choice.key],['航行時間',fmtTime(choice.route.time)],['預計返航',fmtEta(Date.now()+duration*1000)],['燃料',choice.route.fuel+' 罐']],ok:'⚓ 確認出航'}).then(ok=>{
+   if(!ok)return;
+   recordDeparture(i,choice.route,routeText,choice.key);
+   renderBuilds();calculate();
   });
-  window.dispatchEvent(new Event('submarine-voyage-started'));
-  renderBuilds();calculate();
  });
  $('calc-result').querySelectorAll('[data-apply-build]').forEach(btn=>btn.onclick=()=>{
   const i=Number(btn.dataset.applyBuild),next=btn.dataset.newBuild;
   if(!builds[next]||state().ships[i].voyaging)return;
-  persist(st=>{st.ships[i].currentBuild=next});renderBuilds();calculate();
+  recordBuildChange(i,next);renderBuilds();calculate();
  });
 }
 const defaultPlannerSettings={

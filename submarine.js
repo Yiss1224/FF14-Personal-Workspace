@@ -37,6 +37,7 @@ function normalize(saved){
 let state;
 try{state=normalize(JSON.parse(localStorage.getItem(KEY)||'null'))}catch(e){state=fresh()}
 const $=id=>document.getElementById(id);
+const dialogs=()=>window.SubDialog||{confirm:o=>Promise.resolve(window.confirm(o.message||o)),alert:o=>{window.alert(o.message||o);return Promise.resolve(true)},toast:()=>({close(){}})};
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // 以 localStorage 的最新內容取代記憶體副本；資料損毀時保留目前的記憶體狀態。
 function reload(){
@@ -248,17 +249,25 @@ function renderLogs(){
 function renderLogTable(){
  const runs=state.logs.length;
  $('log-table').innerHTML=runs?'<table><thead><tr><th>日期</th><th>艇</th><th>航線</th><th>EXP</th><th>燃料</th><th>修理</th><th>備註</th><th></th></tr></thead><tbody>'+state.logs.slice().reverse().map((l,idx)=>'<tr><td>'+esc(l.date)+'</td><td>'+esc(shipLabel(Number(l.ship)-1,state.ships[Number(l.ship)-1]))+'</td><td>'+esc(l.route)+'</td><td>'+Number(l.exp||0).toLocaleString()+'</td><td>'+Number(l.fuel||0)+'</td><td>'+Number(l.repair||0)+'</td><td>'+(l.kind==='settlement'?'<strong>返航結算 · Rank '+esc(l.rankAfter)+' / EXP '+Number(l.expAfter||0).toLocaleString()+'</strong>；'+(l.openedSectors||[]).map(p=>esc(p.label)).join('、')+'<br>':'')+esc(l.note||'')+'</td><td><button type="button" data-delete="'+(runs-1-idx)+'">刪除</button></td></tr>').join('')+'</tbody></table>':'<div class="empty">還沒有出航紀錄。</div>';
- $('log-table').querySelectorAll('[data-delete]').forEach(el=>el.onclick=()=>{
+ $('log-table').querySelectorAll('[data-delete]').forEach(el=>el.onclick=async()=>{
   const index=+el.dataset.delete,entry=state.logs[index],shown=JSON.stringify(entry);
-  if(entry?.kind==='settlement'&&!confirm('刪除這筆返航結算？會回補消耗物資，但 Rank／EXP 和海圖不會倒回。若需修正可直接在上方手動修改。'))return;
+  if(entry?.kind==='settlement'&&!await dialogs().confirm({title:'刪除返航結算',message:'刪除這筆返航結算？會回補消耗物資，但 Rank／EXP 和海圖不會倒回。若需修正可直接在上方手動修改。',ok:'刪除',danger:true}))return;
   // 依畫面上的紀錄內容在最新資料中定位，避免其他分頁增刪紀錄後刪錯筆。
-  let missing=false;
+  let missing=false,removed=null,removedAt=-1;
   update(s=>{
    const at=JSON.stringify(s.logs[index])===shown?index:s.logs.findIndex(x=>JSON.stringify(x)===shown);
    if(at<0){missing=true;return}
    const l=s.logs.splice(at,1)[0];s.fuel=Number(s.fuel||0)+(Number(l.fuel)||0);s.repair=Number(s.repair||0)+(Number(l.repair)||0);
+   removed=l;removedAt=at;
   });
-  if(missing)alert('這筆紀錄已在其他分頁變更或刪除，畫面已更新為最新資料。');
+  if(missing){dialogs().alert('這筆紀錄已在其他分頁變更或刪除，畫面已更新為最新資料。');return}
+  if(removed)dialogs().toast('已刪除 '+(removed.date||'')+' 的紀錄，物資已回補。',{action:{label:'復原',run(){
+   // 放回原位置並重新扣回當時回補的物資。
+   update(s=>{
+    s.logs.splice(Math.min(removedAt,s.logs.length),0,removed);
+    s.fuel=Math.max(0,Number(s.fuel||0)-(Number(removed.fuel)||0));s.repair=Math.max(0,Number(s.repair||0)-(Number(removed.repair)||0));
+   });
+  }}});
  });
 }
 const logPanel=$('log-table').closest('details');
@@ -299,7 +308,7 @@ function exportBackup(){
   const url=URL.createObjectURL(blob),link=document.createElement('a');
   link.href=url;link.download='ff14-submarine-full-backup-'+new Date().toISOString().slice(0,10)+'.json';
   link.click();URL.revokeObjectURL(url);
- }catch(e){alert('匯出失敗：'+e.message)}
+ }catch(e){dialogs().alert({title:'匯出失敗',message:e.message})}
 }
 function importedState(obj){
  const incoming=obj?.data||obj;
@@ -330,8 +339,8 @@ $('import-data').onchange=async e=>{
   render();
   window.dispatchEvent(new Event('submarine-data-imported'));
   window.dispatchEvent(new Event('submarine-state-updated'));
-  alert('完整備份已匯入：船隊、配件、庫存、海圖及全部航行歷史已還原；如備份包含計算器設定，也已套用。');
- }catch(err){alert('匯入失敗，原始資料未變更：'+err.message)}
+  dialogs().toast('完整備份已匯入：船隊、配件、庫存、海圖及全部航行歷史已還原；如備份包含計算器設定，也已套用。',{tone:'success',timeout:7000});
+ }catch(err){dialogs().alert({title:'匯入失敗',message:'原始資料未變更：'+err.message})}
  e.target.value='';
 };
 render();

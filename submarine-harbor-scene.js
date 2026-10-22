@@ -159,14 +159,23 @@
     haloCache.set(spr,c);return c;
   }
   // Installed parts per submarine, read-only from the planner data (same fallback as the calculator).
-  let builds=['1111','1111','1111','1111'];
+  let builds=['1111','1111','1111','1111'],buildsRead=false;
+  // departed[i]: last seen departure time, so a fresh departure plays its moment once.
+  const departed=[0,0,0,0];
   function readBuilds(){
     try{
       const ships=(JSON.parse(localStorage.getItem('ff14_submarine_planner_v1')||'{}').ships)||[];
-      builds=[0,1,2,3].map(i=>{const s=ships[i]||{},b=String(s.currentBuild||'');return /^[1-5]{4}$/.test(b)?b:((Number(s.rank)||1)<15?'1111':'1121')});
+      const next=[0,1,2,3].map(i=>{const s=ships[i]||{},b=String(s.currentBuild||'');return /^[1-5]{4}$/.test(b)?b:((Number(s.rank)||1)<15?'1111':'1121')});
+      builds=next;
+      ships.forEach((s,i)=>{
+        if(i>3)return;
+        const dep=Number(s?.voyage?.departedAt)||0;
+        if(buildsRead&&dep&&dep!==departed[i]&&s.voyaging&&Date.now()-dep<90000&&animated())departRitual(i);
+        departed[i]=dep;
+      });
+      buildsRead=true;
     }catch(e){}
   }
-  readBuilds();
   const DIGITS={0:['###','#.#','#.#','#.#','###'],1:['.#.','##.','.#.','.#.','###'],2:['##.','..#','.#.','#..','###'],3:['##.','..#','.#.','..#','##.'],4:['#.#','#.#','###','..#','..#'],5:['###','#..','##.','..#','##.'],6:['.##','#..','###','#.#','###'],7:['###','..#','.#.','.#.','.#.'],8:['###','#.#','###','#.#','###'],9:['###','#.#','###','..#','##.']};
   const SHIP_COLORS=['#e8b04a','#5bbfae','#e07a5f','#a493e6'];
   const BASE={o:'#1a2f3c',L:'#a7c6c8',H:'#709cab',D:'#41697b',T:'#4f7889',p:'#c9dcd6',w:'#e9e3b8',f:'#33586a',r:'#33586a'};
@@ -183,6 +192,7 @@
     spriteCache.set(key,c);return c;
   }
 
+  readBuilds();
   /* ---------- geometry from the existing DOM anchors ---------- */
   const boats=[...dock.querySelectorAll('[data-harbor-ship]')];
   let W=0,H=0,w=0,h=0,G=null;
@@ -476,7 +486,67 @@
     rect(g,'#2f4a57',x,y-2,1,2+0);rect(g,'#2f4a57',x+2,y-2+step,1,2-step);
     rect(g,wk.vest,x,y-6,3,4);rect(g,'#f0d2a8',x+(wk.dir>0?1:0),y-8,2,2);rect(g,'#f1c45a',x,y-9,3,1);
     if(wk.carry){rect(g,'#8a5d33',x+(wk.dir>0?2:-2),y-7,3,3);rect(g,'#b07a42',x+(wk.dir>0?3:-1),y-6,1,1)}
+    else if(wk.wave>0){const up=Math.floor(wk.wave*6)%2;rect(g,wk.vest,x+(wk.dir>0?3:-1),y-8+up,1,2);rect(g,'#f0d2a8',x+(wk.dir>0?3:-1),y-9+up,1,1)}
   }
+  // Workers stop and wave toward a berth (departures and returns).
+  function waveAt(x,seconds){
+    for(const wk of workers){if(wk.state==='walk'){wk.target=wk.x;wk.state='idle'}wk.dir=Math.sign(x-wk.x)||wk.dir;wk.wave=seconds;wk.timer=Math.max(wk.timer,seconds+.5)}
+  }
+
+  /* ---------- fleet moments: berth signals, horn steam ---------- */
+  const animated=()=>!reduced()&&!document.hidden;
+  const signals=[],puffs=[];
+  function signalAt(i,color,seconds){for(let k=signals.length-1;k>=0;k--)if(signals[k].i===i)signals.splice(k,1);signals.push({i,color,left:seconds})}
+  function berthX(i){return G&&G.piers[i+1]!==undefined?Math.round((G.piers[i]+G.piers[i+1])/2):null}
+  // Departure: the berth signal turns green, two blasts of steam from the tower, the deck crew waves.
+  function departRitual(i){
+    signalAt(i,'#5fe08a',6);
+    const x=berthX(i);if(x!==null)waveAt(x,3);
+    [0.15,0.9].forEach(at=>setTimeout(()=>{const d=boatState[i]?.draw;if(d)for(let k=0;k<6;k++)puffs.push({x:d.towerX+(Math.random()-.5)*2,y:d.y0-1,vx:(Math.random()-.5)*3+wind,vy:-4-Math.random()*3,life:0,max:1.4+Math.random()*.6})},at*1000));
+    horn();
+  }
+  // Return: amber signal and a wave from the deck crew.
+  function welcome(i){
+    signalAt(i,'#ffc24a',7);
+    const x=berthX(i);if(x!==null)waveAt(x,3.5);
+  }
+  function drawSignals(g,lights,dt,t){
+    for(const sg of signals)sg.left-=dt;
+    for(let k=signals.length-1;k>=0;k--)if(signals[k].left<=0)signals.splice(k,1);
+    for(const sg of signals){
+      const x=berthX(sg.i);if(x===null)continue;
+      const px=x-5,py=G.apronY-5,on=sg.left>1.5||Math.floor(t*4)%2===0;
+      rect(g,'#33464c',px,py+1,1,4);rect(g,'#2a363c',px-1,py-1,3,2);
+      if(on){rect(g,sg.color,px,py-1,1,1);lights.push([px,py-1,4,.9,sg.color])}
+    }
+  }
+  function drawPuffs(g,dt){
+    for(const q of puffs){q.life+=dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy*=.97}
+    for(let k=puffs.length-1;k>=0;k--)if(puffs[k].life>=puffs[k].max)puffs.splice(k,1);
+    for(const q of puffs){const a=(1-q.life/q.max)*.75,sz=1+Math.floor(q.life*1.6);g.fillStyle='rgba(240,244,246,'+a.toFixed(2)+')';g.fillRect(Math.round(q.x),Math.round(q.y),sz,sz)}
+  }
+  // Two short low notes (only with sound on), same voice as the return chime.
+  function horn(){
+    if(!prefs.sound)return;
+    try{
+      audio=audio||new (window.AudioContext||window.webkitAudioContext)();
+      const now=audio.currentTime;
+      [0,.55].forEach(at=>{const o=audio.createOscillator(),gn=audio.createGain();o.type='sawtooth';o.frequency.value=146.8;
+        gn.gain.setValueAtTime(0,now+at);gn.gain.linearRampToValueAtTime(.035,now+at+.05);gn.gain.setValueAtTime(.035,now+at+.35);gn.gain.exponentialRampToValueAtTime(.0001,now+at+.5);
+        o.connect(gn).connect(audio.destination);o.start(now+at);o.stop(now+at+.55)});
+    }catch(e){}
+  }
+  // A settlement shows its most valuable find (by current prices) in the salvage vignette.
+  function findIcon(name){
+    return /戒指|手鐲|耳飾|項鍊/.test(name)?'jewel':/水晶|晶簇/.test(name)?'crystal':/古錢|財寶|寶物/.test(name)?'coin':/樂譜/.test(name)?'scroll':/潛水艇/.test(name)?'part':'chest';
+  }
+  window.addEventListener('submarine-settlement-saved',e=>{
+    const detail=e.detail||{},loot=Array.isArray(detail.loot)?detail.loot:[];
+    if(!loot.length||!events||!events.publicApi.cue||!animated())return;
+    const price=x=>{const p=window.SubmarinePrices?.lookup(x.name)?.price;return (Number.isFinite(p)?p:0)*(Number(x.qty)||0)};
+    const best=loot.slice().sort((a,b)=>price(b)-price(a))[0];
+    events.publicApi.cue('salvage',{i:detail.index,icon:findIcon(String(best.name||'')),name:best.name});
+  });
   function drawFisher(g,t,dt){
     const x=G.dockR-3,y=G.apronY-1;
     rect(g,'#3b5566',x-2,y-3,4,3);rect(g,'#c86f4a',x-2,y-6,3,3);rect(g,'#f0d2a8',x-1,y-8,2,2);rect(g,'#2d5a4a',x-2,y-9,4,1);
@@ -628,9 +698,10 @@
     // Actors are drawn on their own layer so the time-of-day tint applies to them too.
     const g=fx.getContext('2d'),lights=[];g.clearRect(0,0,w,h);
     drawAetheryte(g,t);
-    for(const wk of workers){updateWorker(wk,dt);drawWorker(g,wk)}
+    for(const wk of workers){if(wk.wave>0)wk.wave-=dt;updateWorker(wk,dt);drawWorker(g,wk)}
     drawFisher(g,t,dt);drawSmoke(g,P,dt);
     for(const info of (env?env.boats:boatsInfo()))if(info)drawBoat(g,lights,info,P,t,dt);
+    drawSignals(g,lights,dt,t);drawPuffs(g,dt);
     if(events)events.draw('actors',g,env);
     if(P.tint[3]>0){g.globalCompositeOperation='source-atop';g.fillStyle=css(P.tint,P.tint[3]*.85);g.fillRect(0,0,w,h);g.globalCompositeOperation='source-over'}
     ctx.drawImage(fx,0,0);
@@ -656,7 +727,7 @@
       for(const lx of G.lamps)glow(lx,G.apronY-15,11,.55*P.light*flick,[255,200,120]);
       if(G.aetheryte)glow(G.aetheryte.x,G.aetheryte.y-12,9,.45*P.light,[150,225,255]);
       if(G.office)glow(G.office.win[0]+1,G.office.win[1]+1,6,.5*P.light,[255,190,110]);
-      for(const [lx,ly,r,a] of lights)glow(lx,ly,r,a*P.light,[255,210,130]);
+      for(const [lx,ly,r,a,col] of lights)glow(lx,ly,r,a*(col?Math.max(.4,P.light):P.light),col?hex(col).join(','):[255,210,130]);
       const lhx=far.islet+1,lhy=G.horizonY-14,beam=Math.cos(t*.9);
       glow(lhx,lhy,4+Math.max(0,beam)*5,(.35+Math.max(0,beam)*.55)*P.light,[255,236,170]);
       if(beam>0){const grd=ctx.createLinearGradient(lhx,lhy,lhx-40*beam,lhy);grd.addColorStop(0,'rgba(255,236,170,'+(.22*P.light*beam).toFixed(2)+')');grd.addColorStop(1,'rgba(255,236,170,0)');ctx.fillStyle=grd;ctx.fillRect(lhx-40*beam,lhy-1,40*beam,2)}
@@ -727,6 +798,7 @@
   let audio=null;
   function arrived(i){
     window.dispatchEvent(new CustomEvent('harbor-submarine-arrived',{detail:{index:i}}));
+    welcome(i);
     if(!prefs.sound)return;
     try{
       audio=audio||new (window.AudioContext||window.webkitAudioContext)();
@@ -797,6 +869,7 @@
   // Read-only diagnostics for performance checks.
   window.HarborScene={events:events?events.publicApi:null,
     time:()=>{const E=window.HarborEorzea;return {et:E?E.eorzeaTime(Date.now()):null,hour:nowHour(),weather:weatherId,zone:prefs.zone,sound:Boolean(prefs.sound),builds:builds.slice()}},
+    fleet:()=>({signals:signals.map(s=>({i:s.i,color:s.color})),waving:workers.some(wk=>wk.wave>0),puffs:puffs.length}),
     stats:()=>{const s=frameMs.slice().sort((a,b)=>a-b);return {frames:s.length,medianMs:s[s.length>>1]||0,p95Ms:s[Math.floor(s.length*.95)]||0,artSize:[w,h]}}};
   if(document.readyState==='complete')start();else window.addEventListener('load',start);
 })();

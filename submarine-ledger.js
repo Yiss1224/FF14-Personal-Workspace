@@ -57,7 +57,7 @@ $('ledger-month').onchange=monthly;
 window.addEventListener('submarine-prices-updated',()=>{renderTotal();if($('ledger-details').open)monthly()});
 $('ledger-price-save').onclick=()=>{
  const name=$('ledger-price-name').value.trim(),p=Number($('ledger-price-value').value);
- if(!name||!Number.isSafeInteger(p)||p<0){alert('物品名稱及價格格式不符');return}
+ if(!name||!Number.isSafeInteger(p)||p<0){const msg='物品名稱及價格格式不符';if(window.SubDialog)window.SubDialog.alert(msg);else window.alert(msg);return}
  const s=read();s.lootPrices=s.lootPrices||{};s.lootPrices[name]=p;
  localStorage.setItem(KEY,JSON.stringify(s));renderTotal();monthly();$('ledger-price-status').textContent=name+'：'+p+' Gil／件，已儲存。';
 };

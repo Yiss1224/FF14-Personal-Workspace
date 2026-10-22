@@ -801,11 +801,14 @@
   });
 
   // 25. Salvage: a returned submarine's crew holds up a glinting find, then stows it in a crate.
+  //     Cued after a settlement with the haul's most valuable item (data: {i, icon}); random otherwise.
   def({id:'salvage',name:'打撈品出艙',time:'any',weight:7,cooldown:200,
     can:env=>env.boatDraw.some(d=>d&&d.moored&&d.big&&d.awaiting),
+    cueCan:(env,data)=>{const d=env.boatDraw[data?.i];return Boolean(d&&d.moored&&d.big)},
     setup(e,env){
-      const list=env.boatDraw.filter(d=>d&&d.moored&&d.big&&d.awaiting),d=list[Math.floor(e.r()*list.length)];
-      e.i=d.i;e.dur=11;e.spark=[];e.zones=[['boat'+d.i,0,0]];e.pal=MECH;
+      const list=env.boatDraw.filter(d=>d&&d.moored&&d.big&&d.awaiting),cued=e.data&&env.boatDraw[e.data.i];
+      const d=cued||list[Math.floor(e.r()*list.length)];
+      e.i=d.i;e.dur=11;e.spark=[];e.zones=[['boat'+d.i,0,0]];e.pal=MECH;e.icon=e.data?.icon||'chest';
     },
     update(e,dt,env){const d=env.boatDraw[e.i];if(!d||!d.moored){e.done=true;return}
       if(e.t>2.8&&e.t<7.6&&e.r()<dt*14){const bow=d.flip?d.x0+4:d.x0+d.w-7,ix=bow+(d.flip?-2:4);e.spark.push({x:ix+(e.r()-.5)*7,y:d.y0+3+(e.r()-.5)*4,vx:0,vy:-3,life:0,max:.6,col:'#fff2b0'})}
@@ -821,11 +824,21 @@
         if(t>8.2){px=lerp(bow,hx-1,smooth(seg(t,8.2,9.2)));pose='walk'}
         person(g,{x:px,y:py,dir:t>8.2?-dir:dir,pal:e.pal,pose,frame:Math.floor(t*7)})}
       else{py=lerp(top,top+9,smooth(seg(t,9.2,10.2)));g.save();g.beginPath();g.rect(0,0,env.w,top+1);g.clip();person(g,{x:hx-1,y:py,dir,pal:e.pal,pose:'stand'});g.restore()}
-      if(t>2.8&&t<7.6){const ix=bow+(dir>0?4:-2),iy=deck-5+Math.round(Math.sin(t*3)*.5);R(g,'#8a6a2a',ix-1,iy,4,3);R(g,'#d8b45c',ix-1,iy,4,1);R(g,'#fff2b0',ix+1,iy+1,1,1);
+      if(t>2.8&&t<7.6){const ix=bow+(dir>0?4:-2),iy=deck-5+Math.round(Math.sin(t*3)*.5);drawFind(g,e.icon,ix,iy);
         if(t<5)bubble(g,ix+1,iy-1,'!','#2f7a5a')}
       drawParticles(g,e.spark);
     }
   });
+
+  // Salvage finds by kind, about 4x3 art pixels, top-left at (x,y).
+  function drawFind(g,icon,x,y){
+    if(icon==='jewel'){R(g,'#d8b45c',x,y,3,1);R(g,'#d8b45c',x-1,y+1,1,1);R(g,'#d8b45c',x+3,y+1,1,1);R(g,'#d8b45c',x,y+2,3,1);R(g,'#e85a7a',x+1,y-1,1,1);R(g,'#fff6c8',x+1,y,1,1)}
+    else if(icon==='crystal'){R(g,'#5fc6e8',x+1,y-1,1,1);R(g,'#5fc6e8',x,y,3,2);R(g,'#2f7fb0',x+1,y+2,1,1);R(g,'#d8f6ff',x,y,1,1)}
+    else if(icon==='coin'){R(g,'#b8892a',x-1,y,5,3);R(g,'#f0cf62',x,y,3,1);R(g,'#f0cf62',x-1,y+1,1,1);R(g,'#fff2b0',x+1,y+1,1,1)}
+    else if(icon==='scroll'){R(g,'#efe6c8',x-1,y,5,3);R(g,'#b8862a',x-1,y,1,3);R(g,'#b8862a',x+3,y,1,3);R(g,'#6a5a3a',x,y+1,3,1)}
+    else if(icon==='part'){R(g,'#6f8ea3',x-1,y,5,3);R(g,'#b8ccd2',x,y,3,1);R(g,'#2a4250',x+1,y+1,1,1)}
+    else{R(g,'#8a6a2a',x-1,y,4,3);R(g,'#d8b45c',x-1,y,4,1);R(g,'#fff2b0',x+1,y+1,1,1)}
+  }
 
   /* ============================================================
      Scheduler
@@ -841,12 +854,12 @@
   function overlaps(a,b){return a[0]===b[0]&&a[1]<=b[2]&&b[1]<=a[2]}
   function create(api){
     A=api;
-    const active=[],cooldown={};
+    const active=[],cooldown={},cues=[];
     let clock=0,nextAt=6+Math.random()*6,paused=false,auto=true,lastEnv=null,lastId=null,seedBase=(Date.now()>>>0),lastPlay=null,blockedKey='';
     const byId=Object.fromEntries(DEFS.map(d=>[d.id,d]));
 
-    function instance(d,env,seed){
-      const e={def:d,id:d.id,seed,r:mulberry(seed),t:0,dur:10,zones:[],done:false};
+    function instance(d,env,seed,data){
+      const e={def:d,id:d.id,seed,r:mulberry(seed),t:0,dur:10,zones:[],done:false,data:data||null};
       d.setup(e,env);return e;
     }
     function free(e){return !active.some(o=>o.zones.some(z=>e.zones.some(y=>overlaps(z,y))))}
@@ -889,6 +902,13 @@
         if(e.def.update)e.def.update(e,dt,env);
         if(e.done||e.t>=e.dur)finish(e);
       }
+      // Cued events (driven by fleet actions) start as soon as their space is free; stale cues expire.
+      while(cues.length&&clock-cues[0].at>30)cues.shift();
+      if(cues.length&&active.length<2){
+        const c=cues[0],d=byId[c.id];
+        if(!d||!(d.cueCan?d.cueCan(env,c.data):!d.can||d.can(env)))cues.shift();
+        else{const e=instance(d,env,(seedBase+=7919)>>>0,c.data);if(free(e)){cues.shift();active.push(e);nextAt=Math.max(nextAt,clock+e.dur+8)}}
+      }
       if(auto&&clock>=nextAt){
         const started=tryStart(env);
         // Quiet time after each event; minor events may overlap a running one.
@@ -905,7 +925,9 @@
     function status(){return {paused,auto,clock:+clock.toFixed(1),nextIn:auto?+(nextAt-clock).toFixed(1):null,
       active:active.map(e=>({id:e.id,name:e.def.name,t:+e.t.toFixed(2),dur:+e.dur.toFixed(2),zones:e.zones,focus:e.focus||null,marks:e.marks||null}))}}
     const list=()=>DEFS.map((d,i)=>({no:i+1,id:d.id,name:d.name,time:d.time,weight:d.weight,cooldown:d.cooldown,minor:Boolean(d.minor),rare:Boolean(d.rare)}));
-    const publicApi={list,status};
+    // cue(id, data): play a definition for a real fleet action (e.g. salvage after a settlement).
+    function cue(id,data){if(byId[id]&&cues.length<6)cues.push({id,data:data||null,at:clock})}
+    const publicApi={list,status,cue};
     if(DEV){
       Object.assign(publicApi,{
         play(id,opts={}){

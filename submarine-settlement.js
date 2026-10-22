@@ -117,7 +117,10 @@ function commit(){
    kind:'settlement',date,ship:shipNo,route:$('settle-route').value.trim(),
    exp:gained??0,fuel,repair,note:$('settle-note').value.trim(),
    rankBefore:Number(ship.rank)||1,expBefore:Number(ship.exp)||0,
-   rankAfter:rank,expAfter:exp,openedSectors:newlyOpened,loot
+   rankAfter:rank,expAfter:exp,openedSectors:newlyOpened,loot,
+   // 實際航行秒數與配置，供航線實測效率統計；手動標記的航程沒有這兩項。
+   durationSeconds:Number(ship.voyage?.durationSeconds)>0?Number(ship.voyage.durationSeconds):undefined,
+   build:typeof ship.voyage?.build==='string'?ship.voyage.build:undefined
   });
   s.fuel=Number(s.fuel||0)-fuel;s.repair=Number(s.repair||0)-repair;
   ship.rank=rank;ship.exp=exp;ship.voyaging=false;
@@ -125,7 +128,7 @@ function commit(){
   if(ship.voyage){ship.lastVoyage={...ship.voyage,settledAt:Date.now()};delete ship.voyage}
   for(const p of newlyOpened)s.unlocks['sector-'+p.id]=true;
   localStorage.setItem(KEY,JSON.stringify(s));
-  window.dispatchEvent(new Event('submarine-settlement-saved'));
+  window.dispatchEvent(new CustomEvent('submarine-settlement-saved',{detail:{index:shipNo-1,loot,rankBefore:s.logs.at(-1).rankBefore,rankAfter:rank}}));
   window.dispatchEvent(new Event('submarine-state-updated'));
   clearForm();
   justSaved=true;
