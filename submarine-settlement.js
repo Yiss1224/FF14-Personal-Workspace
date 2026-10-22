@@ -2,7 +2,7 @@
 'use strict';
 const KEY='ff14_submarine_planner_v1';
 const $=id=>document.getElementById(id);
-const labels={1:'溺沒海',2:'灰海',3:'翠浪海'};
+const labels=window.SubmarineMapNames||{1:'溺沒海',2:'灰海',3:'翠浪海',4:'塞壬海',5:'紫礁海',6:'南蒼茫洋',7:'北洋'};
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let sectors=null,chosen=new Set(),justSaved=false;
 function today(){
@@ -59,7 +59,7 @@ function refreshPoints(){
  }
  const s=read();
  const available=sectors.filter(p=>!opened(p,s)&&!chosen.has(p.id));
- const opts=[1,2,3].map(map=>{
+ const opts=Object.keys(labels).map(Number).map(map=>{
   const here=available.filter(p=>p.map===map);
   return here.length?'<optgroup label="'+labels[map]+'">'+here.map(p=>
     '<option value="'+p.id+'">'+esc(p.letter)+'（Rank '+p.rank+'）</option>').join('')+'</optgroup>':'';
@@ -156,11 +156,11 @@ function init(){
  });
  window.addEventListener('submarine-data-imported',()=>{justSaved=false;refreshShipOptions();clearForm();status('已載入備份；返航結算已切換到匯入的船隊資料。')});
  refreshShip();refreshPoints();
- fetch('submarine-route-data.json').then(r=>{
+ fetch('submarine-route-data.json?v=20261022-seas2').then(r=>{
   if(!r.ok)throw new Error('HTTP '+r.status);
   return r.json();
  }).then(data=>{
-  sectors=(data.sectors||[]).filter(p=>[1,2,3].includes(p.map))
+  sectors=(data.sectors||[]).filter(p=>labels[p.map])
    .map(p=>({id:Number(p.id),map:Number(p.map),letter:String(p.letter),rank:Number(p.rank)}));
   refreshPoints();
  }).catch(e=>{
