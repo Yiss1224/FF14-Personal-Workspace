@@ -1,6 +1,6 @@
 # FF14 Personal Workspace
 
-個人用的 FF14 日課、練等與釣魚進度工具。純前端，可放在 GitHub Pages；資料存在瀏覽器 `localStorage`，可匯出／匯入完整備份，之後可接上自架伺服器（`server/`）同步多裝置。
+個人用的 FF14 日課、練等與釣魚進度工具。純前端，可放在 GitHub Pages；資料存在瀏覽器 `localStorage`，可匯出／匯入完整備份；目前過渡期沿用 Supabase 帳號同步，之後改接自架伺服器（`server/`）。
 
 ## 目前功能
 
@@ -47,7 +47,8 @@
 - 資料備份與同步
   - 首頁頂端「匯出備份／匯入備份」涵蓋 Daily、練等設定、今晚排程、釣魚歷史、已知魚 ID、跳過清單、魚餌狀態與釣魚 UI 偏好
   - 潛水艇頁保留原本的完整 JSON 備份
-  - 在 `ff14-config.js` 填入 `apiBase` 並設定同步金鑰後，兩頁都會與自架伺服器同步（預設關閉）
+  - 過渡期：首頁「登入同步」沿用原本的 Supabase 帳號，首頁與潛水艇頁都會同步（`ff14-supabase-remote.js`）
+  - 自架伺服器上線後：`ff14-config.js` 填入 `apiBase`、刪掉 `supabase` 設定，再在首頁按「同步金鑰」輸入金鑰
 
 ## 資料來源與限制
 
@@ -84,7 +85,10 @@
 - `SCOPES` 登記每一頁的資料鍵：`workspace`（首頁）與 `submarine`（潛水艇頁）。新增需要保存或同步的資料時，把鍵加到這裡。
 - `read / write / readRaw / writeRaw`：讀寫本機資料；舊模組直接呼叫 `localStorage.setItem` 也會被攔截並通知同步層。
 - `snapshot / restore / exportBackup / parseBackup`：整頁快照、還原與備份格式 `{app, schema, scope, exportedAt, data}`；也接受舊 Supabase 同步的「資料鍵在最上層」格式。
-- `sync`：遠端同步插槽。`ff14-config.js` 的 `apiBase` 留空為純本機模式；填入網址後，頁面載入時先從伺服器讀取，伺服器沒有資料就上傳本機資料，之後每次修改 0.8 秒後自動上傳。
+- `sync`：遠端同步插槽，介面只有 `pull(scope)` 與 `push(scope, data)`。頁面載入時先從遠端讀取，遠端沒有這一頁的資料就上傳本機資料，之後每次修改 0.8 秒後自動上傳。
+  - `ff14-config.js` 的 `apiBase` 有值：使用自架伺服器（`createHttpRemote`）。
+  - 只有 `supabase` 有值：過渡期使用原本的 Supabase 資料表 `user_workspace_state`（`ff14-supabase-remote.js`），兩頁共用同一列，各自只合併自己的資料鍵，不需改資料庫。
+  - 兩者皆空：純本機模式。
 - 快取類資料（魚類目錄、台服名詞、地圖快取等）不登記，不會進備份或同步。
 
 伺服器 API 與甲骨文部署方式見 [server/README.md](server/README.md)。
