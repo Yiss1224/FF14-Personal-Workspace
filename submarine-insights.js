@@ -7,7 +7,7 @@ const $=id=>document.getElementById(id);
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const details=$('ledger-details'),trend=$('ledger-trend'),table=$('route-efficiency');
 if(!details||!trend||!table)return;
-function read(){try{return JSON.parse(localStorage.getItem(KEY)||'null')||{}}catch(e){return {}}}
+function read(){try{return JSON.parse(FF14Data.readRaw(KEY)||'null')||{}}catch(e){return {}}}
 function unitPrice(name,s){
  const found=window.SubmarinePrices?.lookup(name)?.price;
  if(typeof found==='number'&&Number.isFinite(found))return found;

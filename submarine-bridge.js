@@ -11,7 +11,7 @@ const MAP_IDS=Object.fromEntries(Object.entries(window.SubmarineMapNames||{1:'�
 const BASE_TITLE=document.title;
 let rankXp=null;
 
-function read(){try{return JSON.parse(localStorage.getItem(KEY)||'null')||{}}catch(e){return {}}}
+function read(){try{return JSON.parse(FF14Data.readRaw(KEY)||'null')||{}}catch(e){return {}}}
 function fleet(s){return [0,1,2,3].map(i=>({registered:i===0,rank:1,exp:0,name:'',...(s.ships?.[i]||{})}))}
 function label(i,ship){const name=typeof ship?.name==='string'?ship.name.trim():'';return '潛水艇 '+(i+1)+(name?' · '+name:'')}
 function buildOf(ship){const code=String(ship.currentBuild||'');return /^[1-5]{4}$/.test(code)?code:((Number(ship.rank)||1)<15?'1111':'1121')}

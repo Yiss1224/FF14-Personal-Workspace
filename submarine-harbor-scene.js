@@ -63,8 +63,8 @@
 
   /* ---------- weather of the chosen housing district ---------- */
   const PREFS_KEY='ff14_harbor_prefs';
-  const readPrefs=()=>{try{return Object.assign({zone:'mist',sound:false},JSON.parse(localStorage.getItem(PREFS_KEY)||'{}'))}catch(e){return {zone:'mist',sound:false}}};
-  const writePrefs=p=>{try{localStorage.setItem(PREFS_KEY,JSON.stringify(p))}catch(e){}};
+  const readPrefs=()=>{try{return Object.assign({zone:'mist',sound:false},JSON.parse(FF14Data.readRaw(PREFS_KEY)||'{}'))}catch(e){return {zone:'mist',sound:false}}};
+  const writePrefs=p=>{try{FF14Data.writeRaw(PREFS_KEY,JSON.stringify(p))}catch(e){}};
   let prefs=readPrefs();
   let forcedWeather=(()=>{const v=new URLSearchParams(location.search).get('harbor-weather');return v||null})();
   // Targets per weather; the scene eases toward them so changes blend over a few seconds.
@@ -164,7 +164,7 @@
   const departed=[0,0,0,0];
   function readBuilds(){
     try{
-      const ships=(JSON.parse(localStorage.getItem('ff14_submarine_planner_v1')||'{}').ships)||[];
+      const ships=(JSON.parse(FF14Data.readRaw('ff14_submarine_planner_v1')||'{}').ships)||[];
       const next=[0,1,2,3].map(i=>{const s=ships[i]||{},b=String(s.currentBuild||'');return /^[1-5]{4}$/.test(b)?b:((Number(s.rank)||1)<15?'1111':'1121')});
       builds=next;
       ships.forEach((s,i)=>{

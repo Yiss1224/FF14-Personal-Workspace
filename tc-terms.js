@@ -1,50 +1,3 @@
-const FF14_SUPABASE_URL='https://sxfvfiukywcgteioxsva.supabase.co';
-const FF14_SUPABASE_KEY='sb_publishable_lgNIyKPIds4TFc7H23xIlA_HSAv1Q9f';
-const FF14_SYNC_KEYS=['roulettes','dailyDone','levelPlan','levelJobs','levelSchedulerSettings','levelMultiPlan','tonightSettings','tonightPlan','fishHistory','fishTarget','fishCurrentCount','fishcakeCaughtIds','fishCaughtIds','fishSkippedIds','fishUniversalLureOverrides','fishBaitOwned','fishBaitNotes','fishBiteTimeOverrides','fishBaitOnlyRequired','fishRouteReadyOnly'];
-let ff14Client=null,ff14User=null,ff14Saving=false,ff14Loading=false,ff14SyncTimer=null;
-
-function syncStatus(t){const el=document.getElementById('sync-status');if(el)el.textContent=t}
-function ensureClient(){if(!ff14Client)ff14Client=window.supabase.createClient(FF14_SUPABASE_URL,FF14_SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});return ff14Client}
-function cloudSnapshot(){const p={};for(const k of FF14_SYNC_KEYS){const raw=localStorage.getItem(k);if(raw!==null){try{p[k]=JSON.parse(raw)}catch{}}}return p}
-function rerenderCloudState(){
-  for(const name of ['renderFF14All','renderLevelScheduler','renderTonightPlanner','renderFishingGuide']){
-    try{const fn=window[name];if(typeof fn==='function')fn()}catch(e){console.error(`cloud rerender failed: ${name}`,e)}
-  }
-}
-function applyCloudSnapshot(p){if(!p||typeof p!=='object')return false;let changed=false;for(const k of FF14_SYNC_KEYS){if(!Object.prototype.hasOwnProperty.call(p,k))continue;const next=JSON.stringify(p[k]),prev=localStorage.getItem(k);if(prev!==next){nativeSetItem(k,next);changed=true}}if(changed)rerenderCloudState();return changed}
-function authUi(){const login=document.getElementById('sync-login'),now=document.getElementById('sync-now'),logout=document.getElementById('sync-logout');if(ff14User){login.hidden=true;now.hidden=false;logout.hidden=false;syncStatus(ff14User.email||'已登入')}else{login.hidden=false;now.hidden=true;logout.hidden=false;logout.hidden=true;syncStatus('未登入')}}
-async function cloudSave(){
-  const c=ensureClient();if(!ff14User||ff14Saving||ff14Loading)return;ff14Saving=true;syncStatus('同步中…');
-  try{const{error}=await c.from('user_workspace_state').upsert({user_id:ff14User.id,payload:cloudSnapshot(),updated_at:new Date().toISOString()},{onConflict:'user_id'});if(error)throw error;syncStatus(`已同步 ${new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}`)}
-  catch(e){console.error('cloud save failed',e);syncStatus('同步失敗')}
-  finally{ff14Saving=false}
-}
-async function cloudLoad(){
-  const c=ensureClient();if(!ff14User||ff14Loading)return;ff14Loading=true;syncStatus('讀取雲端…');let seedCloud=false;
-  try{
-    const{data,error}=await c.from('user_workspace_state').select('payload,updated_at').eq('user_id',ff14User.id).maybeSingle();if(error)throw error;
-    if(data?.payload){applyCloudSnapshot(data.payload);syncStatus(`雲端已載入 ${data.updated_at?new Date(data.updated_at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}):''}`)}else seedCloud=true;
-  }catch(e){console.error('cloud load failed',e);syncStatus('讀取失敗')}
-  finally{ff14Loading=false}
-  if(seedCloud)await cloudSave();
-}
-async function initCloud(){
-  try{const c=ensureClient(),{data,error}=await c.auth.getSession();if(error)throw error;ff14User=data.session?.user||null;authUi();if(ff14User)await cloudLoad();c.auth.onAuthStateChange((event,session)=>{ff14User=session?.user||null;authUi();if(event==='SIGNED_IN'&&ff14User)setTimeout(()=>cloudLoad(),0)})}
-  catch(e){console.error('cloud init failed',e);ff14Loading=false;syncStatus('雲端初始化失敗')}
-}
-window.addEventListener('DOMContentLoaded',()=>{
-  const panel=document.getElementById('auth-panel'),email=document.getElementById('auth-email'),password=document.getElementById('auth-password'),msg=document.getElementById('auth-message');
-  document.getElementById('sync-login').onclick=()=>panel.hidden=false;
-  document.getElementById('auth-cancel').onclick=()=>panel.hidden=true;
-  document.getElementById('sync-now').onclick=cloudSave;
-  document.getElementById('sync-logout').onclick=async()=>{await ensureClient().auth.signOut();ff14User=null;authUi()};
-  document.getElementById('auth-signin').onclick=async()=>{msg.textContent='登入中…';const{data,error}=await ensureClient().auth.signInWithPassword({email:email.value.trim(),password:password.value});if(error){msg.textContent=error.message;return}ff14User=data.user;msg.textContent='登入成功';panel.hidden=true;authUi();await cloudLoad()};
-  document.getElementById('auth-signup').onclick=async()=>{msg.textContent='建立帳號中…';const{data,error}=await ensureClient().auth.signUp({email:email.value.trim(),password:password.value});if(error){msg.textContent=error.message;return}msg.textContent=data.session?'帳號已建立並登入。':'帳號已建立。若收到驗證信，完成驗證後再回來登入。';if(data.session){ff14User=data.user;panel.hidden=true;authUi();await cloudLoad()}};
-  initCloud();
-});
-const nativeSetItem=localStorage.setItem.bind(localStorage);
-localStorage.setItem=function(k,v){nativeSetItem(k,v);if(FF14_SYNC_KEYS.includes(k)&&ff14User&&!ff14Loading){clearTimeout(ff14SyncTimer);ff14SyncTimer=setTimeout(cloudSave,800)}};
-
 // ---- Taiwan Traditional Chinese display layer ----
 const FF14_TC_CACHE_KEY='ff14TcTermCacheV1';
 const FF14_TC_CACHE_MS=30*24*60*60*1000;
@@ -53,7 +6,7 @@ const FF14_EN_BASE='https://raw.githubusercontent.com/xivapi/ffxiv-datamining/ma
 let ff14TcBusy=false,ff14TcObserver=null,ff14TcApplyTimer=null,ff14TcApplying=false;
 let ff14TcCache={ts:0,items:{},places:{},weather:{},itemEnglish:{}};
 function ff14TcLoadCache(){try{const x=JSON.parse(localStorage.getItem(FF14_TC_CACHE_KEY)||'null');if(x&&typeof x==='object')ff14TcCache={ts:Number(x.ts)||0,items:x.items||{},places:x.places||{},weather:x.weather||{},itemEnglish:x.itemEnglish||{}}}catch{}return ff14TcCache}
-function ff14TcSaveCache(){try{nativeSetItem(FF14_TC_CACHE_KEY,JSON.stringify(ff14TcCache))}catch(e){console.warn('TC term cache save failed',e)}}
+function ff14TcSaveCache(){try{localStorage.setItem(FF14_TC_CACHE_KEY,JSON.stringify(ff14TcCache))}catch(e){console.warn('TC term cache save failed',e)}}
 function ff14TcCsvLine(line){const out=[];let cur='',quoted=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(quoted&&line[i+1]==='"'){cur+='"';i++}else quoted=!quoted}else if(c===','&&!quoted){out.push(cur);cur=''}else cur+=c}out.push(cur);return out}
 function ff14TcCsvMeta(text){const lines=String(text||'').replace(/^\uFEFF/,'').split(/\r?\n/),heads=ff14TcCsvLine(lines[1]||'');let nameIndex=heads.indexOf('Name');if(nameIndex<0)nameIndex=heads.indexOf('Singular');if(nameIndex<0)nameIndex=1;return{lines,nameIndex}}
 function ff14TcNamesById(text,neededIds=null){const{lines,nameIndex}=ff14TcCsvMeta(text),out={};for(let i=3;i<lines.length;i++){if(!lines[i])continue;const row=ff14TcCsvLine(lines[i]),id=Number(row[0]);if(!Number.isFinite(id))continue;if(neededIds&&!neededIds.has(id))continue;const name=String(row[nameIndex]||'').trim();if(name)out[id]=name}return out}

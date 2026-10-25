@@ -9,7 +9,7 @@
   }
   function renderOverview() {
     let data = null;
-    try { data = JSON.parse(localStorage.getItem(KEY) || 'null'); }
+    try { data = JSON.parse(FF14Data.readRaw(KEY) || 'null'); }
     catch (_) { /* Invalid backups should not break the interface. */ }
     // Mirror initial values from the existing fleet's fresh defaults.
     const ships = Array.isArray(data?.ships) ? data.ships : [{registered:true,rank:1},{},{},{}];

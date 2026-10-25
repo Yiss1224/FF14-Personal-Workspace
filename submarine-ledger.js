@@ -3,7 +3,7 @@
 const KEY='ff14_submarine_planner_v1',$=id=>document.getElementById(id);
 let loot=[];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const read=()=>JSON.parse(localStorage.getItem(KEY)||'{}');
+const read=()=>JSON.parse(FF14Data.readRaw(KEY)||'{}');
 function renderTotal(){
  let total=0,missing=new Set();
  for(const x of loot){
@@ -59,7 +59,7 @@ $('ledger-price-save').onclick=()=>{
  const name=$('ledger-price-name').value.trim(),p=Number($('ledger-price-value').value);
  if(!name||!Number.isSafeInteger(p)||p<0){const msg='物品名稱及價格格式不符';if(window.SubDialog)window.SubDialog.alert(msg);else window.alert(msg);return}
  const s=read();s.lootPrices=s.lootPrices||{};s.lootPrices[name]=p;
- localStorage.setItem(KEY,JSON.stringify(s));renderTotal();monthly();$('ledger-price-status').textContent=name+'：'+p+' Gil／件，已儲存。';
+ FF14Data.writeRaw(KEY,JSON.stringify(s));renderTotal();monthly();$('ledger-price-status').textContent=name+'：'+p+' Gil／件，已儲存。';
 };
 render();
 })();

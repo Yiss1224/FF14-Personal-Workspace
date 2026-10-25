@@ -11,7 +11,7 @@ function today(){
 }
 function read(){
  try{
-  const raw=JSON.parse(localStorage.getItem(KEY)||'null')||{};
+  const raw=JSON.parse(FF14Data.readRaw(KEY)||'null')||{};
   return {
    ...raw,
    ships:Array.from({length:4},(_,i)=>({
@@ -127,7 +127,7 @@ function commit(){
   // 已結算的航程不再作為進行中航程；保留為 lastVoyage，避免之後手動標記出航時誤用舊計時。
   if(ship.voyage){ship.lastVoyage={...ship.voyage,settledAt:Date.now()};delete ship.voyage}
   for(const p of newlyOpened)s.unlocks['sector-'+p.id]=true;
-  localStorage.setItem(KEY,JSON.stringify(s));
+  FF14Data.writeRaw(KEY,JSON.stringify(s));
   window.dispatchEvent(new CustomEvent('submarine-settlement-saved',{detail:{index:shipNo-1,loot,rankBefore:s.logs.at(-1).rankBefore,rankAfter:rank}}));
   window.dispatchEvent(new Event('submarine-state-updated'));
   clearForm();

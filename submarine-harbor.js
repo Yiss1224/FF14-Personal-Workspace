@@ -20,7 +20,7 @@
   }
   const motion=window.matchMedia?window.matchMedia('(prefers-reduced-motion: reduce)'):null;
   const reduced=()=>Boolean(motion&&motion.matches);
-  function read(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch{return {}}}
+  function read(){try{return JSON.parse(FF14Data.readRaw(KEY)||'{}')||{}}catch{return {}}}
   function fmt(ms){return new Date(ms).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})}
   fleetEl.innerHTML=starts.map((start,i)=>
     '<div class="harbor-submarine" data-harbor-ship="'+i+'" style="left:'+start+
