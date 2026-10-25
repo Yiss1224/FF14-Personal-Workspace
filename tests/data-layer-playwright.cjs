@@ -14,19 +14,6 @@ const server=require('../server/server.js');
   const browser=await chromium.launch();
   // 外部資料來源與本測試無關，全部擋掉以免拖慢或不穩定。
   const isolate=async ctx=>ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/,r=>r.abort());
-  const localOnly=async ctx=>ctx.route('**/ff14-config.js*',r=>r.fulfill({contentType:'text/javascript',body:'window.FF14_CONFIG={apiBase:""};'}));
-  // 過渡期 Supabase 同步：以假的 supabase-js 取代 CDN 套件，資料列存在測試程序的記憶體裡。
-  const fakeDb={row:null};
-  const FAKE_LIB=`window.supabase={createClient(){const listeners=[];let session=JSON.parse(localStorage.getItem('fake-session')||'null');
-   const db=async(method,body)=>{const r=await fetch('/__fakedb',{method,body:body&&JSON.stringify(body)});return r.json()};
-   return{auth:{getSession:async()=>({data:{session},error:null}),onAuthStateChange(fn){listeners.push(fn)},
-    signInWithPassword:async({email})=>{session={user:{id:'u1',email}};localStorage.setItem('fake-session',JSON.stringify(session));listeners.forEach(f=>f('SIGNED_IN',session));return{data:{user:session.user,session},error:null}},
-    signOut:async()=>{session=null;localStorage.removeItem('fake-session');listeners.forEach(f=>f('SIGNED_OUT',null));return{error:null}}},
-    from(){return{select(){return{eq(){return{maybeSingle:async()=>({data:await db('GET'),error:null})}}}},upsert:async row=>{await db('POST',row);return{error:null}}}}}}};`;
-  const withFakeSupabase=async ctx=>{
-    await ctx.route(/supabase-js/,r=>r.fulfill({contentType:'text/javascript',body:FAKE_LIB}));
-    await ctx.route('**/__fakedb',r=>{if(r.request().method()==='POST')fakeDb.row=JSON.parse(r.request().postData());r.fulfill({contentType:'application/json',body:JSON.stringify(fakeDb.row)})});
-  };
   const withSync=async ctx=>{
     await ctx.route('**/ff14-config.js*',r=>r.fulfill({contentType:'text/javascript',body:`window.FF14_CONFIG={apiBase:${JSON.stringify(base)}};`}));
     await ctx.addInitScript(()=>localStorage.setItem('ff14ApiToken','test-token'));
@@ -34,18 +21,18 @@ const server=require('../server/server.js');
   let failed=false;
   const step=async(name,fn)=>{try{await fn();console.log('PASS',name)}catch(e){failed=true;console.error('FAIL',name,'\n',e)}};
   try{
-    await step('未設定同步時為純本機模式，不載入 Supabase',async()=>{
+    await step('首頁不再載入 Supabase，預設為本機模式',async()=>{
       const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
-      assert.ok(!/supabase-js|supabase\.co/i.test(html),'index.html 不應直接載入 Supabase');
+      assert.ok(!/supabase/i.test(html),'index.html 仍提到 Supabase');
       assert.ok(!fs.existsSync(path.join(ROOT,'cloud.js')),'cloud.js 應已移除');
-      const ctx=await browser.newContext();await isolate(ctx);await localOnly(ctx);
+      const ctx=await browser.newContext();await isolate(ctx);
       const page=await ctx.newPage(),requests=[],errors=[];
       page.on('request',r=>requests.push(r.url()));
       page.on('pageerror',e=>errors.push(e.message));
       await page.goto(base+'/index.html');
       await page.waitForFunction(()=>window.FF14Data&&document.getElementById('sync-status'));
       assert.equal(await page.textContent('#sync-status'),'本機模式');
-      assert.ok(!requests.some(u=>/supabase-js|supabase\.co/i.test(u)),'仍有 Supabase 請求');
+      assert.ok(!requests.some(u=>/supabase/i.test(u)),'仍有 Supabase 請求');
       assert.equal(await page.evaluate(()=>typeof window.ff14TcItemText),'function','台服繁中名詞層應保留');
       await page.waitForTimeout(500);
       assert.deepEqual(errors.filter(m=>/supabase|FF14Data|sync-|auth-/i.test(m)),[],'資料層相關錯誤：'+errors.join(' | '));
@@ -54,7 +41,7 @@ const server=require('../server/server.js');
     });
 
     await step('首頁完整備份可匯出再匯入到另一台裝置',async()=>{
-      const ctx=await browser.newContext({acceptDownloads:true});await isolate(ctx);await localOnly(ctx);
+      const ctx=await browser.newContext({acceptDownloads:true});await isolate(ctx);
       const page=await ctx.newPage();
       await page.addInitScript(()=>{if(!sessionStorage.getItem('seeded')){localStorage.setItem('fishCaughtIds','[101,202]');localStorage.setItem('levelPlan','{"job":"PLD","from":50,"to":60}');localStorage.setItem('fishCatalog','[]');sessionStorage.setItem('seeded','1')}});
       await page.goto(base+'/index.html');await page.waitForFunction(()=>window.FF14Data);
@@ -67,7 +54,7 @@ const server=require('../server/server.js');
       assert.ok(!('fishCatalog' in backup.data),'快取資料不應進備份');
       await ctx.close();
 
-      const other=await browser.newContext();await isolate(other);await localOnly(other);
+      const other=await browser.newContext();await isolate(other);
       const p2=await other.newPage();await p2.goto(base+'/index.html');await p2.waitForFunction(()=>window.FF14Data);
       p2.on('dialog',d=>d.accept());
       await p2.setInputFiles('#workspace-backup-file',file);
@@ -128,35 +115,6 @@ const server=require('../server/server.js');
       const b=await browser.newContext();await isolate(b);await withSync(b);
       const pb=await b.newPage();await pb.goto(base+'/submarine.html');
       await pb.waitForFunction(()=>(localStorage.getItem('ff14_submarine_planner_v1')||'').includes('同步測試號'));
-      await b.close();
-    });
-    await step('過渡期 Supabase：登入後載入舊雲端資料，兩頁共用同一列且互不覆寫',async()=>{
-      // 舊版 cloud.js 存的格式：首頁資料鍵直接放在 payload 最上層。
-      fakeDb.row={user_id:'u1',payload:{fishSkippedIds:[5],roulettes:{expert:true}},updated_at:'2026-10-01T00:00:00Z'};
-      const a=await browser.newContext();await isolate(a);await withFakeSupabase(a);
-      const pa=await a.newPage();await pa.goto(base+'/index.html');
-      await pa.waitForFunction(()=>/未登入/.test(document.getElementById('sync-status').textContent));
-      assert.equal(await pa.isVisible('#sync-login'),true);
-      await pa.click('#sync-login');await pa.fill('#auth-email','me@example.com');await pa.fill('#auth-password','secret1');await pa.click('#auth-signin');
-      await pa.waitForFunction(()=>localStorage.getItem('fishSkippedIds')==='[5]');
-      assert.equal(await pa.isVisible('#sync-logout'),true);
-      // 同一個瀏覽器開潛水艇頁：沿用登入，伺服器尚無潛艇資料，就把本機資料上傳。
-      const ps=await a.newPage();await ps.goto(base+'/submarine.html');
-      for(let i=0;i<40&&!fakeDb.row.payload.ff14_submarine_planner_v1;i++)await new Promise(r=>setTimeout(r,150));
-      assert.ok(fakeDb.row.payload.ff14_submarine_planner_v1,'潛艇資料未上傳');
-      assert.deepEqual(fakeDb.row.payload.fishSkippedIds,[5],'潛艇頁上傳覆寫了首頁資料');
-      // 首頁修改後上傳，潛艇資料保留。
-      await pa.evaluate(()=>FF14Data.write('fishSkippedIds',[5,6]));
-      for(let i=0;i<40&&JSON.stringify(fakeDb.row.payload.fishSkippedIds)!=='[5,6]';i++)await new Promise(r=>setTimeout(r,150));
-      assert.deepEqual(fakeDb.row.payload.fishSkippedIds,[5,6]);
-      assert.ok(fakeDb.row.payload.ff14_submarine_planner_v1,'首頁上傳覆寫了潛艇資料');
-      await a.close();
-      // 另一台已登入的裝置開潛水艇頁，取得船隊資料。
-      fakeDb.row.payload.ff14_submarine_planner_v1.ships[0].name='過渡同步號';
-      const b=await browser.newContext();await isolate(b);await withFakeSupabase(b);
-      await b.addInitScript(()=>localStorage.setItem('fake-session',JSON.stringify({user:{id:'u1',email:'me@example.com'}})));
-      const pb=await b.newPage();await pb.goto(base+'/submarine.html');
-      await pb.waitForFunction(()=>(localStorage.getItem('ff14_submarine_planner_v1')||'').includes('過渡同步號'));
       await b.close();
     });
   }finally{

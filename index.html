@@ -10,22 +10,14 @@
   <link rel="stylesheet" href="fishing-guide.css?v=20260827-1245">
   <script src="ff14-config.js?v=20261025-data"></script>
   <script src="ff14-data.js?v=20261025-data" data-scope="workspace"></script>
-  <script src="ff14-supabase-remote.js?v=20261025-data"></script>
   <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
 <style>.tab-link{display:inline-block;padding:10px 14px;text-decoration:none;color:inherit;border-radius:8px;background:#eef2f8;margin:6px}@media(prefers-color-scheme:dark){.tab-link{background:#303845}}</style>
 </head>
 <body>
   <header>
     <div><h1>FF14 Personal Workspace</h1><p>日課、練等、釣魚進度集中管理 · v2026.09.07.54</p></div>
-    <div id="sync-box" class="sync-box"><span id="sync-status">本機模式</span><button id="workspace-export" title="下載首頁全部進度（日課、練等、今晚、釣魚）">匯出備份</button><button id="workspace-import" title="用備份檔覆蓋這台裝置的首頁進度">匯入備份</button><button id="sync-token" hidden>同步金鑰</button><button id="sync-login" hidden>登入同步</button><button id="sync-now" hidden>立即同步</button><button id="sync-logout" hidden>登出</button><input id="workspace-backup-file" type="file" accept="application/json,.json" hidden></div>
+    <div id="sync-box" class="sync-box"><span id="sync-status">本機模式</span><button id="workspace-export" title="下載首頁全部進度（日課、練等、今晚、釣魚）">匯出備份</button><button id="workspace-import" title="用備份檔覆蓋這台裝置的首頁進度">匯入備份</button><button id="sync-token" hidden>同步金鑰</button><input id="workspace-backup-file" type="file" accept="application/json,.json" hidden></div>
   </header>
-  <div id="auth-panel" class="auth-panel" hidden>
-    <h3>雲端同步（過渡期）</h3>
-    <label>Email <input id="auth-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
-    <label>密碼 <input id="auth-password" type="password" autocomplete="current-password" minlength="6"></label>
-    <div class="row"><button id="auth-signin">登入</button><button id="auth-cancel">取消</button></div>
-    <div id="auth-message" class="muted">自架伺服器上線前，暫時沿用原本的 Supabase 帳號同步首頁與潛水艇頁；資料仍會先存在本機。</div>
-  </div>
 
   <nav>
     <button class="active" data-tab="dashboard">首頁</button>

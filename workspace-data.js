@@ -13,10 +13,7 @@ window.addEventListener('ff14-data-restored',e=>{if(!e.detail?.scope||e.detail.s
 window.addEventListener('ff14-sync-status',e=>status(e.detail.text));
 window.addEventListener('DOMContentLoaded',()=>{
  const data=window.FF14Data,file=$('workspace-backup-file');
- if(data.sync.enabled)status(data.sync.status);
- else if(data.config.apiBase)status('尚未設定同步金鑰');
- else if(data.config.supabase?.url)status('連線中…');
- else status('本機模式');
+ status(data.sync.enabled?data.sync.status:(data.config.apiBase?'尚未設定同步金鑰':'本機模式'));
  $('workspace-export').onclick=()=>{const p=data.downloadBackup(SCOPE,`ff14-workspace-backup-${new Date().toISOString().slice(0,10)}.json`);status(`已匯出 ${Object.keys(p.data).length} 項資料`)};
  $('workspace-import').onclick=()=>file.click();
  file.onchange=async e=>{

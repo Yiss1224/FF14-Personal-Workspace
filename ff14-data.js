@@ -97,14 +97,11 @@ async function pull(){
  // 伺服器上還沒有資料時，以這台裝置的資料做為初始值。
  if(seed)await push();
 }
-// 本機修改 0.8 秒後自動上傳；只有連線中的 scope 會送出。
-listeners.add(d=>{if(sync.remote&&d.scope===sync.scope&&d.source==='local'){clearTimeout(sync.timer);sync.timer=setTimeout(push,800)}});
 function connect(remote,scope){
- if(!SCOPES[scope])throw new Error('未知的資料範圍：'+scope);
  sync.remote=remote;sync.scope=scope;
+ listeners.add(d=>{if(d.scope===scope&&d.source==='local'&&sync.remote){clearTimeout(sync.timer);sync.timer=setTimeout(push,800)}});
  return pull();
 }
-function disconnect(text='本機模式'){clearTimeout(sync.timer);sync.remote=null;sync.scope=null;setStatus(text)}
 function getToken(){return native.get(TOKEN_KEY)||''}
 function setToken(token){if(token)native.set(TOKEN_KEY,String(token).trim());else native.remove(TOKEN_KEY)}
 
@@ -116,7 +113,7 @@ window.FF14Data={
  sync:{
   get enabled(){return!!sync.remote},
   get status(){return sync.status},
-  connect,disconnect,setStatus,pull,push,createHttpRemote,getToken,setToken
+  connect,pull,push,createHttpRemote,getToken,setToken
  }
 };
 

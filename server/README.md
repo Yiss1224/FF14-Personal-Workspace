@@ -70,7 +70,7 @@ FF14_TOKEN=換成一串長亂碼 node server/server.js
    sudo iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT
    sudo netfilter-persistent save
    ```
-6. 把 `ff14-config.js` 的 `apiBase` 設為 `'https://ff14.example.com'`（網頁也由這台提供時可用 `location.origin`），並刪掉過渡期的 `supabase` 設定，推上 GitHub 後在主機 `git pull`。切換前先在資料最新的裝置開一次網站，讓 Supabase 的資料同步回本機。
+6. 把 `ff14-config.js` 的 `apiBase` 設為 `'https://ff14.example.com'`（網頁也由這台提供時可用 `location.origin`），推上 GitHub 後在主機 `git pull`。
 7. 在每台裝置的首頁按「同步金鑰」輸入 `FF14_TOKEN`。第一台會把本機資料上傳成初始值，其他裝置載入時會改用伺服器版本，所以請先在資料最新的裝置設定。
 
 ### 繼續放在 GitHub Pages、只把 API 放甲骨文
