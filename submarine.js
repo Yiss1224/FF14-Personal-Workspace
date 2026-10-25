@@ -35,13 +35,13 @@ function normalize(saved){
  return s;
 }
 let state;
-try{state=normalize(JSON.parse(localStorage.getItem(KEY)||'null'))}catch(e){state=fresh()}
+try{state=normalize(JSON.parse(FF14Data.readRaw(KEY)||'null'))}catch(e){state=fresh()}
 const $=id=>document.getElementById(id);
 const dialogs=()=>window.SubDialog||{confirm:o=>Promise.resolve(window.confirm(o.message||o)),alert:o=>{window.alert(o.message||o);return Promise.resolve(true)},toast:()=>({close(){}})};
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // 以 localStorage 的最新內容取代記憶體副本；資料損毀時保留目前的記憶體狀態。
 function reload(){
- try{state=normalize(JSON.parse(localStorage.getItem(KEY)||'null'));return true}
+ try{state=normalize(JSON.parse(FF14Data.readRaw(KEY)||'null'));return true}
  catch(e){console.error('潛艇資料讀取失敗，保留目前畫面資料',e);return false}
 }
 // 每次寫入都先重新讀取最新儲存資料，只套用本次修改的欄位。
@@ -49,7 +49,7 @@ function reload(){
 const update=mutator=>{
  reload();
  mutator(state);
- localStorage.setItem(KEY,JSON.stringify(state));render();window.dispatchEvent(new Event('submarine-state-updated'));
+ FF14Data.writeRaw(KEY,JSON.stringify(state));render();window.dispatchEvent(new Event('submarine-state-updated'));
 };
 // 外部更新（其他分頁、計算器、返航結算）重畫畫面時，保留使用者尚未送出的輸入、船名草稿與焦點。
 // 只保留使用者實際輸入過、尚未觸發 change 的欄位；未修改的欄位照常顯示最新資料。
@@ -238,7 +238,7 @@ function renderUnlocks(){
    const id=gi+'-'+si,key='u-'+id;
    return '<label class="unlock-step"><input type="checkbox" data-unlock="'+key+'" '+(state.unlocks[key]?'checked':'')+'><span>'+s[0]+' 海域已開</span><small>Rank '+s[1]+'</small></label>'
  }).join('')+'</div>').join('');
- $('unlock-list').querySelectorAll('[data-unlock]').forEach(el=>el.onchange=()=>{state.unlocks[el.dataset.unlock]=el.checked;localStorage.setItem(KEY,JSON.stringify(state))});
+ $('unlock-list').querySelectorAll('[data-unlock]').forEach(el=>el.onchange=()=>{state.unlocks[el.dataset.unlock]=el.checked;FF14Data.writeRaw(KEY,JSON.stringify(state))});
 }
 function renderLogs(){
  const runs=state.logs.length,fuelUsed=state.logs.reduce((a,l)=>a+(Number(l.fuel)||0),0),repairUsed=state.logs.reduce((a,l)=>a+(Number(l.repair)||0),0),xp=state.logs.reduce((a,l)=>a+(Number(l.exp)||0),0);
@@ -287,7 +287,7 @@ inventoryDialog.addEventListener('click',e=>{if(e.target===inventoryDialog)inven
 function exportBackup(){
  try{
   window.dispatchEvent(new Event('submarine-export-requested'));
-  const stored=JSON.parse(localStorage.getItem(KEY)||'null')||JSON.parse(JSON.stringify(state));
+  const stored=JSON.parse(FF14Data.readRaw(KEY)||'null')||JSON.parse(JSON.stringify(state));
   if(!stored.plannerSettings){
    stored.plannerSettings={
     maxHours:Number($('calc-hours')?.value)||48,
@@ -334,7 +334,7 @@ $('import-data').onchange=async e=>{
  try{
   const parsed=JSON.parse(await f.text()),restored=importedState(parsed);
   // 匯入是整份還原：直接覆寫儲存資料，不與現有資料合併。
-  localStorage.setItem(KEY,JSON.stringify(restored));
+  FF14Data.writeRaw(KEY,JSON.stringify(restored));
   state=restored;
   render();
   window.dispatchEvent(new Event('submarine-data-imported'));
@@ -343,5 +343,12 @@ $('import-data').onchange=async e=>{
  }catch(err){dialogs().alert({title:'匯入失敗',message:'原始資料未變更：'+err.message})}
  e.target.value='';
 };
+// 自架伺服器同步載入新資料時，視同匯入完整備份，讓各模組改用伺服器版本。
+window.addEventListener('ff14-data-restored',e=>{
+ if(e.detail?.source!=='remote'||!e.detail.keys?.includes(KEY)||!reload())return;
+ render();
+ window.dispatchEvent(new Event('submarine-data-imported'));
+ window.dispatchEvent(new Event('submarine-state-updated'));
+});
 render();
 })();

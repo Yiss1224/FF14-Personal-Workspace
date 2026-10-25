@@ -10,7 +10,8 @@ const DEFAULT_ROULETTES=[
 const XIVAPI='https://v2.xivapi.com/api';
 const CATALOG_CACHE_MS=7*24*60*60*1000;
 const FISH_CATALOG_SCHEMA=2;
-const store={get:(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))};
+// 讀寫統一經過 ff14-data.js 資料層。
+const store={get:(k,d)=>FF14Data.read(k,d),set:(k,v)=>FF14Data.write(k,v)};
 function today(){const d=new Date();const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
 function addDays(days){const d=new Date();d.setDate(d.getDate()+days);return d.toLocaleDateString('zh-TW')}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}

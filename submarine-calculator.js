@@ -113,12 +113,12 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 function state(){
  const base={fuel:1600,repair:300,parts:{'1111':4,'0020':4,'3004':4,'0003':0},partStock:legacyPartStock({'1111':4,'0020':4,'3004':4,'0003':0}),ships:Array.from({length:4},(_,i)=>({registered:i===0,rank:1,exp:0,name:''})),unlocks:{},logs:[],activeSectorMap:1};
  try{
-  const saved=JSON.parse(localStorage.getItem(KEY)||'null')||{};
+  const saved=JSON.parse(FF14Data.readRaw(KEY)||'null')||{};
   const parts={...base.parts,...(saved.parts||{})};
   return {...base,...saved,parts,partStock:{...legacyPartStock(parts),...(saved.partStock||{})},ships:base.ships.map((ship,i)=>({...ship,...(saved.ships?.[i]||{})})),unlocks:saved.unlocks||{},logs:Array.isArray(saved.logs)?saved.logs:[]};
  }catch{return base}
 }
-function persist(mutator){const s=state();mutator(s);localStorage.setItem(KEY,JSON.stringify(s));window.dispatchEvent(new Event('submarine-build-state-updated'))}
+function persist(mutator){const s=state();mutator(s);FF14Data.writeRaw(KEY,JSON.stringify(s));window.dispatchEvent(new Event('submarine-build-state-updated'))}
 let data=null,lootData=[],pendingItemDeparture=null;
 function maxRank(){return data?.ranks?.at(-1)?.rank||90}
 function rankRec(rank){return data.ranks.find(x=>x.rank===rank)||data.ranks.filter(x=>x.rank<=rank).at(-1)}

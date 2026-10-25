@@ -1,6 +1,6 @@
 # FF14 Personal Workspace
 
-個人用的 FF14 日課、練等與釣魚進度工具。純前端，可放在 GitHub Pages；本機以 `localStorage` 快取，登入後用 Supabase 同步多裝置進度。
+個人用的 FF14 日課、練等與釣魚進度工具。純前端，可放在 GitHub Pages；資料存在瀏覽器 `localStorage`，可匯出／匯入完整備份，之後可接上自架伺服器（`server/`）同步多裝置。
 
 ## 目前功能
 
@@ -44,10 +44,10 @@
   - 透過 XIVAPI 解析 Item ID，再用 Garland Tools item 資料嘗試列出 Gil NPC、特殊商店、價格、區域、座標，以及製作 / 採集 / 精選 / 掉落等其他來源
   - 可把同一 NPC 能買到的多種餌合併成採買點，減少跑腿
   - 掃圖路線會優先推薦「目前餌已備妥、可以直接處理最多缺魚」的釣點；若缺指定餌會標出卡住數量與缺哪幾種餌
-- Supabase 雲端同步
-  - Daily / 單職與多職練等設定 / 今晚排程 / 釣魚歷史 / 已知魚 ID / 跳過清單同步
-  - 萬能餌人工判定、魚餌持有狀態、魚餌備註、手動秒數與釣魚 UI 偏好同步
-  - RLS 限制每個登入帳號只能讀寫自己的資料
+- 資料備份與同步
+  - 首頁頂端「匯出備份／匯入備份」涵蓋 Daily、練等設定、今晚排程、釣魚歷史、已知魚 ID、跳過清單、魚餌狀態與釣魚 UI 偏好
+  - 潛水艇頁保留原本的完整 JSON 備份
+  - 在 `ff14-config.js` 填入 `apiBase` 並設定同步金鑰後，兩頁都會與自架伺服器同步（預設關閉）
 
 ## 資料來源與限制
 
@@ -68,10 +68,31 @@
 
 - HTML / CSS / Vanilla JavaScript
 - GitHub Pages
-- Supabase Auth + Postgres (RLS)
+- `ff14-data.js` 統一資料層（見下方）
+- 自架同步伺服器 `server/`（Node.js，無外部套件）
 - XIVAPI v2
 - FFXIV Wiki Semantic MediaWiki API
 - Carbuncle Plushy fish data
 - Lodinn community bite-time data
 - Garland Tools item / vendor data
 - localStorage 離線快取
+
+## 資料層
+
+所有使用者資料都經過 `ff14-data.js`（`window.FF14Data`）：
+
+- `SCOPES` 登記每一頁的資料鍵：`workspace`（首頁）與 `submarine`（潛水艇頁）。新增需要保存或同步的資料時，把鍵加到這裡。
+- `read / write / readRaw / writeRaw`：讀寫本機資料；舊模組直接呼叫 `localStorage.setItem` 也會被攔截並通知同步層。
+- `snapshot / restore / exportBackup / parseBackup`：整頁快照、還原與備份格式 `{app, schema, scope, exportedAt, data}`；也接受舊 Supabase 同步的「資料鍵在最上層」格式。
+- `sync`：遠端同步插槽。`ff14-config.js` 的 `apiBase` 留空為純本機模式；填入網址後，頁面載入時先從伺服器讀取，伺服器沒有資料就上傳本機資料，之後每次修改 0.8 秒後自動上傳。
+- 快取類資料（魚類目錄、台服名詞、地圖快取等）不登記，不會進備份或同步。
+
+伺服器 API 與甲骨文部署方式見 [server/README.md](server/README.md)。
+
+## 測試
+
+```sh
+node tests/data-layer-playwright.cjs   # 資料層、備份與同步
+node tests/submarine-stage1-playwright.cjs
+# 其他 tests/*.cjs 同樣直接用 node 執行
+```
