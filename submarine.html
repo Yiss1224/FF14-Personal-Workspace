@@ -93,6 +93,7 @@
           <select id="calc-hours"><option value="24">24 小時</option><option value="36">36 小時</option><option value="48">48 小時</option><option value="50">50 小時</option><option value="52">52 小時</option><option value="72" selected>72 小時（完整比較）</option></select>
         </label>
         <label>估算目標 Rank <input id="calc-target-rank" type="number" min="2" max="145" value="85"></label>
+        <label>畢業船撥去開圖 <select id="calc-explorers"><option value="0" selected>0 艘（全部跑 O → J）</option><option value="1">1 艘</option><option value="2">2 艘</option><option value="3">3 艘</option><option value="4">4 艘</option></select></label>
         <label class="build-check"><input id="daily-pickup" type="checkbox" checked>依每日可收船時段最佳化</label>
         <label>每天可收船開始 <input id="pickup-start" type="time" value="19:00"></label>
         <label>每天可收船結束 <input id="pickup-end" type="time" value="22:00"></label>
@@ -280,7 +281,7 @@
   <script src="submarine-dialog.js?v=20261022-ux2"></script>
   <script src="submarine-sector-names.js?v=20261022-seas"></script>
   <script src="submarine.js?v=20261022-ux2"></script>
-  <script src="submarine-calculator.js?v=20261022-seas2"></script>
+  <script src="submarine-calculator.js?v=20261026-explore"></script>
   <script src="submarine-settlement.js?v=20261022-seas2"></script>
   <script defer src="submarine-ledger.js?v=20261022-ux2"></script>
   <script defer src="submarine-drop-select.js?v=20261022-seas2"></script>
