@@ -117,6 +117,27 @@ const server=require('../server/server.js');
       await pb.waitForFunction(()=>(localStorage.getItem('ff14_submarine_planner_v1')||'').includes('同步測試號'));
       await b.close();
     });
+
+    await step('儲存空間已滿時：使用者資料寫入會提示，快取寫入不打擾',async()=>{
+      const ctx=await browser.newContext();await isolate(ctx);
+      const page=await ctx.newPage();await page.goto(base+'/submarine.html');
+      await page.waitForFunction(()=>window.FF14Data&&localStorage.getItem('ff14_submarine_planner_v1'));
+      const r=await page.evaluate(()=>{
+        // 用垃圾資料把空間塞滿，塊越切越小直到一個字元都塞不進。
+        let n=0;for(let size=1<<20;size>=1;size=size>>1){for(;;){try{localStorage.setItem('fill-'+(n++),'x'.repeat(size))}catch{break}}}
+        const events=[];window.addEventListener('ff14-storage-full',e=>events.push(e.detail.key));
+        let cacheThrew=false;try{localStorage.setItem('ff14TcTermCacheV1','x'.repeat(4096))}catch{cacheThrew=true}
+        const bannerAfterCache=!!document.querySelector('.ff14-storage-full');
+        let userThrew=false;try{FF14Data.writeRaw('ff14_submarine_planner_v1','x'.repeat(65536))}catch{userThrew=true}
+        return{cacheThrew,bannerAfterCache,userThrew,events,banner:document.querySelector('.ff14-storage-full')?.textContent||''};
+      });
+      assert.ok(r.cacheThrew&&r.userThrew,'空間已滿時寫入應失敗');
+      assert.equal(r.bannerAfterCache,false,'快取寫入失敗不應跳提示');
+      assert.deepEqual(r.events,['ff14_submarine_planner_v1']);
+      assert.match(r.banner,/儲存空間已滿/);
+      assert.equal(await page.evaluate(()=>typeof FF14Data.storage.persisted),'boolean','應已向瀏覽器要求持久保存');
+      await ctx.close();
+    });
   }finally{
     await browser.close();server.close();fs.rmSync(DATA_DIR,{recursive:true,force:true});
   }
