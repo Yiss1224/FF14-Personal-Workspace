@@ -24,8 +24,28 @@ function emit(key,source){
  for(const fn of listeners){try{fn(detail)}catch(e){console.error('FF14Data listener failed',e)}}
  window.dispatchEvent(new CustomEvent('ff14-data-changed',{detail}));
 }
+function isQuotaError(e){return e instanceof DOMException&&(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED'||e.code===22||e.code===1014)}
+// 儲存空間已滿時，使用者資料寫入會失敗；跳出提示請使用者先匯出備份，避免默默遺失變更。
+let quotaNotice=null;
+function notifyQuota(key){
+ window.dispatchEvent(new CustomEvent('ff14-storage-full',{detail:{key,scope:scopeOf(key)}}));
+ if(quotaNotice?.isConnected||!document.body)return;
+ const box=document.createElement('div');
+ box.className='ff14-storage-full';box.setAttribute('role','alert');
+ box.style.cssText='position:fixed;left:16px;right:16px;bottom:16px;z-index:9999;max-width:640px;margin:0 auto;padding:12px 16px;border-radius:8px;background:#7f1d1d;color:#fff;font:14px/1.5 system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.35);display:flex;gap:12px;align-items:flex-start';
+ const text=document.createElement('div');text.style.flex='1';
+ text.textContent='瀏覽器儲存空間已滿，剛才的變更沒有存到。請先匯出備份，再清除網站資料或刪除舊紀錄後重新整理。';
+ const close=document.createElement('button');close.type='button';close.textContent='知道了';
+ close.style.cssText='flex:none;border:0;border-radius:6px;padding:4px 10px;background:#fff;color:#7f1d1d;cursor:pointer';
+ close.onclick=()=>box.remove();
+ box.append(text,close);document.body.appendChild(box);quotaNotice=box;
+}
 // 舊模組仍直接呼叫 localStorage.setItem；在這裡統一攔截，登記過的資料鍵就會通知同步層。
-ls.setItem=function(k,v){native.set(k,v);if(scopeOf(k))emit(k,applying?'restore':'local')};
+ls.setItem=function(k,v){
+ try{native.set(k,v)}
+ catch(e){if(isQuotaError(e)){if(scopeOf(k))notifyQuota(k);else console.warn('FF14 快取寫入失敗：儲存空間已滿',k)}throw e}
+ if(scopeOf(k))emit(k,applying?'restore':'local');
+};
 ls.removeItem=function(k){native.remove(k);if(scopeOf(k))emit(k,applying?'restore':'local')};
 
 function readRaw(key){return native.get(key)}
@@ -116,6 +136,11 @@ window.FF14Data={
   connect,pull,push,createHttpRemote,getToken,setToken
  }
 };
+
+// 請瀏覽器把本站資料標記為持久保存，降低空間不足時被自動清除的機會；不支援或被拒絕都不影響使用。
+const storage={persisted:null};
+try{navigator.storage?.persist?.().then(ok=>{storage.persisted=!!ok},()=>{storage.persisted=false})}catch{}
+window.FF14Data.storage={get persisted(){return storage.persisted}};
 
 // 頁面在 ff14-config.js 之後、各功能模組之前載入本檔。
 if(config.apiBase&&SCOPES[pageScope]){
