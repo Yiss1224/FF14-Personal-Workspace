@@ -255,3 +255,13 @@ input,select,textarea{font-size:14px;font-weight:500}
 label .hint{font-weight:400}
 #estimate .hint{margin:4px 0 0}
 @media (prefers-color-scheme:dark){.bridge-nav-wrap{background:rgba(16,25,35,.92)}}
+/* Return settlement: per-point EXP fields and the projected Rank after return. */
+.settle-exp-points{grid-column:1/-1;background:var(--ui-surface-soft);border:1px solid var(--ui-border);border-radius:13px;padding:16px 17px}
+.settle-exp-points[hidden]{display:none}
+.settle-exp-points h3{margin:0 0 4px;font-size:15px}
+.settle-exp-points>.hint{margin:0 0 12px}
+.settle-exp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.settle-exp-total{margin:12px 0 0;color:var(--ui-teal);font-weight:700;font-variant-numeric:tabular-nums}
+.settle-exp-total:empty,.settle-after:empty{display:none}
+.settle-after{grid-column:1/-1;margin:-4px 0 0;color:var(--ui-ink)}
+#settle-ship-progress{display:block;margin:2px 0 0}
