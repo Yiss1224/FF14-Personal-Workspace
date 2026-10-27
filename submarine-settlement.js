@@ -147,7 +147,12 @@ function init(){
   chosen.add(id);resetButton();refreshPoints();
  };
  $('settle-save').onclick=commit;
- $('settle-reset').onclick=()=>{justSaved=false;clearForm();window.dispatchEvent(new Event('submarine-settlement-reset'));status('')};
+ $('settle-reset').onclick=async()=>{
+  // Typed route, EXP, loot or notes are lost on reset, so ask before throwing them away.
+  const typed=['settle-route','settle-gain','settle-fuel','settle-repair','settle-note'].some(id=>$(id).value.trim())||chosen.size||$('voyage-loot-rows')?.children.length;
+  if(!justSaved&&typed&&window.SubDialog&&!await window.SubDialog.confirm({title:'清空這次結算',message:'清空後，已填的航線、EXP、掉落物與備註都會移除。',ok:'清空結算',danger:true}))return;
+  justSaved=false;clearForm();window.dispatchEvent(new Event('submarine-settlement-reset'));status('');
+ };
  $('settle-form').addEventListener('input',resetButton);
  $('settle-form').addEventListener('change',resetButton);
  window.addEventListener('submarine-build-state-updated',refreshPoints);

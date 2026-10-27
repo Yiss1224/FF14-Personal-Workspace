@@ -240,3 +240,14 @@ tbody tr:hover{background:var(--ui-teal-soft);}
 .dock-fx-sonar{width:32px;height:32px;box-shadow:0 0 0 6px rgba(105,191,183,.12)}
 .dock-fx-bubble{width:9px;height:9px;background:rgba(174,231,231,.24);box-shadow:inset 1px 1px 0 rgba(255,255,255,.7)}
 @media(prefers-reduced-motion:reduce){.dock-fx-sonar,.dock-fx-bubble{display:none!important}}
+
+/* UX pass: field values read as content rather than as another label, and stay at 16px on
+   phones so iOS does not zoom the page when a field gains focus. */
+input,select,textarea{font-size:14px;font-weight:500}
+.settle-route-summary{color:var(--ui-muted);font-size:13px;line-height:1.55}
+#parts-inventory-summary{font-size:14px}
+@media(max-width:700px){
+  input,select,textarea{font-size:16px}
+  /* The section tabs scroll sideways; fade the trailing edge so the hidden tabs read as reachable. */
+  .bridge-nav{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent)}
+}
