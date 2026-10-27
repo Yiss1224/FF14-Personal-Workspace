@@ -240,3 +240,28 @@ tbody tr:hover{background:var(--ui-teal-soft);}
 .dock-fx-sonar{width:32px;height:32px;box-shadow:0 0 0 6px rgba(105,191,183,.12)}
 .dock-fx-bubble{width:9px;height:9px;background:rgba(174,231,231,.24);box-shadow:inset 1px 1px 0 rgba(255,255,255,.7)}
 @media(prefers-reduced-motion:reduce){.dock-fx-sonar,.dock-fx-bubble{display:none!important}}
+
+/* UX pass: field values read as content rather than as another label, and stay at 16px on
+   phones so iOS does not zoom the page when a field gains focus. */
+input,select,textarea{font-size:14px;font-weight:500}
+.settle-route-summary{color:var(--ui-muted);font-size:13px;line-height:1.55}
+#parts-inventory-summary,#fleet-summary{font-size:14px}
+@media(max-width:700px){
+  input,select,textarea{font-size:16px}
+  /* The section tabs scroll sideways; fade the trailing edge so the hidden tabs read as reachable. */
+  .bridge-nav{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent)}
+}
+/* Hints inside a label keep body weight instead of the label's bold. */
+label .hint{font-weight:400}
+#estimate .hint{margin:4px 0 0}
+@media (prefers-color-scheme:dark){.bridge-nav-wrap{background:rgba(16,25,35,.92)}}
+/* Return settlement: per-point EXP fields and the projected Rank after return. */
+.settle-exp-points{grid-column:1/-1;background:var(--ui-surface-soft);border:1px solid var(--ui-border);border-radius:13px;padding:16px 17px}
+.settle-exp-points[hidden]{display:none}
+.settle-exp-points h3{margin:0 0 4px;font-size:15px}
+.settle-exp-points>.hint{margin:0 0 12px}
+.settle-exp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.settle-exp-total{margin:12px 0 0;color:var(--ui-teal);font-weight:700;font-variant-numeric:tabular-nums}
+.settle-exp-total:empty,.settle-after:empty{display:none}
+.settle-after{grid-column:1/-1;margin:-4px 0 0;color:var(--ui-ink)}
+#settle-ship-progress{display:block;margin:2px 0 0}

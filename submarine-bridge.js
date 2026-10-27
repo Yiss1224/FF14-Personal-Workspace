@@ -145,7 +145,7 @@ function prefill(i){
   filled.push('航線','燃料');
  }else if(Number(v.fuelEstimate)>0){$('settle-fuel').value=String(Number(v.fuelEstimate));filled.push('燃料')}
  if(note&&filled.length){
-  note.textContent='已依出航紀錄預填'+filled.join('、')+'（'+(v.route||'航線未記錄')+'）。請確認後補上返航後 Rank／EXP 與掉落物。';
+  note.textContent='已依出航紀錄預填'+filled.join('、')+'（'+(v.route||'航線未記錄')+'）。請確認後填入各航點 EXP 與掉落物。';
   note.hidden=false;
  }
  return filled.length>0;
@@ -156,7 +156,7 @@ function goToSettlement(i){
  select.dispatchEvent(new Event('change',{bubbles:true}));
  const panel=$('return-settlement');
  panel?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
- setTimeout(()=>$('settle-rank')?.focus({preventScroll:true}),350);
+ setTimeout(()=>(document.querySelector('#settle-exp-points:not([hidden]) input')||$('settle-rank'))?.focus({preventScroll:true}),350);
 }
 
 /* ---------- wiring ---------- */

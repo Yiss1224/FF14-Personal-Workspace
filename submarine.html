@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <title>FF14 潛水艇養成計畫</title>
   <link rel="stylesheet" href="submarine.css?v=20261012-3">
-  <link rel="stylesheet" href="submarine-ui.css?v=20261019-feedback">
+  <link rel="stylesheet" href="submarine-ui.css?v=20261027-ux3">
   <link rel="stylesheet" href="submarine-harbor.css?v=20261022-ux2">
   <link rel="stylesheet" href="submarine-harbor-scene.css?v=20261021-ff1">
   <link rel="stylesheet" href="submarine-bridge.css?v=20261022-ux2">
@@ -51,17 +51,18 @@
       </div>
       <div class="inventory-launch">
         <span id="parts-inventory-summary">部件庫存尚未載入</span>
-        <button id="open-inventory" type="button">管理潛水艇與部件庫存</button>
+        <button id="open-inventory" type="button">管理部件庫存</button>
       </div>
-      <div id="estimate" class="estimate-grid"></div>
+      <div id="estimate"></div>
       
     </section>
 
     <section class="panel" id="fleet-panel">
       <div class="section-title"><div><h2>船隊進度</h2></div></div>
-      <p class="hint">潛水艇 Rank、名稱、登記狀態與部件庫存集中在管理視窗。</p>
-      <button type="button" data-open-inventory>管理潛水艇與部件庫存</button>
-      <div id="fleet-summary" class="fleet-summary"></div>
+      <div class="inventory-launch">
+        <span id="fleet-summary"></span>
+        <button type="button" data-open-inventory>管理潛水艇</button>
+      </div>
       <div id="fleet-cards" class="fleet-cards" aria-live="off"></div>
     </section>
     <dialog id="sub-inventory-dialog" class="sub-inventory-dialog" aria-labelledby="sub-inventory-title">
@@ -134,6 +135,7 @@
             <option value="1">潛水艇 1</option><option value="2">潛水艇 2</option>
             <option value="3">潛水艇 3</option><option value="4">潛水艇 4</option>
           </select>
+          <small id="settle-ship-progress" class="hint" aria-live="polite"></small>
         </label>
         <div class="settle-route-select">
           <label>航線海圖 <select id="loot-map"><option value="1">溺沒海</option><option value="2">灰海</option><option value="3">翠浪海</option><option value="4">塞壬海</option><option value="5">紫礁海</option><option value="6">南蒼茫洋</option><option value="7">北洋</option></select></label>
@@ -141,9 +143,11 @@
           <div class="settle-route-summary" id="loot-points" aria-live="polite"></div>
           <input id="settle-route" type="hidden" value="">
         </div>
+        <div class="settle-exp-points" id="settle-exp-points" hidden></div>
+        <label>本趟合計 EXP <input id="settle-gain" type="number" min="0" step="1" placeholder="填各航點後自動加總，也可直接輸入"></label>
         <label>返航後 Rank <input id="settle-rank" type="number" min="1" max="145" step="1" required></label>
         <label>返航後本 Rank EXP <input id="settle-exp" type="number" min="0" step="1" required></label>
-        <label>本趟 EXP（選填）<input id="settle-gain" type="number" min="0" step="1" placeholder="用來記錄航線實測效率"></label>
+        <p id="settle-after" class="hint settle-after" aria-live="polite"></p>
         <label>消耗燃料 <input id="settle-fuel" type="number" min="0" step="1" placeholder="依航線自動估算，可修改"><small id="settle-fuel-info" class="hint">輸入航線後自動估算燃料。</small></label>
         <label>消耗修理材料 <input id="settle-repair" type="number" min="0" step="1" placeholder="未填視為 0"></label>
         <label class="settle-sector-field">新開航點（選填）
@@ -280,14 +284,15 @@
   <script src="ff14-data.js?v=20261026-quota" data-scope="submarine"></script>
   <script src="submarine-dialog.js?v=20261022-ux2"></script>
   <script src="submarine-sector-names.js?v=20261022-seas"></script>
-  <script src="submarine.js?v=20261022-ux2"></script>
+  <script src="submarine.js?v=20261027-ux3"></script>
   <script src="submarine-calculator.js?v=20261026-explore"></script>
-  <script src="submarine-settlement.js?v=20261022-seas2"></script>
+  <script src="submarine-settlement.js?v=20261027-ux3"></script>
   <script defer src="submarine-ledger.js?v=20261022-ux2"></script>
   <script defer src="submarine-drop-select.js?v=20261022-seas2"></script>
+  <script defer src="submarine-settle-exp.js?v=20261027-exp"></script>
   <script defer src="submarine-prices.js?v=20261012-7"></script>
   <script defer src="submarine-ui.js?v=20261019-feedback"></script>
-  <script defer src="submarine-bridge.js?v=20261022-seas2"></script>
+  <script defer src="submarine-bridge.js?v=20261027-exp"></script>
   <script defer src="submarine-insights.js?v=20261022-ux2"></script>
   <script defer src="submarine-harbor.js?v=20261021-ff1"></script>
   <script defer src="submarine-harbor-eorzea.js?v=20261021-ff1"></script>
