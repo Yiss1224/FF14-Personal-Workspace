@@ -245,9 +245,13 @@ tbody tr:hover{background:var(--ui-teal-soft);}
    phones so iOS does not zoom the page when a field gains focus. */
 input,select,textarea{font-size:14px;font-weight:500}
 .settle-route-summary{color:var(--ui-muted);font-size:13px;line-height:1.55}
-#parts-inventory-summary{font-size:14px}
+#parts-inventory-summary,#fleet-summary{font-size:14px}
 @media(max-width:700px){
   input,select,textarea{font-size:16px}
   /* The section tabs scroll sideways; fade the trailing edge so the hidden tabs read as reachable. */
   .bridge-nav{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent)}
 }
+/* Hints inside a label keep body weight instead of the label's bold. */
+label .hint{font-weight:400}
+#estimate .hint{margin:4px 0 0}
+@media (prefers-color-scheme:dark){.bridge-nav-wrap{background:rgba(16,25,35,.92)}}

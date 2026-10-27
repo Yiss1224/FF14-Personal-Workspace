@@ -51,17 +51,18 @@
       </div>
       <div class="inventory-launch">
         <span id="parts-inventory-summary">部件庫存尚未載入</span>
-        <button id="open-inventory" type="button">管理潛水艇與部件庫存</button>
+        <button id="open-inventory" type="button">管理部件庫存</button>
       </div>
-      <div id="estimate" class="estimate-grid"></div>
+      <div id="estimate"></div>
       
     </section>
 
     <section class="panel" id="fleet-panel">
       <div class="section-title"><div><h2>船隊進度</h2></div></div>
-      <p class="hint">潛水艇 Rank、名稱、登記狀態與部件庫存集中在管理視窗。</p>
-      <button type="button" data-open-inventory>管理潛水艇與部件庫存</button>
-      <div id="fleet-summary" class="fleet-summary"></div>
+      <div class="inventory-launch">
+        <span id="fleet-summary"></span>
+        <button type="button" data-open-inventory>管理潛水艇</button>
+      </div>
       <div id="fleet-cards" class="fleet-cards" aria-live="off"></div>
     </section>
     <dialog id="sub-inventory-dialog" class="sub-inventory-dialog" aria-labelledby="sub-inventory-title">
@@ -280,7 +281,7 @@
   <script src="ff14-data.js?v=20261026-quota" data-scope="submarine"></script>
   <script src="submarine-dialog.js?v=20261022-ux2"></script>
   <script src="submarine-sector-names.js?v=20261022-seas"></script>
-  <script src="submarine.js?v=20261022-ux2"></script>
+  <script src="submarine.js?v=20261027-ux3"></script>
   <script src="submarine-calculator.js?v=20261026-explore"></script>
   <script src="submarine-settlement.js?v=20261027-ux3"></script>
   <script defer src="submarine-ledger.js?v=20261022-ux2"></script>

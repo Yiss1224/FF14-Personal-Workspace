@@ -120,13 +120,9 @@ function shipLabel(index,ship){
  return '潛水艇 '+(index+1)+(name?' · '+name:'');
 }
 function renderEstimate(){
- const fuel=Number(state.fuel)||0,repair=Number(state.repair)||0;
- $('estimate').innerHTML=[
-  ['初始目標','Rank 85','依每艘目前 Rank、EXP、開放海域與船速即時計算。'],
-  ['目前庫存',fuel.toLocaleString()+' 罐燃料 / '+repair.toLocaleString()+' 個修理材料','燃料與修理材料仍可在本頁直接修改。'],
-  ['部件庫存','共 '+Object.values(state.partStock||{}).reduce((a,b)=>a+(Number(b)||0),0)+' 件','依型號與槽位逐件登記；全艦隊配置會讀取此庫存。'],
-  ['估算範圍','路線資料到 Rank 80','不含 Rank 81 以上的新海域；EXP 預估不計隨機追加探索。']
- ].map(x=>'<div class="stat"><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong><small>'+esc(x[2])+'</small></div>').join('');
+ // Stock and parts already show in the fields above and the target Rank lives in the calculator,
+ // so only the estimate's scope caveat is left here.
+ $('estimate').innerHTML='<p class="hint">估算範圍：路線資料到 Rank 80，不含 Rank 81 以上的新海域；EXP 預估不計隨機追加探索。</p>';
 }
 function renderPartInventory(){
  const stock=state.partStock||legacyPartStock(state.parts),host=$('part-inventory');
@@ -172,7 +168,7 @@ function renderPartBuildable(stock){
 }
 function renderFleetSummary(){
  const registered=state.ships.filter(s=>s.registered).length;
- $('fleet-summary').textContent='已登記 '+registered+' / 4 艘潛水艇；部件與個別 Rank 可在管理視窗調整。';
+ $('fleet-summary').textContent='已登記 '+registered+' / 4 艘潛水艇；名稱、Rank 與登記狀態在管理視窗調整。';
  $('parts-inventory-summary').textContent='目前部件庫存：'+Object.values(state.partStock||{}).reduce((a,b)=>a+(Number(b)||0),0)+' 件（按型號與槽位管理）';
 }
 function renderFleet(){
