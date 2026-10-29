@@ -115,7 +115,7 @@ function shipLabel(index,ship){
 function renderEstimate(){
  // Stock and parts already show in the fields above and the target Rank lives in the calculator,
  // so only the estimate's scope caveat is left here.
- $('estimate').innerHTML='<p class="hint">估算範圍：路線資料到 Rank 80，不含 Rank 81 以上的新海域；EXP 預估不計隨機追加探索。</p>';
+ $('estimate').innerHTML='<p class="hint">估算範圍：航線資料收錄到 Rank 145（溺沒海到北洋）；EXP 預估不計隨機追加探索。</p>';
 }
 function renderPartInventory(){
  const stock=state.partStock||legacyPartStock(state.parts),host=$('part-inventory');
