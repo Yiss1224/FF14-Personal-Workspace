@@ -690,7 +690,7 @@ function calculateNow(){
   const rank=shipRank(ship);
   const keys=options(ship,used).filter(key=>validBuild(key,rank)),routes=gateOnly?new Map():normalRoutes(ship,keys),
    far=exploring==='frontier'&&rank>=target?frontierRoutes(ship,keys):null;
-  return keys.map(key=>({key,normal:routes.get(key),
+  return keys.map(key=>({key,normal:routes.get(key)||[],
     gate:exploring==='next'?getRoutes(ship,key,progress.parent.id):far?far.get(key):[]}));
  }
  // 航行中的船部件一定占著；判斷誰能撥去開圖時先扣掉這些。
