@@ -12,13 +12,6 @@ const legacyPartStock=parts=>{
 };
 const partClasses={1:'鯊級',2:'雲鯨級',3:'鯨級',4:'腔棘魚級',5:'希爾德里昂級'};
 const partSlots=['船體','船尾','船首','艦橋'];
-const partRecipes={
- '1111':['1:0','1:1','1:2','1:3'],
- '1121':['1:0','1:1','2:2','1:3'],
- '1123':['1:0','1:1','2:2','3:3'],
- '3123':['3:0','1:1','2:2','3:3'],
- '3124':['3:0','1:1','2:2','4:3']
-};
 const fresh=()=>{
  const parts={'1111':4,'0020':4,'3004':4,'0003':0};
  return {fuel:1600,repair:300,parts,partStock:legacyPartStock(parts),
@@ -143,28 +136,13 @@ function syncLegacyPartCounts(){
  state.parts['3004']=Math.min(Number(stock['3:0'])||0,Number(stock['4:3'])||0);
  state.parts['0003']=Number(stock['3:3'])||0;
 }
+// 派船計算器會比較各槽位任意型號的組合，所以可同時組成的艘數只受每個槽位的總件數限制。
 function renderPartBuildable(stock){
- const configs=Object.entries(partRecipes).map(([key,pieces])=>({key,pieces,rank:{1111:1,1121:15,1123:25,3123:25,3124:35}[key]}));
- let best={count:-1,rank:-1,counts:{}},used={};
- function walk(i,count,rank,counts){
-  if(i===configs.length){
-   if(count>best.count||(count===best.count&&rank>best.rank))best={count,rank,counts:{...counts}};
-   return;
-  }
-  const cfg=configs[i],limit=Math.min(4-count,...cfg.pieces.map(k=>Math.max(0,(Number(stock[k])||0)-(Number(used[k])||0))));
-  for(let n=0;n<=limit;n++){
-   cfg.pieces.forEach(k=>used[k]=(Number(used[k])||0)+n);
-   counts[cfg.key]=n;walk(i+1,count+n,rank+n*cfg.rank,counts);
-   cfg.pieces.forEach(k=>used[k]-=n);
-  }
- }
- walk(0,0,0,{});
- const lines=Object.entries(best.counts).filter(([,n])=>n>0).map(([key,n])=>key+' × '+n+' 艘');
- const class5=Object.keys(stock).filter(k=>k.startsWith('5:')).reduce((n,k)=>n+(Number(stock[k])||0),0);
- $('part-buildable').innerHTML='<strong>依目前庫存最多可同時組成 '+Math.max(0,best.count)+' 艘</strong>'
-  +(lines.length?'<span>'+esc(lines.join('　／　'))+'</span>':'<span>目前數量不足以組出已登錄的配置。</span>')
-  +'<small>以上是純部件數量估算；Rank 門檻和各船實際已裝配置仍由派船計算器檢查。</small>'
-  +(class5?'<small>5 型目前已記錄 '+class5+' 件；現有建議配置尚未使用 5 型部件。</small>':'');
+ const perSlot=partSlots.map((name,slot)=>({name,count:Object.keys(partClasses).reduce((n,cls)=>n+(Number(stock[cls+':'+slot])||0),0)}));
+ const count=Math.min(4,...perSlot.map(x=>x.count));
+ $('part-buildable').innerHTML='<strong>依目前庫存最多可同時組成 '+count+' 艘</strong>'
+  +'<span>'+esc(perSlot.map(x=>x.name+' '+x.count+' 件').join('　／　'))+'</span>'
+  +'<small>各槽位可混用不同型號；Rank 門檻、部件容量和各船實際已裝配置由派船計算器檢查。</small>';
 }
 function renderFleetSummary(){
  const registered=state.ships.filter(s=>s.registered).length;

@@ -16,23 +16,34 @@ const mapPositions={
 6:{A:[82.6,17.9],B:[67.4,40.9],C:[61.6,19.9],D:[89.9,49.5],E:[45.4,9.5],F:[48,43.8],G:[37.8,25.9],H:[30.4,37.7],I:[49.9,62],J:[10.9,11.2],K:[10,31.9],L:[70.9,77],M:[33.5,67.3],N:[21.6,65.7],O:[90,91.1],P:[10,51],Q:[46.9,82.1],R:[20.9,77.6],S:[50.9,92.1],T:[10,91.1]},
 7:{A:[87,87.2],B:[89,58.6],C:[80.1,78.4],D:[71.9,64.6],E:[83.9,37.5],F:[54.3,65.3],G:[46.9,44.3],H:[34.6,58.6],I:[64.1,32.4],J:[49.1,16.9],K:[38.8,82.1],L:[65.2,17.2],M:[32.9,40.2]}
 };
+// 部件數值取自遊戲 SubmarinePart 表（不含改造部件）：[需求 Rank, 部件容量, 速度, 航程]，
+// 依槽位 船體／船尾／船首／艦橋。配置碼第 i 碼就是第 i 槽的型號（1 鯊級 … 5 希爾德里昂級）。
+const partStats={
+ 1:[[1,5,20,40],[1,5,60,30],[1,5,10,-20],[1,5,20,20]],
+ 2:[[15,9,0,60],[15,9,30,40],[15,9,20,-15],[15,9,25,30]],
+ 3:[[25,12,35,15],[25,12,0,55],[25,12,-15,20],[25,12,20,45]],
+ 4:[[35,14,25,40],[35,14,35,25],[35,14,-10,30],[35,14,35,-15]],
+ 5:[[45,17,30,-15],[45,17,35,-15],[45,17,-15,40],[45,17,-5,30]]
+};
+const isBuild=key=>/^[1-5]{4}$/.test(String(key??''));
+const allBuildKeys=[];
+for(let a=1;a<=5;a++)for(let b=1;b<=5;b++)for(let c=1;c<=5;c++)for(let d=1;d<=5;d++)allBuildKeys.push(''+a+b+c+d);
+const buildInfos=new Map(allBuildKeys.map(key=>{
+ const rows=[...key].map((c,i)=>partStats[c][i]),sum=n=>rows.reduce((a,x)=>a+x[n],0);
+ return [key,{min:Math.max(...rows.map(x=>x[0])),cost:sum(1),speed:sum(2),range:sum(3)}];
+}));
+// 推薦模式可固定的常用配置；自動模式則比較庫存可組出的全部組合。
 const builds={
- auto:{label:'自動擇優（可換裝）'},
- '1111':{label:'1111（鯊級起步）',min:1,cost:20,speed:110,range:70},
- '1121':{label:'1121（基礎練等）',min:15,cost:24,speed:120,range:75},
- '1123':{label:'1123（高航程練等）',min:25,cost:31,speed:120,range:100},
- '3123':{label:'3123（特定開圖航線）',min:25,cost:38,speed:135,range:75},
- '3124':{label:'3124（金策配置）',min:35,cost:40,speed:150,range:15}
+ auto:{label:'自動擇優（依庫存比較全部組合）'},
+ '1111':{label:'1111（鯊級起步）'},
+ '1121':{label:'1121（基礎練等）'},
+ '1123':{label:'1123（高航程練等）'},
+ '3123':{label:'3123（特定開圖航線）'},
+ '3124':{label:'3124（金策配置）'}
 };
-const buildPieces={
- '1111':['1111:0','1111:1','1111:2','1111:3'],
- '1121':['1111:0','1111:1','0020:2','1111:3'],
- '1123':['1111:0','1111:1','0020:2','0003:3'],
- '3123':['3004:0','1111:1','0020:2','0003:3'],
- '3124':['3004:0','1111:1','0020:2','3004:3']
-};
-const partNames=['船體','船尾','船首','艦橋'],classNames={1:'鯊級',2:'雲鯨級',3:'鯨級',4:'腔棘魚級'};
-function validBuild(key,rank){const b=builds[key],rec=rankRec(rank);return Boolean(b&&b.min&&rec&&rank>=b.min&&rec.cap>=b.cost)}
+const buildPieces=key=>isBuild(key)?[...key].map((c,i)=>c+':'+i):[];
+const partNames=['船體','船尾','船首','艦橋'],classNames={1:'鯊級',2:'雲鯨級',3:'鯨級',4:'腔棘魚級',5:'希爾德里昂級'};
+function validBuild(key,rank){const b=buildInfos.get(key),rec=rankRec(rank);return Boolean(b&&rec&&rank>=b.min&&rec.cap>=b.cost)}
 function legacyPartStock(parts){
  const result={};for(let cls=1;cls<=5;cls++)for(let slot=0;slot<4;slot++)result[cls+':'+slot]=0;
  for(let slot=0;slot<4;slot++)result['1:'+slot]=Math.max(0,Number(parts?.['1111'])||0);
@@ -42,21 +53,40 @@ function legacyPartStock(parts){
  result['3:3']=Math.max(0,Number(parts?.['0003'])||0);
  return result;
 }
+// 庫存以「型號:槽位」計數，與配件管理表格相同。
 function stock(s){
  const matrix={...legacyPartStock(s.parts),...(s.partStock||{})},result={};
- for(const k of ['1111','0020','3004','0003'])for(const slot of [0,1,2,3])result[k+':'+slot]=0;
- for(let slot=0;slot<4;slot++)result['1111:'+slot]=Math.max(0,Number(matrix['1:'+slot])||0);
- result['0020:2']=Math.max(0,Number(matrix['2:2'])||0);
- result['3004:0']=Math.max(0,Number(matrix['3:0'])||0);
- result['3004:3']=Math.max(0,Number(matrix['4:3'])||0);
- result['0003:3']=Math.max(0,Number(matrix['3:3'])||0);
+ for(let cls=1;cls<=5;cls++)for(let slot=0;slot<4;slot++)result[cls+':'+slot]=Math.max(0,Number(matrix[cls+':'+slot])||0);
  return result;
 }
 function allocate(build,used,total){
- const result={...used};for(const piece of buildPieces[build]||[])result[piece]=(result[piece]||0)+1;
+ const pieces=buildPieces(build);if(!pieces.length)return null;
+ const result={...used};for(const piece of pieces)result[piece]=(result[piece]||0)+1;
  return Object.keys(result).every(piece=>result[piece]<=(total[piece]||0))?result:null;
 }
-function installed(ship){return builds[ship.currentBuild]?.min?ship.currentBuild:(shipRank(ship)<15?'1111':'1121')}
+function installed(ship){return isBuild(ship.currentBuild)?ship.currentBuild:(shipRank(ship)<15?'1111':'1121')}
+const partChanges=(from,to)=>[...to].filter((c,i)=>c!==from[i]).length;
+// 列出這艘船用剩餘庫存能組出的全部配置（Rank、部件容量都符合）。航線只取決於速度與航程，
+// 被其他組合在兩者上同時壓過的配置不會更好，所以逐層取「沒被壓過」的組合，
+// 至少湊滿 minPoints 種數值；較差的層仍保留幾層，供庫存被其他船用掉時替補。
+function candidateBuilds(ship,used,total,minPoints=12){
+ const rank=shipRank(ship),current=installed(ship),groups=new Map();
+ for(const key of allBuildKeys){
+  if(!validBuild(key,rank)||!allocate(key,used,total))continue;
+  const b=buildInfos.get(key),id=b.speed+','+b.range;
+  if(!groups.has(id))groups.set(id,{speed:b.speed,range:b.range,keys:[]});
+  groups.get(id).keys.push(key);
+ }
+ let rest=[...groups.values()];const kept=[];
+ while(rest.length&&kept.length<minPoints){
+  const front=rest.filter(p=>!rest.some(q=>q!==p&&q.speed>=p.speed&&q.range>=p.range));
+  kept.push(...front);rest=rest.filter(p=>!front.includes(p));
+ }
+ // 同數值的不同部件組合：先選和目前配置換最少件的，最多留兩種給庫存分配替換。
+ return kept.flatMap(p=>p.keys.sort((a,b)=>partChanges(current,a)-partChanges(current,b)||a.localeCompare(b)).slice(0,2));
+}
+// 例：2131（雲鯨／鯊／鯨／鯊），依 船體／船尾／船首／艦橋。
+const buildLabel=key=>key+'（'+[...key].map(c=>classNames[c].replace('級','')).join('／')+'）';
 function changes(from,to){return [...to].flatMap((code,i)=>code===from[i]?[]:[partNames[i]+'：'+classNames[from[i]]+' → '+classNames[code]]).join('；')}
 // 每日可以收船、再次派船的實際時間窗口（台灣瀏覽器當地時間）。
 const DAY=86400;
@@ -127,7 +157,7 @@ function shipLabel(index,ship){
  return '潛水艇 '+(index+1)+(name?' · '+name:'');
 }
 function buildStats(build,rank){
- const b=builds[build]?.min?builds[build]:builds['1111'],rec=rankRec(rank)||{};
+ const b=buildInfos.get(build)||buildInfos.get('1111'),rec=rankRec(rank)||{};
  return {speed:b.speed+(rec.v||0),range:b.range+(rec.d||0)};
 }
 function sectorUnlockKey(id){return 'sector-'+id}
@@ -179,15 +209,19 @@ function renderBuilds(){
   const rank=shipRank(ship),pref=ship.build||'auto',current=installed(ship);
   return '<div class="build-row"><label>'+esc(shipLabel(i,ship))+'（Rank '+rank+'）· 推薦模式<select data-build="'+i+'">'
    +Object.entries(builds).map(([k,b])=>'<option value="'+k+'" '+(k===pref?'selected':'')+'>'+esc(b.label)+'</option>').join('')+'</select></label>'
-   +'<label>目前實際配置<select data-installed="'+i+'">'+Object.entries(builds).filter(([k,b])=>b.min).map(([k,b])=>'<option value="'+k+'" '+(k===current?'selected':'')+'>'+esc(b.label)+'</option>').join('')+'</select></label>'
+   +'<fieldset class="build-parts"><legend>目前實際配置 · '+esc(current)+'</legend>'+partNames.map((n,slot)=>'<label>'+n+'<select data-installed-part="'+i+':'+slot+'">'
+    +Object.entries(classNames).map(([c,name])=>'<option value="'+c+'" '+(current[slot]===c?'selected':'')+'>'+c+' · '+esc(name)+'</option>').join('')+'</select></label>').join('')+'</fieldset>'
    +'<label class="build-check"><input type="checkbox" data-voyaging="'+i+'" '+(ship.voyaging?'checked':'')+'>航行中（鎖定配件）</label>'
-   +'<small>自動比較 1111 / 1121 / 1123 / 3123，依實際庫存、等級及部件容量過濾。</small></div>'
+   +'<small>自動模式從庫存可組出的所有配置中比較，依等級、部件容量及其他船已占用的部件過濾。</small></div>'
  }).join('');
- for(const [attr,field] of [['build','build'],['installed','currentBuild']]){
-  $('ship-builds').querySelectorAll('[data-'+attr+']').forEach(el=>el.onchange=()=>{
-   persist(s=>{s.ships[Number(el.dataset[attr])][field]=el.value});calculate();
-  });
- }
+ $('ship-builds').querySelectorAll('[data-build]').forEach(el=>el.onchange=()=>{
+  persist(s=>{s.ships[Number(el.dataset.build)].build=el.value});calculate();
+ });
+ $('ship-builds').querySelectorAll('[data-installed-part]').forEach(el=>el.onchange=()=>{
+  const [i,slot]=el.dataset.installedPart.split(':').map(Number);
+  persist(s=>{const ship=s.ships[i],code=[...installed(ship)];code[slot]=el.value;ship.currentBuild=code.join('')});
+  renderBuilds();calculate();
+ });
  $('ship-builds').querySelectorAll('[data-voyaging]').forEach(el=>el.onchange=()=>{
   persist(s=>{
    const ship=s.ships[Number(el.dataset.voyaging)];
@@ -306,20 +340,20 @@ function bestRoutes(available,ship,buildKey,maxHours,s,requiredId=null,beamLimit
  for(const map of seaIds()){const home=seaHome(map);
   const eligible=available.filter(p=>p.map===map&&p.rank<=rank);
   if(!eligible.length||(requiredId!==null&&!eligible.some(p=>p.id===requiredId)))continue;
-  let beam=[{path:[],prev:home,range:0,time:43200,fuel:0,xp:0,used:new Set()}];
+  let beam=[{path:[],prev:home,range:0,time:43200,fuel:0,xp:0}];
   for(let depth=0;depth<5;depth++){
    const next=[];
    for(const cur of beam)for(const p of eligible){
-    if(cur.used.has(p.id))continue;
+    if(cur.path.includes(p))continue;
     const edge=p.to[String(cur.prev)];if(!edge)continue;
     const nr=cur.range+edge[0]+p.sr;if(nr>stats.range)continue;
     const nt=cur.time+travelSeconds(edge[1],stats.speed)+surveySeconds(p,stats.speed);
     if(nt>maxHours*3600)continue;
     next.push({path:cur.path.concat(p),prev:p.id,range:nr,time:nt,fuel:cur.fuel+p.fuel,
-      xp:cur.xp+p.xp,used:new Set([...cur.used,p.id])});
+      xp:cur.xp+p.xp,q:(cur.xp+p.xp)/pickupElapsed(nt,daily)});
    }
-   const quick=r=>r.xp/pickupElapsed(r.time,daily);
-   next.sort((a,b)=>quick(b)-quick(a)||b.xp-a.xp);
+   // 排序分數在建立節點時算好一次，不在比較函式裡反覆計算收船時間。
+   next.sort((a,b)=>b.q-a.q||b.xp-a.xp);
    beam=next.slice(0,beamLimit);
    results.push(...(requiredId===null?beam:next.filter(x=>x.path.some(p=>p.id===requiredId)).slice(0,beamLimit)));
    if(!beam.length)break;
@@ -345,11 +379,11 @@ function bestItemRoutes(available,ship,key,maxHours,s,itemId,beamLimit=400){
  for(const map of seaIds()){const home=seaHome(map);
   const eligible=available.filter(p=>p.map===map&&p.rank<=rank&&bySector.has(p.id));
   if(!eligible.length)continue;
-  let beam=[{path:[],prev:home,range:0,time:43200,fuel:0,used:new Set(),yield:0,miss:1}];
+  let beam=[{path:[],prev:home,range:0,time:43200,fuel:0,yield:0,miss:1}];
   for(let depth=0;depth<5;depth++){
    const next=[];
    for(const cur of beam)for(const p of eligible){
-    if(cur.used.has(p.id))continue;
+    if(cur.path.includes(p))continue;
     const edge=p.to[String(cur.prev)];if(!edge)continue;
     const nr=cur.range+edge[0]+p.sr;if(nr>stats.range)continue;
     const nt=cur.time+travelSeconds(edge[1],stats.speed)+surveySeconds(p,stats.speed);
@@ -359,10 +393,9 @@ function bestItemRoutes(available,ship,key,maxHours,s,itemId,beamLimit=400){
     const chance=Math.max(0,Math.min(1,row.chance));
     const qty=Math.max(0,row.q[1]||0);
     next.push({path:cur.path.concat(p),prev:p.id,range:nr,time:nt,fuel:cur.fuel+p.fuel,
-      used:new Set([...cur.used,p.id]),yield:cur.yield+chance*qty,miss:cur.miss*(1-chance)});
+      yield:cur.yield+chance*qty,miss:cur.miss*(1-chance),q:(cur.yield+chance*qty)/pickupElapsed(nt,daily)});
    }
-   const score=r=>r.yield/pickupElapsed(r.time,daily);
-   next.sort((a,b)=>score(b)-score(a)||b.yield-a.yield);
+   next.sort((a,b)=>b.q-a.q||b.yield-a.yield);
    beam=next.slice(0,beamLimit);
    results.push(...beam.filter(r=>r.yield>0));
    if(!beam.length)break;
@@ -406,13 +439,19 @@ function calculateItemRoutesNow(){
   if(!used){$('item-route-result').innerHTML='<p class="calc-warning">航行中的配件已超出目前登記庫存。請核對持有總數（含已裝配部件）。</p>';return}
   fixedUsage=used;
  }
- const candidates=[];
+ const candidates=[],seen=new Map(),cache=new Map();
  for(const ship of ready){
-  const keys=ship.build&&ship.build!=='auto'?[ship.build]:['1111','1121','1123','3123','3124'];
+  const keys=ship.build&&ship.build!=='auto'?[ship.build].filter(key=>validBuild(key,shipRank(ship))&&allocate(key,fixedUsage,total)):candidateBuilds(ship,fixedUsage,total);
   for(const key of keys){
-   if(!validBuild(key,shipRank(ship))||!allocate(key,fixedUsage,total))continue;
-   const route=bestItemRoutes(open,ship,key,hours,s,itemId,400)[0];
-   if(route)candidates.push({ship,key,route});
+   // 航線只取決於 Rank、速度與航程；同數值的不同部件組合共用一次搜尋。
+   const b=buildInfos.get(key),k=[shipRank(ship),b.speed,b.range].join(':');
+   if(!cache.has(k))cache.set(k,bestItemRoutes(open,ship,key,hours,s,itemId,400)[0]||null);
+   const route=cache.get(k);if(!route)continue;
+   // 同一艘船的不同組合跑出同一條航線時，只列效率最高的；同效率取換裝件數最少的。
+   const id=ship.index+'|'+makeLabel(route.path),prev=seen.get(id),current=installed(ship);
+   if(prev===undefined){seen.set(id,candidates.length);candidates.push({ship,key,route});continue}
+   const old=candidates[prev];
+   if(route.score>old.route.score||(route.score===old.route.score&&partChanges(current,key)<partChanges(current,old.key)))candidates[prev]={ship,key,route};
   }
  }
  candidates.sort((a,b)=>b.route.score-a.route.score);
@@ -465,6 +504,7 @@ function nextMapProgress(open){
 // 只分配「現在可派船」的配件；航行中的已裝配配件先保留。
 // 目標是增加全艦隊的 OJ 營運船日，並降低最後一艘畢業拖延。
 // 這是逐趟啟發式排程，非已證明的全航程最優解。
+const CHOICES_PER_SHIP=6;
 function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, daily){
  const requested=plans.filter(p=>!p.ship.voyaging&&(p.rank<targetRank||p.explorer));
  // 仍然替其他可派船計算；單艘沒有可行航線不應拖垮整個船隊。
@@ -472,6 +512,11 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
  const ready=requested.filter(p=>p.choices.length);
  if(!ready.length)return {chosen:new Map(),missing,
   reason:missing.length?'潛艇 '+missing.join('、')+' 找不到可行航線，請檢查海圖／Rank／回航上限。':null};
+ // 每艘船的選項依自身效益排序（開圖優先、其次預估畢業日），
+ // 逐船只嘗試前幾個庫存仍可組出的選項，避免全部組合相乘後爆量。
+ const order=new Map(ready.map(p=>[p,p.choices.map(option=>({option,
+  rank:option.opening?pickupElapsed(option.route.time,daily)/DAY-1e6:estimatedFinishDays(p,option,targetRank,daily)}))
+  .sort((a,b)=>a.rank-b.rank).map(x=>x.option)]));
  let best=null;
  const decisions=new Map();
  function evaluate(usage,gateCount,gateTurns){
@@ -491,10 +536,12 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
  }
  function walk(i,usage,count,turns){
   if(i>=ready.length){evaluate(usage,count,turns);return}
-  const p=ready[i];
-  for(const option of p.choices){
+  const p=ready[i];let tried=0;
+  for(const option of order.get(p)){
+   if(tried>=CHOICES_PER_SHIP)break;
    const updated=allocate(option.key,usage,availableStock);
    if(!updated)continue;
+   tried++;
    decisions.set(p.ship.index,{plan:p,option});
    walk(i+1,updated,count+Number(option.opening),turns+(option.opening?pickupElapsed(option.route.time,daily):0));
    decisions.delete(p.ship.index);
@@ -522,7 +569,7 @@ function calculateNow(){
  if(!data)return;
  const s=state(),ships=s.ships||[],open=unlockedSectors(s,145),
   hours=Number($('calc-hours').value)||48,target=Math.max(2,Math.min(maxRank(),Number($('calc-target-rank').value)||85)),
-  daily=Boolean($('daily-pickup')?.checked),total=stock(s),available0003=Math.max(0,Number(total['0003:3'])||0),
+  daily=Boolean($('daily-pickup')?.checked),total=stock(s),
   explorersWanted=Math.max(0,Math.min(4,Number($('calc-explorers')?.value)||0));
  const w=windowSettings();
  if(daily&&!w.valid){$('calc-result').innerHTML='<p class="calc-warning">收船窗口結束時間必須晚於開始時間，且在同一天內。</p>';return}
@@ -530,46 +577,63 @@ function calculateNow(){
  const registered=ships.map((ship,i)=>({...ship,index:i})).filter(x=>x.registered);
  const progress=nextMapProgress(open);
  if(!registered.length){$('calc-result').innerHTML='<span class="calc-warning">目前沒有已登記潛艇。</span>';return}
- // 同一天相同 Rank／配置／目標的計算只搜尋一次。
+ // 航線只取決於 Rank、速度、航程與目標：同數值的不同配置只搜尋一次。
  const cache=new Map();
- function getRoutes(ship,key,required){
-  const k=[shipRank(ship),key,required||0,hours,daily].join(':');
-  if(!cache.has(k))cache.set(k,bestRoutes(open,ship,key,hours,s,required||null,required?350:180));
+ function getRoutes(ship,key,required,beam){
+  const b=buildInfos.get(key);if(!b)return [];
+  beam=beam||(required?350:180);
+  const k=[shipRank(ship),b.speed,b.range,required||0,beam].join(':');
+  if(!cache.has(k))cache.set(k,bestRoutes(open,ship,key,hours,s,required||null,beam));
   return cache.get(k);
  }
- function options(ship){
-  if(ship.voyaging)return [installed(ship)];
-  return ship.build&&ship.build!=='auto'?[ship.build]:['1111','1121','1123','3123'];
+ // 組合很多時先用窄搜尋粗排，只對最有希望的幾種數值（及目前配置）做完整搜尋；
+ // 其餘保留窄搜尋找到的航線，作為庫存被其他船用掉時的替補。
+ const SCREEN_BEAM=40,FULL_POINTS=4;
+ function normalRoutes(ship,keys){
+  const point=key=>{const b=buildInfos.get(key);return b.speed+','+b.range};
+  const firstKey=new Map();for(const key of keys)if(!firstKey.has(point(key)))firstKey.set(point(key),key);
+  if(firstKey.size<=FULL_POINTS)return new Map(keys.map(key=>[key,getRoutes(ship,key,null)]));
+  const quick=key=>getRoutes(ship,key,null,SCREEN_BEAM)[0]?.score||0;
+  const ranked=[...firstKey.entries()].sort((a,b)=>quick(b[1])-quick(a[1]));
+  const full=new Set(ranked.slice(0,FULL_POINTS).map(x=>x[0]).concat(point(installed(ship))));
+  return new Map(keys.map(key=>[key,getRoutes(ship,key,null,full.has(point(key))?0:SCREEN_BEAM)]));
  }
- function gateOptions(ship){
+ // 自動模式：從扣掉其他船占用後的庫存中，列出這艘船能組出的配置。
+ function options(ship,used){
+  if(ship.voyaging)return [installed(ship)];
+  return ship.build&&ship.build!=='auto'?[ship.build]:candidateBuilds(ship,used,total);
+ }
+ function gateOptions(ship,used){
   const rank=shipRank(ship);
-  return options(ship).filter(key=>validBuild(key,rank))
-   .map(key=>({key,normal:getRoutes(ship,key,null),
+  const keys=options(ship,used).filter(key=>validBuild(key,rank)),routes=normalRoutes(ship,keys);
+  return keys.map(key=>({key,normal:routes.get(key),
     gate:progress?.parent&&progress.step?getRoutes(ship,key,progress.parent.id):[]}));
  }
+ // 航行中的船部件一定占著；判斷誰能撥去開圖時先扣掉這些。
+ let voyagingUsage={};
+ for(const ship of registered.filter(x=>x.voyaging))voyagingUsage=allocate(installed(ship),voyagingUsage,total)||voyagingUsage;
  // 依設定從已畢業（原本跑 OJ）的船撥出幾艘開後續海域：Rank 越高能探索的前置點越遠，優先撥出。
  const graduated=registered.filter(x=>!x.voyaging&&shipRank(x)>=target);
  const explorers=new Set(explorersWanted&&progress?.parent?graduated
-  .filter(x=>gateOptions(x).some(o=>o.gate.length))
+  .filter(x=>gateOptions(x,voyagingUsage).some(o=>o.gate.length))
   .sort((a,b)=>shipRank(b)-shipRank(a)||a.index-b.index).slice(0,explorersWanted).map(x=>x.index):[]);
- let fixedUsage={},reserved0003=0,stockConflict='';
+ let fixedUsage={},stockConflict='';
  for(const ship of registered.filter(x=>(x.voyaging||shipRank(x)>=target)&&!explorers.has(x.index))){
   const current=installed(ship);
   const next=allocate(current,fixedUsage,total);
   if(!next){stockConflict='航行中或已畢業但尚未拆下的配件超過庫存，請檢查各船「實際配置」與零件數量。';break}
   fixedUsage=next;
-  if(['1123','3123'].includes(current))reserved0003++;
  }
  if(stockConflict){
   $('calc-result').innerHTML='<p class="calc-warning">'+esc(stockConflict)+'</p>';return;
  }
  const ready=registered.filter(x=>!x.voyaging&&(shipRank(x)<target||explorers.has(x.index)));
  const plans=ready.map(ship=>{
-  const rank=shipRank(ship),routeOptions=gateOptions(ship);
+  const rank=shipRank(ship),routeOptions=gateOptions(ship,fixedUsage);
   return {ship,rank,routeOptions,canOpen:routeOptions.some(o=>o.gate.length>0),explorer:explorers.has(ship.index),choices:[]};
  });
  // 延續開圖原則：開圖船合計最多兩艘（撥出的畢業船優先），其餘由練等中最高 Rank 的合格船補上；
- // 但由整隊配置評分決定是否使用 0003。
+ // 各船用哪組部件由整隊配置評分決定。
  const openers=progress?.step&&progress.parent?plans.filter(p=>p.canOpen&&!p.explorer)
   .sort((a,b)=>b.rank-a.rank||a.ship.index-b.ship.index).slice(0,Math.max(0,2-explorers.size)).map(p=>p.ship.index):[];
  for(const p of plans){
@@ -582,6 +646,7 @@ function calculateNow(){
    }
   }
  }
+ const ownBestRate=p=>Math.max(0,...p.choices.filter(c=>!c.opening).map(c=>c.route.actualXp/(pickupElapsed(c.route.time,daily)/DAY)));
  const allocation=selectFleetAllocation(plans,fixedUsage,total,target,daily);
  const selected=allocation.chosen;
  let fuel=0,html=[];
@@ -589,16 +654,13 @@ function calculateNow(){
   const rank=shipRank(ship),current=installed(ship);
   if(ship.voyaging){
    html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'（Rank '+rank+'）</h3>'
-    +'<div class="route-meta">航行中，'+esc(current)+' 配件已占用'
-    +(builds[current]&&['1123','3123'].includes(current)?'（包含 0003 ×1）':'')
-    +'。無法在返航前轉移配件；下次收船後取消「航行中」再計算。</div></article>');
+    +'<div class="route-meta">航行中，'+esc(current)+' 配件已占用。無法在返航前轉移配件；下次收船後取消「航行中」再計算。</div></article>');
    continue;
   }
   if(rank>=target&&!explorers.has(ship.index)){
-   const holding=['1123','3123'].includes(current);
    html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'：已達 Rank '+target+'</h3>'
     +'<div class="route-meta">已達練等目標；建議換成 3124 跑 O → J。'
-    +(holding?'目前 '+esc(current)+' 上的 0003 還是已安裝狀態，暫時不會借給別艘。':'')
+    +(current!=='3124'?'目前 '+esc(current)+' 的部件仍算已安裝，換裝前不會借給別艘。':'')
     +(current==='3124'?' 已登記為 3124，無需換裝。':' 請先在遊戲內換裝，再確認釋出配件。')
     +'</div>'
     +(current!=='3124'?'<div class="switch-advice"><strong>建議換裝：'+esc(current)+' → 3124</strong><span>'
@@ -624,9 +686,9 @@ function calculateNow(){
    ?'依設定從畢業船撥出開後續海域，練等船不受影響。'
    :opening
    ?'優先完成必要開圖，避免全隊受前置航點阻塞。'
-   :['1123','3123'].includes(key)
-    ?'本輪比較後，將有限 0003 分配給此艇有利於整隊盡早完成練等。'
-    :'保留 0003 給其他潛艇，整隊預估營運船日較有利。';
+   :route.actualXp/turns<ownBestRate(p)*0.999
+    ?'這艘自己的最佳配置所需部件分給其他船對整隊較有利；這是剩餘庫存中的最佳組合。'
+    :'在庫存可組出的組合中，這組的 EXP／收船週期最高。';
   const switching=current!==key;
   const swapText=switching
     ?'<div class="switch-advice"><strong>本趟建議換裝：'+esc(current)+' → '+esc(key)+'</strong>'
@@ -635,7 +697,7 @@ function calculateNow(){
     :'<div class="route-meta">本趟使用 '+esc(key)+'，不用換裝。'+esc(reason)+'</div>';
   fuel+=route.fuel;
   html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'：'+(explorer?'畢業船開圖：':opening?'開圖兼練等：':'升等優先：')+esc(makeLabel(route.path))+'</h3>'
-   +'<div class="route-meta">Rank '+rank+' · 建議配置 <strong>'+esc(key)+'</strong> · 速度 '+stats.speed+' / 航程 '+stats.range+'</div>'
+   +'<div class="route-meta">Rank '+rank+' · 建議配置 <strong>'+esc(buildLabel(key))+'</strong> · 速度 '+stats.speed+' / 航程 '+stats.range+'</div>'
    +swapText
    +'<div class="route-kpis"><span>'+route.actualXp.toLocaleString()+' EXP/趟'+(route.usedExp?'（實測）':'（基礎值）')+'</span>'
    +'<span>'+fmtTime(route.time)+'</span><span>'+route.fuel+' 罐燃料</span><span>航程 '+route.range+'</span>'
@@ -650,11 +712,11 @@ function calculateNow(){
    +'<button class="voyage-depart-button" type="button" data-depart-ship="'+ship.index+'">⚓ 確認出航</button></div>'
    +'</article>');
  }
- const premiumAssigned=[...selected.values()].filter(c=>['1123','3123'].includes(c.key)).length;
- const free0003=Math.max(0,available0003-reserved0003-premiumAssigned);
- const header='<div class="route-meta"><strong>0003 智慧分配：</strong>持有 '+available0003+' 套；航行中／已畢業未拆配件占用 '+reserved0003
-  +' 套；本輪派船分配 '+premiumAssigned+' 套；暫時未使用 '+free0003+' 套。'
-  +' 本次比較最多四艘的可行組合，考慮剩餘 EXP、畢業瓶頸及必要開圖。</div>';
+ const count=usage=>Object.values(usage).reduce((a,b)=>a+(Number(b)||0),0);
+ const compared=plans.reduce((n,p)=>n+p.routeOptions.length,0);
+ const header='<div class="route-meta"><strong>依庫存配裝：</strong>部件庫存 '+count(total)+' 件；航行中／已畢業未拆的船占用 '+count(fixedUsage)
+  +' 件；本輪派船使用 '+selected.size*4+' 件。'
+  +' 返航船共比較 '+compared+' 種庫存可組出的配置，考慮剩餘 EXP、畢業瓶頸及必要開圖。</div>';
  const progressNote=progress?.step
   ?'<p class="hint">下一張海圖目標：'+esc(seaName(progress.target.map)+' '+progress.target.letter)
    +'；優先探索 '+esc(progress.parent?seaName(progress.parent.map)+' '+progress.parent.letter:'尚未開出的前置點')
@@ -714,7 +776,7 @@ function calculateNow(){
  });
  $('calc-result').querySelectorAll('[data-apply-build]').forEach(btn=>btn.onclick=()=>{
   const i=Number(btn.dataset.applyBuild),next=btn.dataset.newBuild;
-  if(!builds[next]||state().ships[i].voyaging)return;
+  if(!isBuild(next)||state().ships[i].voyaging)return;
   recordBuildChange(i,next);renderBuilds();calculate();
  });
 }

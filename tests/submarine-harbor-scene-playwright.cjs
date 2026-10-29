@@ -245,9 +245,9 @@ async function main(){
 
   await test('計算器變更實際配置後，碼頭潛水艇外形即時更新',async()=>{
     const {ctx,page}=await open(fleetSeed());
-    await page.waitForSelector('[data-installed="0"]',{timeout:20000});
+    await page.waitForSelector('[data-installed-part="0:3"]',{timeout:20000});
     assert.strictEqual((await page.evaluate(()=>HarborScene.time().builds))[0],'1121');
-    await page.selectOption('[data-installed="0"]','1123');await page.waitForTimeout(300);
+    await page.selectOption('[data-installed-part="0:3"]','3');await page.waitForTimeout(300);
     assert.strictEqual((await page.evaluate(()=>HarborScene.time().builds))[0],'1123','外形未跟隨配置更新');
     assert.strictEqual((await page.evaluate(k=>JSON.parse(localStorage.getItem(k)).ships[0].currentBuild,KEY)),'1123');
     assert.ok((await tooltipFor(page,0)).includes('配置 1123'));
