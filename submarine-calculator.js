@@ -379,15 +379,37 @@ function frontierParents(open){
  }
  return out;
 }
-// 找出至少經過一個邊界前置點的航線。mode='frontier' 先比可開航點數；mode='balanced' 先比收益指標
-// （EXP／收船週期：工具沒有各航點金策掉落表，以航點 EXP 代表深度與價值），再比可開航點數。
-function bestFrontierRoutes(available,ship,buildKey,maxHours,s,parents,mode,beamLimit=250){
+// 各航點每次打撈的 Gil 期望值：掉落機率 × 平均堆疊數 × 單價。回收飾品用 NPC 收購價，
+// 其他物品用已查到的行情（Universalis／手動）；查不到價的物品算 0，並記下它們占掉落機率的比例。
+function sectorGilTable(){
+ const P=window.SubmarinePrices,byId=new Map();
+ for(const [name,id] of Object.entries(P?.itemIds||{})){if(!byId.has(Number(id)))byId.set(Number(id),[]);byId.get(Number(id)).push(name)}
+ const priceCache=new Map(),price=row=>{
+  if(!priceCache.has(row.itemId)){
+   let v=null;
+   for(const n of [...(byId.get(row.itemId)||[]),row.localName]){const x=P?.lookup(n)?.price;if(Number.isFinite(x)){v=x;break}}
+   priceCache.set(row.itemId,v);
+  }
+  return priceCache.get(row.itemId);
+ };
+ const table=new Map();
+ for(const row of lootData){
+  const t=table.get(row.sectorId)||{gil:0,unpriced:0,total:0},chance=Math.max(0,Math.min(1,row.chance)),v=price(row);
+  t.total+=chance;
+  if(v===null)t.unpriced+=chance;else t.gil+=chance*Math.max(0,row.q[1]||0)*v;
+  table.set(row.sectorId,t);
+ }
+ return table;
+}
+// 找出至少經過一個邊界前置點的航線，依 mode 排序：
+// 'balanced' 兼顧 EXP（EXP／收船週期）、'gil' 兼顧 Gil（Gil 估值／收船週期）、'frontier' 只管開圖（可開航點數，再比週期短）。
+function bestFrontierRoutes(available,ship,buildKey,maxHours,s,parents,mode,beamLimit=250,gilTable=new Map()){
  const rank=shipRank(ship);if(!validBuild(buildKey,rank))return [];
  const stats=buildStats(buildKey,rank),daily=Boolean($('daily-pickup')?.checked),results=[];
  for(const map of seaIds()){const home=seaHome(map);
   const eligible=available.filter(p=>p.map===map&&p.rank<=rank);
   if(!eligible.some(p=>parents.has(p.id)))continue;
-  let beam=[{path:[],prev:home,range:0,time:43200,fuel:0,xp:0,opens:0,used:new Set()}];
+  let beam=[{path:[],prev:home,range:0,time:43200,fuel:0,xp:0,gil:0,unpriced:0,opens:0,used:new Set()}];
   for(let depth=0;depth<5;depth++){
    const next=[];
    for(const cur of beam)for(const p of eligible){
@@ -397,9 +419,10 @@ function bestFrontierRoutes(available,ship,buildKey,maxHours,s,parents,mode,beam
     const nt=cur.time+travelSeconds(edge[1],stats.speed)+surveySeconds(p,stats.speed);
     if(nt>maxHours*3600)continue;
     next.push({path:cur.path.concat(p),prev:p.id,range:nr,time:nt,fuel:cur.fuel+p.fuel,
-      xp:cur.xp+p.xp,opens:cur.opens+(parents.get(p.id)?.length||0),used:new Set([...cur.used,p.id])});
+      xp:cur.xp+p.xp,gil:cur.gil+(gilTable.get(p.id)?.gil||0),unpriced:cur.unpriced+(gilTable.get(p.id)?.unpriced??1),
+      opens:cur.opens+(parents.get(p.id)?.length||0),used:new Set([...cur.used,p.id])});
    }
-   const quick=r=>r.xp/pickupElapsed(r.time,daily);
+   const quick=mode==='gil'?r=>r.gil/pickupElapsed(r.time,daily):mode==='frontier'?r=>-pickupElapsed(r.time,daily):r=>r.xp/pickupElapsed(r.time,daily);
    next.sort((a,b)=>quick(b)-quick(a)||b.opens-a.opens);
    // 高收益的半成品與已經過前置點的航線各保留一份，避免其中一種被另一種擠出搜尋。
    const touching=next.filter(r=>r.opens>0).sort((a,b)=>b.opens-a.opens||quick(b)-quick(a)).slice(0,beamLimit);
@@ -411,9 +434,9 @@ function bestFrontierRoutes(available,ship,buildKey,maxHours,s,parents,mode,beam
  const routes=new Map();
  for(const r of results){
   const label=makeLabel(r.path),observed=measuredExp(r.path,s),xp=observed||r.xp;
-  const score=xp/pickupElapsed(r.time,daily);
-  if(!routes.has(label)||routes.get(label).score<score)routes.set(label,{...r,actualXp:xp,usedExp:Boolean(observed),score,build:buildKey,
-   targets:r.path.flatMap(p=>parents.get(p.id)||[])});
+  const cycle=pickupElapsed(r.time,daily),score=xp/cycle,route={...r,actualXp:xp,usedExp:Boolean(observed),score,gilRate:r.gil/cycle,cycle,build:buildKey,
+   targets:r.path.flatMap(p=>parents.get(p.id)||[])};
+  if(!routes.has(label)||frontierOrder(mode)(route,routes.get(label))<0)routes.set(label,route);
  }
  return [...routes.values()].sort(frontierOrder(mode)).slice(0,3);
 }
@@ -423,10 +446,13 @@ function frontierNote(route){
  const parents=route.path.filter(p=>route.targets.some(t=>t.unlockedBy===p.id));
  return '<div class="route-meta">本輪經過前置點 '+esc(parents.map(p=>seaName(p.map)+' '+p.letter).join('、'))
   +'，可能開出 '+esc(route.targets.map(name).join('、'))+'（共 '+route.targets.length+' 個未開航點）；開圖有機率，成功後請點地圖更新。'
-  +'收益指標以航點 EXP 估計：'+Math.round(route.score*DAY).toLocaleString()+' EXP／收船日。</div>';
+  +'預估 '+Math.round(route.score*DAY).toLocaleString()+' EXP／收船日、Gil 估值約 '+Math.round(route.gilRate*DAY).toLocaleString()+' Gil／收船日'
+  +(route.unpriced>0.005?'（約 '+Math.round(route.unpriced/route.path.length*100)+'% 的掉落還沒有價格，未計入）':'')+'。</div>';
 }
 function frontierOrder(mode){
- return mode==='frontier'?(a,b)=>b.opens-a.opens||b.score-a.score:(a,b)=>b.score-a.score||b.opens-a.opens;
+ if(mode==='frontier')return (a,b)=>b.opens-a.opens||a.cycle-b.cycle||b.score-a.score;
+ if(mode==='gil')return (a,b)=>b.gilRate-a.gilRate||b.opens-a.opens||b.score-a.score;
+ return (a,b)=>b.score-a.score||b.opens-a.opens;
 }
 
 
@@ -632,7 +658,7 @@ function calculateNow(){
   hours=Number($('calc-hours').value)||48,target=Math.max(2,Math.min(maxRank(),Number($('calc-target-rank').value)||85)),
   daily=Boolean($('daily-pickup')?.checked),total=stock(s),
   explorersWanted=Math.max(0,Math.min(4,Number($('calc-explorers')?.value)||0)),
-  exploreMode=['frontier','balanced'].includes($('calc-explore-mode')?.value)?$('calc-explore-mode').value:'next';
+  exploreMode=['frontier','balanced','gil'].includes($('calc-explore-mode')?.value)?$('calc-explore-mode').value:'next';
  const w=windowSettings();
  if(daily&&!w.valid){$('calc-result').innerHTML='<p class="calc-warning">收船窗口結束時間必須晚於開始時間，且在同一天內。</p>';return}
  if(daily&&!w.departureInside){$('calc-result').innerHTML='<p class="calc-warning">預計本次派船時間應在收船窗口內；請調整時間後再計算。</p>';return}
@@ -643,7 +669,7 @@ function calculateNow(){
  const exploring=progress?.parent&&progress.step?'next':frontier?.size?'frontier':null;
  if(!registered.length){$('calc-result').innerHTML='<span class="calc-warning">目前沒有已登記潛艇。</span>';return}
  // 航線只取決於 Rank、速度、航程與目標：同數值的不同配置只搜尋一次。
- const cache=new Map();
+ const cache=new Map(),gilTable=exploring==='frontier'?sectorGilTable():new Map();
  function getRoutes(ship,key,required,beam){
   const b=buildInfos.get(key);if(!b)return [];
   beam=beam||(required?350:180);
@@ -667,7 +693,7 @@ function calculateNow(){
   const b=buildInfos.get(key);if(!b)return [];
   beam=beam||250;
   const k=['F',exploreMode,shipRank(ship),b.speed,b.range,beam].join(':');
-  if(!cache.has(k))cache.set(k,bestFrontierRoutes(open,ship,key,hours,s,frontier,exploreMode,beam));
+  if(!cache.has(k))cache.set(k,bestFrontierRoutes(open,ship,key,hours,s,frontier,exploreMode,beam,gilTable));
   return cache.get(k);
  }
  // 剩餘航點開圖同樣先窄搜尋粗排，只對開圖目標排序最前面的幾種數值做完整搜尋。
@@ -675,7 +701,7 @@ function calculateNow(){
   const point=key=>{const b=buildInfos.get(key);return b.speed+','+b.range};
   const firstKey=new Map();for(const key of keys)if(!firstKey.has(point(key)))firstKey.set(point(key),key);
   if(firstKey.size<=FULL_POINTS)return new Map(keys.map(key=>[key,getFrontierRoutes(ship,key)]));
-  const order=frontierOrder(exploreMode),none={opens:0,score:0};
+  const order=frontierOrder(exploreMode),none={opens:0,score:0,gilRate:0,cycle:Infinity};
   const ranked=[...firstKey.entries()].sort((a,b)=>order(getFrontierRoutes(ship,a[1],SCREEN_BEAM)[0]||none,getFrontierRoutes(ship,b[1],SCREEN_BEAM)[0]||none));
   const full=new Set(ranked.slice(0,FULL_POINTS).map(x=>x[0]));
   return new Map(keys.map(key=>[key,getFrontierRoutes(ship,key,full.has(point(key))?0:SCREEN_BEAM)]));
@@ -820,7 +846,7 @@ function calculateNow(){
   if(exploreMode==='next')return head+'還有 '+closed+' 個航點未開；想用撥出的畢業船慢慢開，可把「海圖開完後」改成開剩餘航點。';
   const reachable=[...frontier.values()].reduce((a,x)=>a+x.length,0);
   return head+'還有 '+closed+' 個航點未開，其中 '+reachable+' 個的前置點已開、這輪就能探索。'
-   +(explorers.size?'撥出 '+explorers.size+' 艘畢業船去開，'+(exploreMode==='frontier'?'優先選能開最多航點的航線':'在經過前置點的航線中挑收益指標最高的')+'；其他船照常練等／跑 O → J。'
+   +(explorers.size?'撥出 '+explorers.size+' 艘畢業船去開，'+({frontier:'只管開圖：優先選能開最多航點的航線，同樣多再挑收船週期短的',gil:'在經過前置點的航線中挑 Gil 估值／收船週期最高的',balanced:'在經過前置點的航線中挑 EXP／收船週期最高的'}[exploreMode])+'；其他船照常練等／跑 O → J。'
     :'要開的話，把「畢業船撥去開圖」設為 1 艘以上。')
    +(explorersWanted>explorers.size&&explorers.size?'（設定撥出 '+explorersWanted+' 艘，但目前只有 '+explorers.size+' 艘返航中的畢業船能跑到前置點。）':'');
  }
@@ -895,7 +921,7 @@ function plannerControls(settings){
  $('calc-hours').value=[24,36,48,50,52,72].includes(Number(s.maxHours))?String(s.maxHours):'72';
  $('calc-target-rank').value=Number.isInteger(Number(s.targetRank))&&Number(s.targetRank)>=2&&Number(s.targetRank)<=maxRank()?String(s.targetRank):'85';
  $('calc-explorers').value=[0,1,2,3,4].includes(Number(s.explorers))?String(Number(s.explorers)):'0';
- $('calc-explore-mode').value=['next','balanced','frontier'].includes(s.exploreMode)?s.exploreMode:'next';
+ $('calc-explore-mode').value=['next','balanced','gil','frontier'].includes(s.exploreMode)?s.exploreMode:'next';
  $('daily-pickup').checked=s.dailyPickup!==false;
  $('pickup-start').value=validClock(s.pickupStart,'19:00');
  $('pickup-end').value=validClock(s.pickupEnd,'22:00');
@@ -915,6 +941,8 @@ async function init(){
  try{
   const [res,lootRes]=await Promise.all([fetch('submarine-route-data.json?v=20261022-seas2'),fetch('submarine-loot-data.json?v=20261022-seas')]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
   data=await res.json();lootData=await lootRes.json();
+  // 讓行情查詢也涵蓋掉落表的物品，「兼顧 Gil」才有材料價格可用。
+  window.SubmarineLootItemIds=Object.fromEntries(lootData.map(x=>[x.localName||x.name,x.itemId]));
   renderBuilds();renderSectors();renderItemPlanner();
   let manuallySelectedDeparture=plannerControls(state().plannerSettings);
   // 記錄已啟用長航線，避免之後手動切回 48h 又被升級。
@@ -955,6 +983,8 @@ async function init(){
    renderBuilds();renderSectors();calculate();
   });
   window.addEventListener('submarine-state-updated',()=>{renderBuilds();renderSectors();calculate()});
+  // 查到新行情後，「兼顧 Gil」的估值跟著更新。
+  window.addEventListener('submarine-prices-updated',()=>{if($('calc-explore-mode')?.value==='gil')calculate()});
   calculate();
  }catch(e){$('calc-result').textContent='海域資料載入失敗：'+e.message}
 }
