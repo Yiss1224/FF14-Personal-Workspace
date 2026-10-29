@@ -334,6 +334,66 @@ function bestRoutes(available,ship,buildKey,maxHours,s,requiredId=null,beamLimit
  }
  return [...routes.values()].sort((a,b)=>b.score-a.score).slice(0,3);
 }
+// 海圖入口都開後的剩餘開圖：未開航點中「前置點已開」者是現在就能探索到的邊界。
+// 回傳 前置點 id → 經過它可能開出的未開航點。
+function frontierParents(open){
+ const openIds=new Set(open.map(p=>p.id)),out=new Map();
+ for(const p of data.sectors){
+  if(openIds.has(p.id)||!p.unlockedBy||!openIds.has(p.unlockedBy))continue;
+  if(!out.has(p.unlockedBy))out.set(p.unlockedBy,[]);
+  out.get(p.unlockedBy).push(p);
+ }
+ return out;
+}
+// 找出至少經過一個邊界前置點的航線。mode='frontier' 先比可開航點數；mode='balanced' 先比收益指標
+// （EXP／收船週期：工具沒有各航點金策掉落表，以航點 EXP 代表深度與價值），再比可開航點數。
+function bestFrontierRoutes(available,ship,buildKey,maxHours,s,parents,mode,beamLimit=250){
+ const rank=shipRank(ship);if(!validBuild(buildKey,rank))return [];
+ const stats=buildStats(buildKey,rank),daily=Boolean($('daily-pickup')?.checked),results=[];
+ for(const map of seaIds()){const home=seaHome(map);
+  const eligible=available.filter(p=>p.map===map&&p.rank<=rank);
+  if(!eligible.some(p=>parents.has(p.id)))continue;
+  let beam=[{path:[],prev:home,range:0,time:43200,fuel:0,xp:0,opens:0,used:new Set()}];
+  for(let depth=0;depth<5;depth++){
+   const next=[];
+   for(const cur of beam)for(const p of eligible){
+    if(cur.used.has(p.id))continue;
+    const edge=p.to[String(cur.prev)];if(!edge)continue;
+    const nr=cur.range+edge[0]+p.sr;if(nr>stats.range)continue;
+    const nt=cur.time+travelSeconds(edge[1],stats.speed)+surveySeconds(p,stats.speed);
+    if(nt>maxHours*3600)continue;
+    next.push({path:cur.path.concat(p),prev:p.id,range:nr,time:nt,fuel:cur.fuel+p.fuel,
+      xp:cur.xp+p.xp,opens:cur.opens+(parents.get(p.id)?.length||0),used:new Set([...cur.used,p.id])});
+   }
+   const quick=r=>r.xp/pickupElapsed(r.time,daily);
+   next.sort((a,b)=>quick(b)-quick(a)||b.opens-a.opens);
+   // 高收益的半成品與已經過前置點的航線各保留一份，避免其中一種被另一種擠出搜尋。
+   const touching=next.filter(r=>r.opens>0).sort((a,b)=>b.opens-a.opens||quick(b)-quick(a)).slice(0,beamLimit);
+   beam=[...new Set([...next.slice(0,beamLimit),...touching])];
+   results.push(...touching);
+   if(!beam.length)break;
+  }
+ }
+ const routes=new Map();
+ for(const r of results){
+  const label=makeLabel(r.path),observed=measuredExp(r.path,s),xp=observed||r.xp;
+  const score=xp/pickupElapsed(r.time,daily);
+  if(!routes.has(label)||routes.get(label).score<score)routes.set(label,{...r,actualXp:xp,usedExp:Boolean(observed),score,build:buildKey,
+   targets:r.path.flatMap(p=>parents.get(p.id)||[])});
+ }
+ return [...routes.values()].sort(frontierOrder(mode)).slice(0,3);
+}
+// 剩餘航點開圖的航線說明：經過哪些前置點、可能開出哪些航點。
+function frontierNote(route){
+ const name=p=>seaName(p.map)+' '+p.letter+(sectorName(p.map,p.letter)?'（'+sectorName(p.map,p.letter)+'）':'');
+ const parents=route.path.filter(p=>route.targets.some(t=>t.unlockedBy===p.id));
+ return '<div class="route-meta">本輪經過前置點 '+esc(parents.map(p=>seaName(p.map)+' '+p.letter).join('、'))
+  +'，可能開出 '+esc(route.targets.map(name).join('、'))+'（共 '+route.targets.length+' 個未開航點）；開圖有機率，成功後請點地圖更新。'
+  +'收益指標以航點 EXP 估計：'+Math.round(route.score*DAY).toLocaleString()+' EXP／收船日。</div>';
+}
+function frontierOrder(mode){
+ return mode==='frontier'?(a,b)=>b.opens-a.opens||b.score-a.score:(a,b)=>b.score-a.score||b.opens-a.opens;
+}
 
 
 const fmtYield=n=>n<0.01?n.toFixed(4):n<1?n.toFixed(3):n.toFixed(2);
@@ -482,8 +542,9 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
   const fleetBottleneck=Math.max(0,...etas);
   const switching=entries.filter(({plan,option})=>installed(plan.ship)!==option.key).length;
   // 開圖優先：先保證盡可能多艘合格開圖船探索，再降低其派船週期。
-  // 剩下的以可提前投入 OJ 的船日＋全艦隊完成日期評分。
-  const objective=sum+fleetBottleneck*0.6+switching*0.002;
+  // 剩下的以可提前投入 OJ 的船日＋全艦隊完成日期評分；剩餘航點開圖以 penalty 表達航線偏好順序。
+  const preference=entries.reduce((a,{option})=>a+(option.penalty||0),0);
+  const objective=sum+fleetBottleneck*0.6+switching*0.002+preference;
   const val={gateCount,gateTurns,objective,entries:entries.map(x=>({plan:x.plan,option:x.option}))};
   if(!best||val.gateCount>best.gateCount||
      (val.gateCount===best.gateCount&&val.gateTurns<best.gateTurns)||
@@ -496,7 +557,7 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
    const updated=allocate(option.key,usage,availableStock);
    if(!updated)continue;
    decisions.set(p.ship.index,{plan:p,option});
-   walk(i+1,updated,count+Number(option.opening),turns+(option.opening?pickupElapsed(option.route.time,daily):0));
+   walk(i+1,updated,count+Number(option.opening),turns+(option.opening&&!option.frontier?pickupElapsed(option.route.time,daily):0));
    decisions.delete(p.ship.index);
   }
  }
@@ -523,18 +584,27 @@ function calculateNow(){
  const s=state(),ships=s.ships||[],open=unlockedSectors(s,145),
   hours=Number($('calc-hours').value)||48,target=Math.max(2,Math.min(maxRank(),Number($('calc-target-rank').value)||85)),
   daily=Boolean($('daily-pickup')?.checked),total=stock(s),available0003=Math.max(0,Number(total['0003:3'])||0),
-  explorersWanted=Math.max(0,Math.min(4,Number($('calc-explorers')?.value)||0));
+  explorersWanted=Math.max(0,Math.min(4,Number($('calc-explorers')?.value)||0)),
+  exploreMode=['frontier','balanced'].includes($('calc-explore-mode')?.value)?$('calc-explore-mode').value:'next';
  const w=windowSettings();
  if(daily&&!w.valid){$('calc-result').innerHTML='<p class="calc-warning">收船窗口結束時間必須晚於開始時間，且在同一天內。</p>';return}
  if(daily&&!w.departureInside){$('calc-result').innerHTML='<p class="calc-warning">預計本次派船時間應在收船窗口內；請調整時間後再計算。</p>';return}
  const registered=ships.map((ship,i)=>({...ship,index:i})).filter(x=>x.registered);
  const progress=nextMapProgress(open);
+ // 下一張海圖的前置鏈優先；海圖入口都開後，依「開圖目標」決定撥出船是否改開剩餘航點。
+ const frontier=!progress&&exploreMode!=='next'?frontierParents(open):null;
+ const exploring=progress?.parent&&progress.step?'next':frontier?.size?'frontier':null;
  if(!registered.length){$('calc-result').innerHTML='<span class="calc-warning">目前沒有已登記潛艇。</span>';return}
  // 同一天相同 Rank／配置／目標的計算只搜尋一次。
  const cache=new Map();
  function getRoutes(ship,key,required){
   const k=[shipRank(ship),key,required||0,hours,daily].join(':');
   if(!cache.has(k))cache.set(k,bestRoutes(open,ship,key,hours,s,required||null,required?350:180));
+  return cache.get(k);
+ }
+ function getFrontierRoutes(ship,key){
+  const k=['F',exploreMode,shipRank(ship),key,hours,daily].join(':');
+  if(!cache.has(k))cache.set(k,bestFrontierRoutes(open,ship,key,hours,s,frontier,exploreMode));
   return cache.get(k);
  }
  function options(ship){
@@ -545,11 +615,12 @@ function calculateNow(){
   const rank=shipRank(ship);
   return options(ship).filter(key=>validBuild(key,rank))
    .map(key=>({key,normal:getRoutes(ship,key,null),
-    gate:progress?.parent&&progress.step?getRoutes(ship,key,progress.parent.id):[]}));
+    gate:exploring==='next'?getRoutes(ship,key,progress.parent.id)
+     :exploring==='frontier'&&rank>=target?getFrontierRoutes(ship,key):[]}));
  }
  // 依設定從已畢業（原本跑 OJ）的船撥出幾艘開後續海域：Rank 越高能探索的前置點越遠，優先撥出。
  const graduated=registered.filter(x=>!x.voyaging&&shipRank(x)>=target);
- const explorers=new Set(explorersWanted&&progress?.parent?graduated
+ const explorers=new Set(explorersWanted&&exploring?graduated
   .filter(x=>gateOptions(x).some(o=>o.gate.length))
   .sort((a,b)=>shipRank(b)-shipRank(a)||a.index-b.index).slice(0,explorersWanted).map(x=>x.index):[]);
  let fixedUsage={},reserved0003=0,stockConflict='';
@@ -570,16 +641,21 @@ function calculateNow(){
  });
  // 延續開圖原則：開圖船合計最多兩艘（撥出的畢業船優先），其餘由練等中最高 Rank 的合格船補上；
  // 但由整隊配置評分決定是否使用 0003。
- const openers=progress?.step&&progress.parent?plans.filter(p=>p.canOpen&&!p.explorer)
+ const openers=exploring==='next'?plans.filter(p=>p.canOpen&&!p.explorer)
   .sort((a,b)=>b.rank-a.rank||a.ship.index-b.ship.index).slice(0,Math.max(0,2-explorers.size)).map(p=>p.ship.index):[];
  for(const p of plans){
   const designated=p.explorer||openers.includes(p.ship.index);
   for(const b of p.routeOptions){
    if(designated&&b.gate.length){
-    for(const route of b.gate.slice(0,2))p.choices.push({key:b.key,route,alternates:b.normal,opening:true});
+    for(const route of b.gate.slice(0,2))p.choices.push({key:b.key,route,alternates:b.normal,opening:true,frontier:exploring==='frontier'});
    }else if(b.normal.length&&!p.explorer){
     p.choices.push({key:b.key,route:b.normal[0],alternates:b.normal,opening:false});
    }
+  }
+  // 剩餘航點開圖：跨配置依開圖目標排序，越後面的航線加一點 penalty，讓整隊評分仍尊重這個順序。
+  if(exploring==='frontier'&&p.explorer){
+   const order=frontierOrder(exploreMode);
+   p.choices.sort((a,b)=>order(a.route,b.route)).forEach((c,i)=>{c.penalty=i*0.05});
   }
  }
  const allocation=selectFleetAllocation(plans,fixedUsage,total,target,daily);
@@ -621,7 +697,7 @@ function calculateNow(){
        (previous.actualXp/(pickupElapsed(previous.time,daily)/DAY))-1)*100):null;
   const explorer=explorers.has(ship.index);
   const reason=explorer
-   ?'依設定從畢業船撥出開後續海域，練等船不受影響。'
+   ?(exploring==='frontier'?'依設定從畢業船撥出開剩餘航點，練等船不受影響。':'依設定從畢業船撥出開後續海域，練等船不受影響。')
    :opening
    ?'優先完成必要開圖，避免全隊受前置航點阻塞。'
    :['1123','3123'].includes(key)
@@ -643,8 +719,9 @@ function calculateNow(){
    +(deltaRate!==null?'<span>相較目前配置 '+(deltaRate>=0?'+':'')+deltaRate+'% EXP／收船週期</span>':'')+'</div>'
    +(explorer
     ?'<div class="route-meta">已達 Rank '+target+'，本趟暫停 O → J 改去開圖；開完或不想開時，把「畢業船撥去開圖」調低即可回到 3124 跑 O → J。</div>'
+     +(choice.frontier?frontierNote(route):'')
     :'<div class="route-meta">至 Rank '+target+' 尚需 '+remaining.toLocaleString()+' EXP；若一直跑這條約 '+runs+' 趟（升級與開圖後會改變）。</div>')
-   +(opening?'<div class="route-meta">本輪探索 '+esc(seaName(progress.step.map)+' '+progress.step.letter)+' 的前置點；成功開圖後請點地圖更新。</div>':'')
+   +(opening&&!choice.frontier?'<div class="route-meta">本輪探索 '+esc(seaName(progress.step.map)+' '+progress.step.letter)+' 的前置點；成功開圖後請點地圖更新。</div>':'')
    +stepBar([{label:switching?'遊戲內換裝 '+current+' → '+key+'，再按「更新紀錄」':'配置符合（'+key+'）',done:!switching,current:switching},{label:'遊戲內派往這條航線',current:!switching},{label:'按「確認出航」開始計時'}])
    +'<div class="voyage-depart-actions"><span class="route-meta">預計實際航行 '+esc(fmtTime(route.time))+'；完成遊戲內出航後再按下按鈕。</span>'
    +'<button class="voyage-depart-button" type="button" data-depart-ship="'+ship.index+'">⚓ 確認出航</button></div>'
@@ -660,7 +737,18 @@ function calculateNow(){
    +'；優先探索 '+esc(progress.parent?seaName(progress.parent.map)+' '+progress.parent.letter:'尚未開出的前置點')
    +'。'+(explorers.size?'撥出 '+explorers.size+' 艘畢業船開圖'+(explorers.size<2?'，練等船最多再補 1 艘':'')+'，其他船照常練等／跑 O → J。':'最多兩艘合格船負責開圖，其他船優先練等。')
    +(explorersWanted>explorers.size?'（設定撥出 '+explorersWanted+' 艘，但目前只有 '+explorers.size+' 艘返航中的畢業船能跑到開圖前置點。）':'')+'</p>'
-  :'<p class="hint">'+(seaIds().every(m=>m===1||open.some(p=>p.id===seaEntry(m)?.id))?'目前資料內的海圖都已開啟；之後新增海圖時，撥出的畢業船會自動改去開新海域。':'下一張海圖前置已完成，返航的船會以練等／OJ 營運為目標分配。')+'</p>';
+  :'<p class="hint">'+(progress?'下一張海圖前置已完成，返航的船會以練等／OJ 營運為目標分配。':remainingNote())+'</p>';
+ function remainingNote(){
+  const openIds=new Set(open.map(p=>p.id)),closed=data.sectors.filter(p=>!openIds.has(p.id)).length;
+  const head='目前資料內的海圖入口都已開啟；之後新增海圖時，撥出的畢業船會自動改去開新海域。';
+  if(!closed)return head+'所有航點也都開完了。';
+  if(exploreMode==='next')return head+'還有 '+closed+' 個航點未開；想用撥出的畢業船慢慢開，可把「海圖開完後」改成開剩餘航點。';
+  const reachable=[...frontier.values()].reduce((a,x)=>a+x.length,0);
+  return head+'還有 '+closed+' 個航點未開，其中 '+reachable+' 個的前置點已開、這輪就能探索。'
+   +(explorers.size?'撥出 '+explorers.size+' 艘畢業船去開，'+(exploreMode==='frontier'?'優先選能開最多航點的航線':'在經過前置點的航線中挑收益指標最高的')+'；其他船照常練等／跑 O → J。'
+    :'要開的話，把「畢業船撥去開圖」設為 1 艘以上。')
+   +(explorersWanted>explorers.size&&explorers.size?'（設定撥出 '+explorersWanted+' 艘，但目前只有 '+explorers.size+' 艘返航中的畢業船能跑到前置點。）':'');
+ }
  const warning=allocation.reason?'<p class="calc-warning">'+esc(allocation.reason)+'</p>':'';
  $('calc-result').innerHTML=header+progressNote+warning+html.join('')
   +'<p class="hint">本輪建議消耗約 '+fuel+' 罐燃料（庫存 '+(Number(s.fuel)||0)+'）。'
@@ -720,7 +808,7 @@ function calculateNow(){
 }
 const defaultPlannerSettings={
  maxHours:72,targetRank:85,dailyPickup:true,pickupStart:'19:00',
- pickupEnd:'22:00',departureTime:'19:00',manualDeparture:false,explorers:0
+ pickupEnd:'22:00',departureTime:'19:00',manualDeparture:false,explorers:0,exploreMode:'next'
 };
 function validClock(value,fallback){
  return typeof value==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(value)?value:fallback;
@@ -732,6 +820,7 @@ function plannerControls(settings){
  $('calc-hours').value=[24,36,48,50,52,72].includes(Number(s.maxHours))?String(s.maxHours):'72';
  $('calc-target-rank').value=Number.isInteger(Number(s.targetRank))&&Number(s.targetRank)>=2&&Number(s.targetRank)<=maxRank()?String(s.targetRank):'85';
  $('calc-explorers').value=[0,1,2,3,4].includes(Number(s.explorers))?String(Number(s.explorers)):'0';
+ $('calc-explore-mode').value=['next','balanced','frontier'].includes(s.exploreMode)?s.exploreMode:'next';
  $('daily-pickup').checked=s.dailyPickup!==false;
  $('pickup-start').value=validClock(s.pickupStart,'19:00');
  $('pickup-end').value=validClock(s.pickupEnd,'22:00');
@@ -740,7 +829,7 @@ function plannerControls(settings){
 }
 function savePlannerSettings(manualDeparture){
  const snapshot={
-  maxHours:Number($('calc-hours').value),targetRank:Number($('calc-target-rank').value),explorers:Number($('calc-explorers').value)||0,
+  maxHours:Number($('calc-hours').value),targetRank:Number($('calc-target-rank').value),explorers:Number($('calc-explorers').value)||0,exploreMode:$('calc-explore-mode').value,
   dailyPickup:!!$('daily-pickup').checked,pickupStart:$('pickup-start').value,
   pickupEnd:$('pickup-end').value,departureTime:$('calc-departure-time').value,
   manualDeparture:!!manualDeparture,expandedLongRoutes:true
@@ -764,7 +853,7 @@ async function init(){
   }
   function updatePlanner(){savePlannerSettings(manuallySelectedDeparture);calculate()}
   $('calc-routes').onclick=()=>{refreshDepartureClock();updatePlanner()};
-  ['calc-hours','calc-target-rank','calc-explorers','daily-pickup','pickup-start','pickup-end'].forEach(id=>{
+  ['calc-hours','calc-target-rank','calc-explorers','calc-explore-mode','daily-pickup','pickup-start','pickup-end'].forEach(id=>{
    const ctrl=$(id);if(ctrl)ctrl.onchange=updatePlanner;
   });
   $('calc-departure-time').onchange=()=>{manuallySelectedDeparture=true;updatePlanner()};
@@ -776,7 +865,7 @@ async function init(){
   });
   refreshDepartureClock();
   // 其他分頁寫入時，保留本頁正在輸入、尚未觸發 change 的計算器設定。
-  const plannerIds=['calc-hours','calc-target-rank','calc-explorers','daily-pickup','pickup-start','pickup-end','calc-departure-time'];
+  const plannerIds=['calc-hours','calc-target-rank','calc-explorers','calc-explore-mode','daily-pickup','pickup-start','pickup-end','calc-departure-time'];
   const plannerDrafts=new Set();
   for(const id of plannerIds){
    $(id)?.addEventListener('input',()=>plannerDrafts.add(id));
