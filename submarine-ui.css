@@ -265,3 +265,7 @@ label .hint{font-weight:400}
 .settle-exp-total:empty,.settle-after:empty{display:none}
 .settle-after{grid-column:1/-1;margin:-4px 0 0;color:var(--ui-ink)}
 #settle-ship-progress{display:block;margin:2px 0 0}
+.build-parts{border:0;padding:0;margin:10px 0 0;min-width:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
+.build-parts legend{padding:0;margin-bottom:6px;font-size:12px;font-weight:650;color:var(--ui-ink);}
+.build-row .build-parts label+label{margin-top:0;}
+@media(max-width:560px){.build-parts{grid-template-columns:repeat(2,minmax(0,1fr));}}

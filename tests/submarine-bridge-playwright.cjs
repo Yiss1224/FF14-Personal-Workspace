@@ -38,7 +38,8 @@ function seed(){
        voyage:{departedAt:now-30*HOUR,etaAt:now-HOUR,durationSeconds:29*3600,route:'溺沒海 I → K → J',build:'1121',fuelEstimate:6}},
       {registered:true,rank:10,exp:0,name:'',voyaging:true,
        voyage:{departedAt:now-2*HOUR,etaAt:now+20*HOUR,durationSeconds:22*3600,route:'溺沒海 A → C → D',build:'1111',fuelEstimate:4}},
-      {registered:true,rank:30,exp:100,name:'',currentBuild:'1121'},
+      // 固定推薦 1121：這裡測對話框與碼頭，不測配裝選擇。
+      {registered:true,rank:30,exp:100,name:'',currentBuild:'1121',build:'1121'},
       {registered:false,rank:1,exp:0,name:''}
     ],
     unlocks:{},activeSectorMap:1,
@@ -151,7 +152,7 @@ async function main(){
   await test('復原：換裝紀錄與刪除出航紀錄都可復原',async()=>{
     const {ctx,page}=await open(seed());
     await page.evaluate(()=>window.SubDialog.toast('x').close());
-    await page.selectOption('[data-installed="2"]','1123');
+    await page.selectOption('[data-installed-part="2:3"]','3');
     assert.strictEqual((await stored(page)).ships[2].currentBuild,'1123');
     await page.click('details.settlement-history:has(#log-table) > summary');
     const before=await stored(page);
@@ -241,8 +242,8 @@ async function main(){
     await ctx.route(/imgur|universalis/,route=>route.abort());
     await ctx.addInitScript(([key,value])=>{if(!sessionStorage.getItem('s')){sessionStorage.setItem('s','1');localStorage.setItem(key,value)}},[KEY,JSON.stringify(seed())]);
     const page=await ctx.newPage();await page.goto(base+'/submarine.html');
-    await page.waitForSelector('[data-installed="2"]',{timeout:20000});
-    await page.selectOption('[data-installed="2"]','1123');await page.waitForTimeout(300);
+    await page.waitForSelector('[data-installed-part="2:3"]',{timeout:20000});
+    await page.selectOption('[data-installed-part="2:3"]','3');await page.waitForTimeout(300);
     assert.strictEqual(await page.evaluate(()=>HarborScene.time().builds[2]),'1123');
     await ctx.close();
   });
