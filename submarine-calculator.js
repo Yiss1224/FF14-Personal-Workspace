@@ -146,7 +146,7 @@ function state(){
  }catch{return base}
 }
 function persist(mutator){const s=state();mutator(s);FF14Data.writeRaw(KEY,JSON.stringify(s));window.dispatchEvent(new Event('submarine-build-state-updated'))}
-let data=null,lootData=[],pendingItemDeparture=null;
+let data=null,lootData=[],yieldData=null,pendingItemDeparture=null;
 function maxRank(){return data?.ranks?.at(-1)?.rank||90}
 function rankRec(rank){return data.ranks.find(x=>x.rank===rank)||data.ranks.filter(x=>x.rank<=rank).at(-1)}
 function shipRank(ship){return Math.max(1,Number(ship.rank)||1)}
@@ -458,6 +458,45 @@ function frontierOrder(mode){
  return (a,b)=>b.score-a.score||b.opens-a.opens;
 }
 
+// 畢業船跑 溺沒海 O → J 的收益，用社群統計的打撈門檻與掉落池（submarine-yield-data.json）：
+// 探索決定掉到哪一階、收集決定數量、恩惠決定有沒有第二件。只計 NPC 收購的回收飾品（飾品估值）。
+const OJ_ROUTE=['O','J'],npcPrices=new Map();
+function npcPrice(itemId){
+ if(!npcPrices.has(itemId)){
+  const P=window.SubmarinePrices;let v=null;
+  for(const [name,id] of Object.entries(P?.itemIds||{}))if(Number(id)===itemId){const x=P.lookup(name);if(x?.source==='NPC'){v=x.price;break}}
+  npcPrices.set(itemId,v);
+ }
+ return npcPrices.get(itemId);
+}
+function lootStats(key,rank){
+ const rec=rankRec(rank)||{},rows=[...key].map((c,i)=>yieldData.parts[c][i]),sum=n=>rows.reduce((a,x)=>a+x[n],0);
+ return {s:sum(2)+(rec.s||0),r:sum(3)+(rec.r||0),f:sum(6)+(rec.f||0)};
+}
+function sectorYield(id,st){
+ const sec=yieldData.sectors[id];if(!sec)return null;
+ const [t2,t3,normal,optimal,favor]=sec.breakpoints,pools=Object.values(sec.pools);
+ const sc=st.s>=t3?2:st.s>=t2?1:0,rc=st.r>=optimal?2:st.r>=normal?1:0,fav=st.f>=favor;
+ const classTotal=pools.reduce((a,p)=>a+p.surv[sc],0);if(!classTotal)return null;
+ // 第二件的資料以「件」計數，換回「每趟」只能給區間；取較保守的一端（約七成）。
+ const F=pools.reduce((a,p)=>a+p.favor,0),D=pools.reduce((a,p)=>a+p.doubleDips,0),dd=F>D/2?(D/2)/(F-D/2):0;
+ let gil=0;
+ for(const p of pools)for(const [itemId,amount,...ranges] of p.items){
+  const v=npcPrice(itemId);if(v===null)continue;
+  gil+=p.surv[sc]/classTotal*amount/p.records*(ranges[rc][0]+ranges[rc][1])/2*v;
+ }
+ // 門檻是社群統計推得；數值只超過門檻 1–3 點時可能判斷錯，標為估計。
+ const near=[[st.s,t2],[st.s,t3],[st.r,normal],[st.r,optimal],[st.f,favor]].some(([v,t])=>v>=t&&v-t<=3);
+ return {gil:gil*(1+(fav?dd:0)),near,label:['低階','中階','高階'][sc]+'／收集'+['差','普','優'][rc]+(fav?'／恩惠':'')};
+}
+function ojYield(key,rank,open){
+ if(!yieldData||!validBuild(key,rank))return null;
+ const path=OJ_ROUTE.map(l=>open.find(p=>p.map===1&&p.letter===l));if(path.some(p=>!p||p.rank>rank))return null;
+ const stats=buildStats(key,rank),m=routeMetrics(path,stats.speed,stats.range);if(!m)return null;
+ const st=lootStats(key,rank),parts=path.map(p=>sectorYield(p.id,st));if(parts.some(x=>!x))return null;
+ return {key,time:m.time,gil:parts.reduce((a,x)=>a+x.gil,0),near:parts.some(x=>x.near),
+  detail:path.map((p,i)=>p.letter+' '+parts[i].label).join('；')};
+}
 
 const fmtYield=n=>n<0.01?n.toFixed(4):n<1?n.toFixed(3):n.toFixed(2);
 function bestItemRoutes(available,ship,key,maxHours,s,itemId,beamLimit=400){
@@ -786,6 +825,25 @@ function calculateNow(){
  }
  const allocation=selectFleetAllocation(plans,fixedUsage,total,target,daily);
  const selected=allocation.chosen;
+ // 畢業船：在扣掉其他船占用（含本輪派船）後的庫存中，挑 O → J 飾品估值／收船週期最高的配置；
+ // 同分時換裝件數少的優先，再比航行時間。換裝前部件仍算已安裝，不會借給練等船。
+ let ojUsage=fixedUsage;
+ for(const choice of selected.values())ojUsage=allocate(choice.key,ojUsage,total)||ojUsage;
+ const ojPicks=new Map();
+ for(const ship of graduated.filter(x=>!explorers.has(x.index))){
+  const rank=shipRank(ship),current=installed(ship),without={...ojUsage};
+  for(const piece of buildPieces(current))without[piece]--;
+  let best=null;
+  for(const key of allBuildKeys){
+   if(!allocate(key,without,total))continue;
+   const y=ojYield(key,rank,open);if(!y)continue;
+   y.rate=y.gil/pickupElapsed(y.time,daily);
+   const tie=best&&Math.abs(y.rate-best.rate)<=1e-9,swaps=partChanges(current,key)-(best?partChanges(current,best.key):0);
+   if(!best||y.rate>best.rate+1e-9||tie&&(swaps<0||swaps===0&&y.time<best.time))best=y;
+  }
+  ojPicks.set(ship.index,{best,current:ojYield(current,rank,open)});
+  if(best)ojUsage=allocate(best.key,without,total);
+ }
  let fuel=0,html=[];
  for(const ship of registered){
   const rank=shipRank(ship),current=installed(ship);
@@ -796,14 +854,25 @@ function calculateNow(){
    continue;
   }
   if(rank>=target&&!explorers.has(ship.index)){
-   html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'：已達 Rank '+target+'</h3>'
-    +'<div class="route-meta">已達練等目標；建議換成 3124 跑 O → J。'
-    +(current!=='3124'?'目前 '+esc(current)+' 的部件仍算已安裝，換裝前不會借給別艘。':'')
-    +(current==='3124'?' 已登記為 3124，無需換裝。':' 請先在遊戲內換裝，再確認釋出配件。')
+   const {best,current:now}=ojPicks.get(ship.index)||{},gil=y=>'約 '+Math.round(y.gil).toLocaleString()+' Gil／趟';
+   const head='<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'：已達 Rank '+target+'</h3>';
+   if(!best){
+    html.push(head+'<div class="route-meta">已達練等目標。'+(yieldData
+      ?'目前的 Rank、已開航點或剩餘部件組不出能跑 O → J 的配置；'+esc(current)+' 的部件仍算已安裝。'
+      :'O → J 收益資料未載入，無法比較配置；'+esc(current)+' 的部件仍算已安裝。')+'</div></article>');
+    continue;
+   }
+   const same=best.key===current;
+   html.push(head
+    +'<div class="route-meta">已達練等目標；跑 O → J 以 <strong>'+esc(buildLabel(best.key))+'</strong> 的飾品估值最高：'
+    +gil(best)+'（'+esc(best.detail)+'）'+(best.near?'，數值剛好壓在社群統計門檻上，屬估計':'')+'。'
+    +(same?' 已登記為 '+esc(current)+'，無需換裝。'
+      :' 目前 '+esc(current)+(now?' '+gil(now):' 跑不到 O → J')+'，部件仍算已安裝，換裝前不會借給別艘；請先在遊戲內換裝，再確認釋出配件。')
     +'</div>'
-    +(current!=='3124'?'<div class="switch-advice"><strong>建議換裝：'+esc(current)+' → 3124</strong><span>'
-      +esc(changes(current,'3124'))+'</span><button type="button" data-apply-build="'+ship.index
-      +'" data-new-build="3124">已換成 3124，更新紀錄</button></div>':'')
+    +(same?'':'<div class="switch-advice"><strong>建議換裝：'+esc(current)+' → '+esc(best.key)+'</strong><span>'
+      +esc(changes(current,best.key))+'</span><button type="button" data-apply-build="'+ship.index
+      +'" data-new-build="'+best.key+'">已換成 '+best.key+'，更新紀錄</button></div>')
+    +'<small class="hint">飾品估值只計回收飾品的 NPC 收購價，寶石、錠等材料未計入；打撈門檻與掉落率來自社群統計，不含改造部件。</small>'
     +'</article>');
    continue;
   }
@@ -839,7 +908,7 @@ function calculateNow(){
    +(daily?'<span>最早可收／再派：'+esc(pickupLabel(route.time))+'</span><span>本趟收船週期 '+esc(fmtTime(pickupElapsed(route.time,true)))+'</span>':'')
    +compareText+'</div>'
    +(explorer
-    ?'<div class="route-meta">已達 Rank '+target+'，本趟暫停 O → J 改去開圖；開完或不想開時，把「畢業船撥去開圖」調低即可回到 3124 跑 O → J。</div>'
+    ?'<div class="route-meta">已達 Rank '+target+'，本趟暫停 O → J 改去開圖；開完或不想開時，把「畢業船撥去開圖」調低即可回到 O → J。</div>'
      +(choice.frontier?frontierNote(route):'')
     :'<div class="route-meta">至 Rank '+target+' 尚需 '+remaining.toLocaleString()+' EXP；若一直跑這條約 '+runs+' 趟（升級與開圖後會改變）。</div>')
    +(opening&&!choice.frontier?'<div class="route-meta">本輪探索 '+esc(seaName(progress.step.map)+' '+progress.step.letter)+' 的前置點；成功開圖後請點地圖更新。</div>':'')
@@ -961,8 +1030,11 @@ function savePlannerSettings(manualDeparture){
 }
 async function init(){
  try{
-  const [res,lootRes]=await Promise.all([fetch('submarine-route-data.json?v=20261022-seas2'),fetch('submarine-loot-data.json?v=20261022-seas')]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
+  // 收益資料只用於畢業船的 O → J 配置建議，載入失敗不影響其他計算。
+  const [res,lootRes,yieldRes]=await Promise.all([fetch('submarine-route-data.json?v=20261022-seas2'),fetch('submarine-loot-data.json?v=20261022-seas'),
+   fetch('submarine-yield-data.json?v=20261029').catch(()=>null)]);if(!res.ok)throw new Error('route data '+res.status);if(!lootRes.ok)throw new Error('loot data '+lootRes.status);
   data=await res.json();lootData=await lootRes.json();
+  yieldData=yieldRes?.ok?await yieldRes.json().catch(()=>null):null;
   // 讓行情查詢也涵蓋掉落表的物品，「兼顧 Gil」才有材料價格可用。
   window.SubmarineLootItemIds=Object.fromEntries(lootData.map(x=>[x.localName||x.name,x.itemId]));
   renderBuilds();renderSectors();renderItemPlanner();
