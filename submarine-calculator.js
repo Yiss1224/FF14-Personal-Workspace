@@ -164,14 +164,15 @@ function sectorUnlockKey(id){return 'sector-'+id}
 const dialogs=()=>window.SubDialog||{confirm:o=>Promise.resolve(window.confirm(o.message||o)),alert:o=>{window.alert(o.message||o);return Promise.resolve(true)},toast:()=>({close(){}})};
 const fmtEta=ms=>new Date(ms).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
 // Records a departure, then offers a short undo that restores the ship's previous voyage fields.
-function recordDeparture(i,route,routeText,key){
+// purpose：'explore' 撥出的畢業船開圖、'open' 練等船兼開圖；之後計算時，航行中的開圖船仍計入名額。
+function recordDeparture(i,route,routeText,key,purpose){
  const now=Date.now(),duration=Math.round(Number(route.time)),before=state().ships?.[i]||{};
  const previous={voyaging:before.voyaging,voyage:before.voyage};
  let started=false;
  persist(st=>{
   const target=st.ships?.[i];if(!target||target.voyaging)return;
   target.voyaging=true;
-  target.voyage={departedAt:now,etaAt:now+duration*1000,durationSeconds:duration,route:routeText,build:key,fuelEstimate:Number(route.fuel)||0};
+  target.voyage={departedAt:now,etaAt:now+duration*1000,durationSeconds:duration,route:routeText,build:key,fuelEstimate:Number(route.fuel)||0,...(purpose&&{purpose})};
   started=true;
  });
  if(!started)return;
@@ -724,9 +725,13 @@ function calculateNow(){
  for(const ship of registered.filter(x=>x.voyaging))voyagingUsage=allocate(installed(ship),voyagingUsage,total)||voyagingUsage;
  // 依設定從已畢業（原本跑 OJ）的船撥出幾艘開後續海域：Rank 越高能探索的前置點越遠，優先撥出。
  const graduated=registered.filter(x=>!x.voyaging&&shipRank(x)>=target);
+ // 已出港開圖、還沒返航的船也算在名額內，否則換裝出航後重算會再撥一艘去開同一處。
+ const outExploring=registered.filter(x=>x.voyaging&&x.voyage?.purpose==='explore'),
+  outOpening=registered.filter(x=>x.voyaging&&x.voyage?.purpose==='open'),
+  explorerSlots=Math.max(0,explorersWanted-outExploring.length);
  const explorers=new Set(explorersWanted&&exploring?graduated
   .filter(x=>gateOptions(x,voyagingUsage,true).some(o=>o.gate.length))
-  .sort((a,b)=>shipRank(b)-shipRank(a)||a.index-b.index).slice(0,explorersWanted).map(x=>x.index):[]);
+  .sort((a,b)=>shipRank(b)-shipRank(a)||a.index-b.index).slice(0,explorerSlots).map(x=>x.index):[]);
  let fixedUsage={},stockConflict='';
  for(const ship of registered.filter(x=>(x.voyaging||shipRank(x)>=target)&&!explorers.has(x.index))){
   const current=installed(ship);
@@ -745,7 +750,7 @@ function calculateNow(){
  // 延續開圖原則：開圖船合計最多兩艘（撥出的畢業船優先），其餘由練等中最高 Rank 的合格船補上；
  // 各船用哪組部件由整隊配置評分決定。
  const openers=exploring==='next'?plans.filter(p=>p.canOpen&&!p.explorer)
-  .sort((a,b)=>b.rank-a.rank||a.ship.index-b.ship.index).slice(0,Math.max(0,2-explorers.size)).map(p=>p.ship.index):[];
+  .sort((a,b)=>b.rank-a.rank||a.ship.index-b.ship.index).slice(0,Math.max(0,2-explorers.size-outExploring.length-outOpening.length)).map(p=>p.ship.index):[];
  for(const p of plans){
   const designated=p.explorer||openers.includes(p.ship.index);
   for(const b of p.routeOptions){
@@ -762,6 +767,20 @@ function calculateNow(){
   }
  }
  const ownBestRate=p=>Math.max(0,...p.choices.filter(c=>!c.opening).map(c=>c.route.actualXp/(pickupElapsed(c.route.time,daily)/DAY)));
+ // 換裝效益：拿目前配置在「同一個目標」（練等／前置點／剩餘航點開圖）下的最佳航線比較，
+ // 不拿開圖航線去比練等航線，否則差距反映的是航線目標不同，不是配置好壞。
+ function buildComparison(ship,current,choice){
+  const basis=choice.frontier?getFrontierRoutes(ship,current)[0]
+   :getRoutes(ship,current,choice.opening&&progress?.parent?progress.parent.id:null)[0];
+  const goal=choice.frontier?'開剩餘航點':choice.opening?'經過開圖前置點':'練等';
+  if(!basis)return '<span>目前 '+esc(current)+' 在回航上限內找不到'+goal+'航線</span>';
+  const pct=(a,b)=>b>0?Math.round((a/b-1)*100):null,sign=n=>(n>=0?'+':'')+n+'%';
+  const head='比目前 '+esc(current)+' 跑同目標（'+goal+'）的最佳航線 '+esc(makeLabel(basis.path))+'：';
+  if(choice.frontier&&exploreMode==='frontier')
+   return '<span>'+head+'可開 '+basis.opens+' → '+choice.route.opens+' 個航點、收船週期 '+esc(fmtTime(basis.cycle))+' → '+esc(fmtTime(choice.route.cycle))+'</span>';
+  const gil=choice.frontier&&exploreMode==='gil',d=gil?pct(choice.route.gilRate,basis.gilRate):pct(choice.route.score,basis.score);
+  return d===null?'':'<span>'+head+sign(d)+(gil?' Gil 估值':' EXP')+'／收船週期</span>';
+ }
  const allocation=selectFleetAllocation(plans,fixedUsage,total,target,daily);
  const selected=allocation.chosen;
  let fuel=0,html=[];
@@ -769,7 +788,8 @@ function calculateNow(){
   const rank=shipRank(ship),current=installed(ship);
   if(ship.voyaging){
    html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'（Rank '+rank+'）</h3>'
-    +'<div class="route-meta">航行中，'+esc(current)+' 配件已占用。無法在返航前轉移配件；下次收船後取消「航行中」再計算。</div></article>');
+    +'<div class="route-meta">'+(ship.voyage?.purpose==='explore'?'開圖中（計入「畢業船撥去開圖」名額），':ship.voyage?.purpose==='open'?'開圖中（計入開圖船上限），':'航行中，')
+    +esc(current)+' 配件已占用。無法在返航前轉移配件；下次收船後取消「航行中」再計算。</div></article>');
    continue;
   }
   if(rank>=target&&!explorers.has(ship.index)){
@@ -793,10 +813,8 @@ function calculateNow(){
   const {key,route,opening,alternates}=choice,stats=buildStats(key,rank),remaining=remainingToTarget(ship,target);
   const turns=pickupElapsed(route.time,daily)/DAY;
   const runs=remaining?Math.ceil(remaining/Math.max(1,route.actualXp)):0;
-  const previous=getRoutes(ship,current,opening&&progress?.parent?progress.parent.id:null)[0]||null;
-  const deltaRate=previous?Math.round(((route.actualXp/turns)/
-       (previous.actualXp/(pickupElapsed(previous.time,daily)/DAY))-1)*100):null;
-  const explorer=explorers.has(ship.index);
+  const explorer=explorers.has(ship.index),switching=current!==key;
+  const compareText=switching?buildComparison(ship,current,choice):'';
   const reason=explorer
    ?(exploring==='frontier'?'依設定從畢業船撥出開剩餘航點，練等船不受影響。':'依設定從畢業船撥出開後續海域，練等船不受影響。')
    :opening
@@ -804,7 +822,6 @@ function calculateNow(){
    :route.actualXp/turns<ownBestRate(p)*0.999
     ?'這艘自己的最佳配置所需部件分給其他船對整隊較有利；這是剩餘庫存中的最佳組合。'
     :'在庫存可組出的組合中，這組的 EXP／收船週期最高。';
-  const switching=current!==key;
   const swapText=switching
     ?'<div class="switch-advice"><strong>本趟建議換裝：'+esc(current)+' → '+esc(key)+'</strong>'
        +'<span>'+esc(changes(current,key))+'</span><small>'+esc(reason)+'</small>'
@@ -817,7 +834,7 @@ function calculateNow(){
    +'<div class="route-kpis"><span>'+route.actualXp.toLocaleString()+' EXP/趟'+(route.usedExp?'（實測）':'（基礎值）')+'</span>'
    +'<span>'+fmtTime(route.time)+'</span><span>'+route.fuel+' 罐燃料</span><span>航程 '+route.range+'</span>'
    +(daily?'<span>最早可收／再派：'+esc(pickupLabel(route.time))+'</span><span>本趟收船週期 '+esc(fmtTime(pickupElapsed(route.time,true)))+'</span>':'')
-   +(deltaRate!==null?'<span>相較目前配置 '+(deltaRate>=0?'+':'')+deltaRate+'% EXP／收船週期</span>':'')+'</div>'
+   +compareText+'</div>'
    +(explorer
     ?'<div class="route-meta">已達 Rank '+target+'，本趟暫停 O → J 改去開圖；開完或不想開時，把「畢業船撥去開圖」調低即可回到 3124 跑 O → J。</div>'
      +(choice.frontier?frontierNote(route):'')
@@ -833,11 +850,13 @@ function calculateNow(){
  const header='<div class="route-meta"><strong>依庫存配裝：</strong>部件庫存 '+count(total)+' 件；航行中／已畢業未拆的船占用 '+count(fixedUsage)
   +' 件；本輪派船使用 '+selected.size*4+' 件。'
   +' 返航船共比較 '+compared+' 種庫存可組出的配置，考慮剩餘 EXP、畢業瓶頸及必要開圖。</div>';
+ const outNote=outExploring.length?'已有 '+outExploring.length+' 艘撥出的畢業船出港開圖，計入「畢業船撥去開圖」名額；':'';
  const progressNote=progress?.step
   ?'<p class="hint">下一張海圖目標：'+esc(seaName(progress.target.map)+' '+progress.target.letter)
    +'；優先探索 '+esc(progress.parent?seaName(progress.parent.map)+' '+progress.parent.letter:'尚未開出的前置點')
-   +'。'+(explorers.size?'撥出 '+explorers.size+' 艘畢業船開圖'+(explorers.size<2?'，練等船最多再補 1 艘':'')+'，其他船照常練等／跑 O → J。':'最多兩艘合格船負責開圖，其他船優先練等。')
-   +(explorersWanted>explorers.size?'（設定撥出 '+explorersWanted+' 艘，但目前只有 '+explorers.size+' 艘返航中的畢業船能跑到開圖前置點。）':'')+'</p>'
+   +'。'+outNote+(explorers.size?'本輪撥出 '+explorers.size+' 艘畢業船開圖'+(explorers.size+outExploring.length+outOpening.length<2?'，練等船最多再補 1 艘':'')+'，其他船照常練等／跑 O → J。'
+     :outExploring.length?'其他船照常練等／跑 O → J。':'最多兩艘合格船負責開圖，其他船優先練等。')
+   +(explorerSlots>explorers.size?'（設定撥出 '+explorersWanted+' 艘，扣掉已出港的 '+outExploring.length+' 艘後還差 '+explorerSlots+' 艘，但目前只有 '+explorers.size+' 艘返航中的畢業船能跑到開圖前置點。）':'')+'</p>'
   :'<p class="hint">'+(progress?'下一張海圖前置已完成，返航的船會以練等／OJ 營運為目標分配。':remainingNote())+'</p>';
  function remainingNote(){
   const openIds=new Set(open.map(p=>p.id)),closed=data.sectors.filter(p=>!openIds.has(p.id)).length;
@@ -846,9 +865,9 @@ function calculateNow(){
   if(exploreMode==='next')return head+'還有 '+closed+' 個航點未開；想用撥出的畢業船慢慢開，可把「海圖開完後」改成開剩餘航點。';
   const reachable=[...frontier.values()].reduce((a,x)=>a+x.length,0);
   return head+'還有 '+closed+' 個航點未開，其中 '+reachable+' 個的前置點已開、這輪就能探索。'
-   +(explorers.size?'撥出 '+explorers.size+' 艘畢業船去開，'+({frontier:'只管開圖：優先選能開最多航點的航線，同樣多再挑收船週期短的',gil:'在經過前置點的航線中挑 Gil 估值／收船週期最高的',balanced:'在經過前置點的航線中挑 EXP／收船週期最高的'}[exploreMode])+'；其他船照常練等／跑 O → J。'
-    :'要開的話，把「畢業船撥去開圖」設為 1 艘以上。')
-   +(explorersWanted>explorers.size&&explorers.size?'（設定撥出 '+explorersWanted+' 艘，但目前只有 '+explorers.size+' 艘返航中的畢業船能跑到前置點。）':'');
+   +outNote+(explorers.size?'本輪撥出 '+explorers.size+' 艘畢業船去開，'+({frontier:'只管開圖：優先選能開最多航點的航線，同樣多再挑收船週期短的',gil:'在經過前置點的航線中挑 Gil 估值／收船週期最高的',balanced:'在經過前置點的航線中挑 EXP／收船週期最高的'}[exploreMode])+'；其他船照常練等／跑 O → J。'
+    :outExploring.length?'名額已滿，本輪其他船照常練等／跑 O → J。':'要開的話，把「畢業船撥去開圖」設為 1 艘以上。')
+   +(explorerSlots>explorers.size&&explorers.size?'（設定撥出 '+explorersWanted+' 艘，扣掉已出港的 '+outExploring.length+' 艘後還差 '+explorerSlots+' 艘，但目前只有 '+explorers.size+' 艘返航中的畢業船能跑到前置點。）':'');
  }
  const warning=allocation.reason?'<p class="calc-warning">'+esc(allocation.reason)+'</p>':'';
  $('calc-result').innerHTML=header+progressNote+warning+html.join('')
@@ -897,7 +916,7 @@ function calculateNow(){
   dialogs().confirm({title:'確認出航',message:'已在 FF14 中將「'+label+'」實際派往「'+routeText+'」嗎？\n確認後開始計時；燃料與物資會在返航結算時扣除。',
    details:[['航線',routeText],['配置',choice.key],['航行時間',fmtTime(choice.route.time)],['預計返航',fmtEta(Date.now()+duration*1000)],['燃料',choice.route.fuel+' 罐']],ok:'⚓ 確認出航'}).then(ok=>{
    if(!ok)return;
-   recordDeparture(i,choice.route,routeText,choice.key);
+   recordDeparture(i,choice.route,routeText,choice.key,explorers.has(i)?'explore':choice.opening?'open':undefined);
    renderBuilds();calculate();
   });
  });
