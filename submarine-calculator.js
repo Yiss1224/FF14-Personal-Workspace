@@ -32,14 +32,10 @@ const buildInfos=new Map(allBuildKeys.map(key=>{
  const rows=[...key].map((c,i)=>partStats[c][i]),sum=n=>rows.reduce((a,x)=>a+x[n],0);
  return [key,{min:Math.max(...rows.map(x=>x[0])),cost:sum(1),speed:sum(2),range:sum(3)}];
 }));
-// 推薦模式可固定的常用配置；自動模式則比較庫存可組出的全部組合。
+// 推薦模式：自動比較庫存可組出的全部組合，或沿用目前實際配置不換裝。
 const builds={
  auto:{label:'自動擇優（依庫存比較全部組合）'},
- '1111':{label:'1111（鯊級起步）'},
- '1121':{label:'1121（基礎練等）'},
- '1123':{label:'1123（高航程練等）'},
- '3123':{label:'3123（特定開圖航線）'},
- '3124':{label:'3124（金策配置）'}
+ current:{label:'沿用目前實際配置（不換裝）'}
 };
 const buildPieces=key=>isBuild(key)?[...key].map((c,i)=>c+':'+i):[];
 const partNames=['船體','船尾','船首','艦橋'],classNames={1:'鯊級',2:'雲鯨級',3:'鯨級',4:'腔棘魚級',5:'希爾德里昂級'};
@@ -65,6 +61,8 @@ function allocate(build,used,total){
  return Object.keys(result).every(piece=>result[piece]<=(total[piece]||0))?result:null;
 }
 function installed(ship){return isBuild(ship.currentBuild)?ship.currentBuild:(shipRank(ship)<15?'1111':'1121')}
+// 推薦模式固定的配置；自動模式回傳 null。舊版存的 4 碼配置照舊固定使用。
+function fixedBuild(ship){return ship.build==='current'?installed(ship):isBuild(ship.build)?ship.build:null}
 const partChanges=(from,to)=>[...to].filter((c,i)=>c!==from[i]).length;
 // 列出這艘船用剩餘庫存能組出的全部配置（Rank、部件容量都符合）。航線只取決於速度與航程，
 // 被其他組合在兩者上同時壓過的配置不會更好，所以逐層取「沒被壓過」的組合，
@@ -207,16 +205,20 @@ function stepBar(steps){
 function renderBuilds(){
  const ships=state().ships||[];
  $('ship-builds').innerHTML=ships.map((ship,i)=>{
-  const rank=shipRank(ship),pref=ship.build||'auto',current=installed(ship);
+  const rank=shipRank(ship),pref=Object.hasOwn(builds,ship.build??'')||isBuild(ship.build)?ship.build:'auto',current=installed(ship),
+   modes=Object.entries(builds).concat(isBuild(pref)?[[pref,{label:'固定 '+pref+'（舊設定）'}]]:[]);
   return '<div class="build-row"><label>'+esc(shipLabel(i,ship))+'（Rank '+rank+'）· 推薦模式<select data-build="'+i+'">'
-   +Object.entries(builds).map(([k,b])=>'<option value="'+k+'" '+(k===pref?'selected':'')+'>'+esc(b.label)+'</option>').join('')+'</select></label>'
+   +modes.map(([k,b])=>'<option value="'+k+'" '+(k===pref?'selected':'')+'>'+esc(b.label)+'</option>').join('')+'</select></label>'
    +'<fieldset class="build-parts"><legend>目前實際配置 · '+esc(current)+'</legend>'+partNames.map((n,slot)=>'<label>'+n+'<select data-installed-part="'+i+':'+slot+'">'
     +Object.entries(classNames).map(([c,name])=>'<option value="'+c+'" '+(current[slot]===c?'selected':'')+'>'+c+' · '+esc(name)+'</option>').join('')+'</select></label>').join('')+'</fieldset>'
    +'<label class="build-check"><input type="checkbox" data-voyaging="'+i+'" '+(ship.voyaging?'checked':'')+'>航行中（鎖定配件）</label>'
    +'<small>自動模式從庫存可組出的所有配置中比較，依等級、部件容量及其他船已占用的部件過濾。</small></div>'
  }).join('');
  $('ship-builds').querySelectorAll('[data-build]').forEach(el=>el.onchange=()=>{
-  persist(s=>{s.ships[Number(el.dataset.build)].build=el.value});calculate();
+  persist(s=>{s.ships[Number(el.dataset.build)].build=el.value});
+  // 改選後收起「舊設定」選項；其他情況不重繪，選單焦點保留。
+  if(el.options.length>Object.keys(builds).length)renderBuilds();
+  calculate();
  });
  $('ship-builds').querySelectorAll('[data-installed-part]').forEach(el=>el.onchange=()=>{
   const [i,slot]=el.dataset.installedPart.split(':').map(Number);
@@ -528,7 +530,7 @@ function calculateItemRoutesNow(){
  }
  const candidates=[],seen=new Map(),cache=new Map();
  for(const ship of ready){
-  const keys=ship.build&&ship.build!=='auto'?[ship.build].filter(key=>validBuild(key,shipRank(ship))&&allocate(key,fixedUsage,total)):candidateBuilds(ship,fixedUsage,total);
+  const fixed=fixedBuild(ship),keys=fixed?[fixed].filter(key=>validBuild(key,shipRank(ship))&&allocate(key,fixedUsage,total)):candidateBuilds(ship,fixedUsage,total);
   for(const key of keys){
    // 航線只取決於 Rank、速度與航程；同數值的不同部件組合共用一次搜尋。
    const b=buildInfos.get(key),k=[shipRank(ship),b.speed,b.range].join(':');
@@ -710,7 +712,8 @@ function calculateNow(){
  // 自動模式：從扣掉其他船占用後的庫存中，列出這艘船能組出的配置。
  function options(ship,used){
   if(ship.voyaging)return [installed(ship)];
-  return ship.build&&ship.build!=='auto'?[ship.build]:candidateBuilds(ship,used,total);
+  const fixed=fixedBuild(ship);
+  return fixed?[fixed]:candidateBuilds(ship,used,total);
  }
  // gateOnly：只判斷能不能開圖時，不必搜尋一般練等航線。
  function gateOptions(ship,used,gateOnly){
