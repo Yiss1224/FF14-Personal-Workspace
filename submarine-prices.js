@@ -31,7 +31,7 @@ async function refresh(){
  try{
   const state=load(),world=$('market-world').value;
   if(state.marketWorld&&state.marketWorld!==world)live={};state.marketWorld=world;FF14Data.writeRaw(KEY,JSON.stringify(state));
-  const ids={...catalogue,...(state.lootItemIds||{})};
+  const ids={...(window.SubmarineLootItemIds||{}),...catalogue,...(state.lootItemIds||{})};
   const inverse=new Map();
   for(const [name,id] of Object.entries(ids))if(Number.isSafeInteger(Number(id))&&Number(id)>0&&!Object.prototype.hasOwnProperty.call(npc,name)){
    const k=Number(id);if(!inverse.has(k))inverse.set(k,[]);inverse.get(k).push(name);
