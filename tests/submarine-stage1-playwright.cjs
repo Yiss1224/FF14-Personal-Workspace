@@ -356,7 +356,7 @@ async function main(){
     await a.click('[data-edit-ship-name="1"]');
     await a.fill('[data-ship-name-input="1"]','二號草稿');
     await a.click('#close-inventory');
-    await a.selectOption('[data-build="0"]','1121');
+    await a.selectOption('[data-build="0"]','current');
     await a.click('#open-inventory');
     assert.strictEqual(await a.isHidden('[data-ship-name-editor="1"]'),false);
     assert.strictEqual(await a.inputValue('[data-ship-name-input="1"]'),'二號草稿');
@@ -372,6 +372,40 @@ async function main(){
     assert.strictEqual(await activeKey(a),'#calc-target-rank');
     await a.keyboard.press('Tab');
     assert.strictEqual((await stored(a)).plannerSettings.targetRank,60);
+    await ctx.close();
+  });
+
+  await test('9. 推薦模式：舊版固定配置保留為「舊設定」，「沿用目前配置」不建議換裝',async()=>{
+    const seed=baseSeed();seed.ships[0].build='1121';seed.ships[1].build='current';
+    const ctx=await context(seed),page=await open(ctx);
+    const options=i=>page.evaluate(i=>[...document.querySelectorAll('[data-build="'+i+'"] option')].map(o=>o.value+'|'+o.textContent),i);
+    assert.strictEqual(await page.inputValue('[data-build="0"]'),'1121');
+    assert.deepStrictEqual(await options(0),['auto|自動擇優（依庫存比較全部組合）','current|沿用目前實際配置（不換裝）','1121|固定 1121（舊設定）']);
+    assert.strictEqual(await page.inputValue('[data-build="1"]'),'current');
+    const card=await page.evaluate(()=>[...document.querySelectorAll('#calc-result .route-card')].find(c=>c.querySelector('h3').textContent.startsWith('潛水艇 2')).textContent);
+    assert.match(card,/本趟使用 1111，不用換裝/);
+    await page.selectOption('[data-build="0"]','auto');
+    assert.strictEqual((await stored(page)).ships[0].build,'auto');
+    assert.deepStrictEqual((await options(0)).map(x=>x.split('|')[0]),['auto','current']);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
+  await test('10. 畢業船依庫存推薦 O → J 飾品估值最高的配置；收益資料載入失敗時不中斷',async()=>{
+    const seed=baseSeed();seed.ships[0]={registered:true,rank:85,exp:0,name:'',currentBuild:'1121'};
+    seed.unlocks=Object.fromEntries(Array.from({length:20},(_,i)=>['sector-'+(i+1),true]));seed.plannerSettings={targetRank:85};
+    const card=page=>page.evaluate(()=>[...document.querySelectorAll('#calc-result .route-card')].find(c=>c.querySelector('h3').textContent.startsWith('潛水艇 1')).textContent);
+    let ctx=await context(seed),page=await open(ctx);
+    assert.match(await card(page),/跑 O → J 以 3124（.*）\s*的飾品估值最高：約 [\d,]+ Gil／趟/);
+    assert.match(await card(page),/建議換裝：1121 → 3124/);
+    await page.click('[data-apply-build="0"][data-new-build="3124"]');
+    assert.strictEqual((await stored(page)).ships[0].currentBuild,'3124');
+    assert.match(await card(page),/已登記為 3124，無需換裝/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+    ctx=await context(seed);await ctx.route(/submarine-yield-data/,route=>route.abort());page=await open(ctx);
+    assert.match(await card(page),/收益資料未載入/);
+    assert.deepStrictEqual(page.errors,[]);
     await ctx.close();
   });
 
