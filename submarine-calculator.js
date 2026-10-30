@@ -860,6 +860,8 @@ function calculateNow(){
   ojPicks.set(ship.index,{best});
   if(best)ojUsage=allocate(best.key,without,total);
  }
+ // 開圖有機率：同一輪派往同一前置點的其他船，卡片上註明是一起提高機率。
+ const partners=i=>[...selected].filter(([j,c])=>j!==i&&c.opening&&!c.frontier).map(([j])=>shipLabel(j,registered.find(x=>x.index===j)));
  let fuel=0,html=[];
  for(const ship of registered){
   const rank=shipRank(ship),current=installed(ship);
@@ -931,7 +933,8 @@ function calculateNow(){
     ?'<div class="route-meta">已達 Rank '+target+'，本趟暫停 O → J 改去開圖；開完或不想開時，把「畢業船撥去開圖」調低即可回到 O → J。</div>'
      +(choice.frontier?frontierNote(route):'')
     :'<div class="route-meta">至 Rank '+target+' 尚需 '+remaining.toLocaleString()+' EXP；若一直跑這條約 '+runs+' 趟（升級與開圖後會改變）。</div>')
-   +(opening&&!choice.frontier?'<div class="route-meta">本輪探索 '+esc(seaName(progress.step.map)+' '+progress.step.letter)+' 的前置點；成功開圖後請點地圖更新。</div>':'')
+   +(opening&&!choice.frontier?'<div class="route-meta">本輪探索 '+esc(seaName(progress.step.map)+' '+progress.step.letter)+' 的前置點；'
+     +(partners(ship.index).length?'與 '+esc(partners(ship.index).join('、'))+' 同時探索，提高本輪開圖機率；':'')+'成功開圖後請點地圖更新。</div>':'')
    +stepBar([{label:switching?'遊戲內換裝 '+current+' → '+key+'，再按「更新紀錄」':'配置符合（'+key+'）',done:!switching,current:switching},{label:'遊戲內派往這條航線',current:!switching},{label:'按「確認出航」開始計時'}])
    +'<div class="voyage-depart-actions"><span class="route-meta">預計實際航行 '+esc(fmtTime(route.time))+'；完成遊戲內出航後再按下按鈕。</span>'
    +'<button class="voyage-depart-button" type="button" data-depart-ship="'+ship.index+'">⚓ 確認出航</button></div>'

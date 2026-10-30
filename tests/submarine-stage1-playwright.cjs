@@ -489,6 +489,20 @@ async function main(){
     await ctx.close();
   });
 
+  await test('15. 兩艘開圖船派往同一前置點時，卡片註明一起提高開圖機率',async()=>{
+    const full={};for(let c=1;c<=5;c++)for(let slot=0;slot<4;slot++)full[c+':'+slot]=4;
+    const seed=baseSeed();seed.partStock=full;
+    seed.ships=[50,48,45,40].map(rank=>({registered:true,rank,exp:0,name:'',currentBuild:'1121'}));
+    seed.unlocks=Object.fromEntries(Array.from({length:20},(_,i)=>['sector-'+(i+1),true]));seed.plannerSettings={targetRank:85};
+    const ctx=await context(seed),page=await open(ctx);
+    const cards=await page.evaluate(()=>[...document.querySelectorAll('#calc-result .route-card')].map(c=>c.textContent));
+    assert.match(cards[0],/開圖兼練等.*與 潛水艇 2 同時探索，提高本輪開圖機率/);
+    assert.match(cards[1],/開圖兼練等.*與 潛水艇 1 同時探索，提高本輪開圖機率/);
+    assert.doesNotMatch(cards[2]+cards[3],/同時探索/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
   await browser.close();server.close();
   console.log(results.join('\n'));
   console.log(passed+' passed, '+(results.filter(r=>r.startsWith('FAIL')).length)+' failed');
