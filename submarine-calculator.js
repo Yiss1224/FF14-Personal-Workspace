@@ -618,7 +618,7 @@ function remainingToTarget(ship,target){
  return Math.max(0,cumulativeTo(target)-cumulativeTo(rank)-exp);
 }
 function fmtTime(sec){
- const h=Math.floor(sec/3600),m=Math.round((sec%3600)/60);
+ const total=Math.round(sec/60),h=Math.floor(total/60),m=total%60;
  return h+' 小時 '+m+' 分';
 }
 function nextMapProgress(open){
@@ -640,6 +640,9 @@ function nextMapProgress(open){
 // 目標是增加全艦隊的 OJ 營運船日，並降低最後一艘畢業拖延。
 // 這是逐趟啟發式排程，非已證明的全航程最優解。
 const CHOICES_PER_SHIP=6;
+// 開圖船比的是多快回來開下一處：每天收船時以「第幾天收得到」計，同一天回來的再比 EXP；
+// 沒有收船窗口時才以實際航行時間比。
+function gateCost(time,daily){return daily?pickupTiming(time).day:pickupElapsed(time,false)/DAY}
 function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, daily){
  const requested=plans.filter(p=>!p.ship.voyaging&&(p.rank<targetRank||p.explorer));
  // 仍然替其他可派船計算；單艘沒有可行航線不應拖垮整個船隊。
@@ -650,7 +653,7 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
  // 每艘船的選項依自身效益排序（開圖優先、其次預估畢業日），
  // 逐船只嘗試前幾個庫存仍可組出的選項，避免全部組合相乘後爆量。
  const order=new Map(ready.map(p=>[p,p.choices.map(option=>({option,
-  rank:option.frontier?(option.penalty||0)-2e6:option.opening?pickupElapsed(option.route.time,daily)/DAY-1e6:estimatedFinishDays(p,option,targetRank,daily)}))
+  rank:option.frontier?(option.penalty||0)-2e6:option.opening?gateCost(option.route.time,daily)*1e4-1e6+estimatedFinishDays(p,option,targetRank,daily):estimatedFinishDays(p,option,targetRank,daily)}))
   .sort((a,b)=>a.rank-b.rank).map(x=>x.option)]));
  let best=null;
  const decisions=new Map();
@@ -679,7 +682,7 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
    if(!updated)continue;
    tried++;
    decisions.set(p.ship.index,{plan:p,option});
-   walk(i+1,updated,count+Number(option.opening),turns+(option.opening&&!option.frontier?pickupElapsed(option.route.time,daily):0));
+   walk(i+1,updated,count+Number(option.opening),turns+(option.opening&&!option.frontier?gateCost(option.route.time,daily):0));
    decisions.delete(p.ship.index);
   }
  }
@@ -828,7 +831,9 @@ function calculateNow(){
   if(choice.frontier&&exploreMode==='frontier')
    return '<span>'+head+'可開 '+basis.opens+' → '+choice.route.opens+' 個航點、收船週期 '+esc(fmtTime(basis.cycle))+' → '+esc(fmtTime(choice.route.cycle))+'</span>';
   const gil=choice.frontier&&exploreMode==='gil',d=gil?pct(choice.route.gilRate,basis.gilRate):pct(choice.route.score,basis.score);
-  return d===null?'':'<span>'+head+sign(d)+(gil?' Gil 估值':' EXP')+'／收船週期</span>';
+  // 開圖優先比的是多快回來開下一處，EXP 可能略低；把收船週期一起列出，避免只看到負的百分比。
+  const cycleText=choice.opening&&!choice.frontier?'收船週期 '+esc(fmtTime(pickupElapsed(basis.time,daily)))+' → '+esc(fmtTime(pickupElapsed(choice.route.time,daily)))+'，':'';
+  return d===null?'':'<span>'+head+cycleText+sign(d)+(gil?' Gil 估值':' EXP')+'／收船週期</span>';
  }
  const allocation=selectFleetAllocation(plans,fixedUsage,total,target,daily);
  const selected=allocation.chosen;
@@ -855,6 +860,8 @@ function calculateNow(){
   ojPicks.set(ship.index,{best});
   if(best)ojUsage=allocate(best.key,without,total);
  }
+ // 開圖有機率：同一輪派往同一前置點的其他船，卡片上註明是一起提高機率。
+ const partners=i=>[...selected].filter(([j,c])=>j!==i&&c.opening&&!c.frontier).map(([j])=>shipLabel(j,registered.find(x=>x.index===j)));
  let fuel=0,html=[];
  for(const ship of registered){
   const rank=shipRank(ship),current=installed(ship);
@@ -926,7 +933,8 @@ function calculateNow(){
     ?'<div class="route-meta">已達 Rank '+target+'，本趟暫停 O → J 改去開圖；開完或不想開時，把「畢業船撥去開圖」調低即可回到 O → J。</div>'
      +(choice.frontier?frontierNote(route):'')
     :'<div class="route-meta">至 Rank '+target+' 尚需 '+remaining.toLocaleString()+' EXP；若一直跑這條約 '+runs+' 趟（升級與開圖後會改變）。</div>')
-   +(opening&&!choice.frontier?'<div class="route-meta">本輪探索 '+esc(seaName(progress.step.map)+' '+progress.step.letter)+' 的前置點；成功開圖後請點地圖更新。</div>':'')
+   +(opening&&!choice.frontier?'<div class="route-meta">本輪探索 '+esc(seaName(progress.step.map)+' '+progress.step.letter)+' 的前置點；'
+     +(partners(ship.index).length?'與 '+esc(partners(ship.index).join('、'))+' 同時探索，提高本輪開圖機率；':'')+'成功開圖後請點地圖更新。</div>':'')
    +stepBar([{label:switching?'遊戲內換裝 '+current+' → '+key+'，再按「更新紀錄」':'配置符合（'+key+'）',done:!switching,current:switching},{label:'遊戲內派往這條航線',current:!switching},{label:'按「確認出航」開始計時'}])
    +'<div class="voyage-depart-actions"><span class="route-meta">預計實際航行 '+esc(fmtTime(route.time))+'；完成遊戲內出航後再按下按鈕。</span>'
    +'<button class="voyage-depart-button" type="button" data-depart-ship="'+ship.index+'">⚓ 確認出航</button></div>'

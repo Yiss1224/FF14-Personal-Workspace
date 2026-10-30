@@ -462,6 +462,47 @@ async function main(){
     await ctx.close();
   });
 
+  await test('13. 開圖船換裝比較同時列出收船週期（開圖優先比週期，EXP 可能略低）',async()=>{
+    const full={};for(let c=1;c<=5;c++)for(let slot=0;slot<4;slot++)full[c+':'+slot]=4;
+    const seed=baseSeed();seed.partStock=full;
+    seed.ships=[{registered:true,rank:85,exp:0,name:'',currentBuild:'3124'},{registered:true,rank:60,exp:0,name:'',currentBuild:'1121'},{registered:false,rank:1,exp:0,name:''},{registered:false,rank:1,exp:0,name:''}];
+    seed.unlocks=Object.fromEntries(Array.from({length:20},(_,i)=>['sector-'+(i+1),true]));seed.plannerSettings={targetRank:85};
+    const ctx=await context(seed),page=await open(ctx);
+    const text=await page.evaluate(()=>document.querySelectorAll('#calc-result .route-card')[1].textContent);
+    assert.match(text,/開圖兼練等/);
+    assert.match(text,/比目前 1121 跑同目標（經過開圖前置點）的最佳航線 .*：收船週期 48 小時 0 分 → 26 小時 1 分，-\d+% EXP／收船週期/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
+  await test('14. 開圖船同一天收得到時比 EXP，不為了早一小時犧牲 EXP',async()=>{
+    // Rank 20、已開 溺沒海 A–K：1121 走 K → J（26 小時 43 分）和 1111 走 E → J（25 小時 36 分）都是隔天收，
+    // 應選 EXP 高的 K → J，而不是快一小時但 EXP 少三成的 E → J。
+    const seed=baseSeed();seed.ships=[{registered:true,rank:20,exp:0,name:'',currentBuild:'1121'}];
+    seed.unlocks=Object.fromEntries(Array.from({length:11},(_,i)=>['sector-'+(i+1),true]));seed.plannerSettings={targetRank:85};
+    const ctx=await context(seed),page=await open(ctx);
+    const text=await page.evaluate(()=>document.querySelector('#calc-result .route-card').textContent);
+    assert.match(text,/開圖兼練等：溺沒海 K → J/);
+    assert.match(text,/本趟使用 1121，不用換裝/);
+    assert.doesNotMatch(text,/\d+ 小時 60 分/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
+  await test('15. 兩艘開圖船派往同一前置點時，卡片註明一起提高開圖機率',async()=>{
+    const full={};for(let c=1;c<=5;c++)for(let slot=0;slot<4;slot++)full[c+':'+slot]=4;
+    const seed=baseSeed();seed.partStock=full;
+    seed.ships=[50,48,45,40].map(rank=>({registered:true,rank,exp:0,name:'',currentBuild:'1121'}));
+    seed.unlocks=Object.fromEntries(Array.from({length:20},(_,i)=>['sector-'+(i+1),true]));seed.plannerSettings={targetRank:85};
+    const ctx=await context(seed),page=await open(ctx);
+    const cards=await page.evaluate(()=>[...document.querySelectorAll('#calc-result .route-card')].map(c=>c.textContent));
+    assert.match(cards[0],/開圖兼練等.*與 潛水艇 2 同時探索，提高本輪開圖機率/);
+    assert.match(cards[1],/開圖兼練等.*與 潛水艇 1 同時探索，提高本輪開圖機率/);
+    assert.doesNotMatch(cards[2]+cards[3],/同時探索/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
   await browser.close();server.close();
   console.log(results.join('\n'));
   console.log(passed+' passed, '+(results.filter(r=>r.startsWith('FAIL')).length)+' failed');

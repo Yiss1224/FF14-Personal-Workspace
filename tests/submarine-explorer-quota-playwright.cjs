@@ -84,7 +84,7 @@ const explorerCards=r=>r.cards.filter(c=>c.title.includes('畢業船開圖'));
       assert.ok(explorerCards(one.before)[0].title.includes('QA1'),tag+' Rank 最高的 QA1 先撥出');
       assert.strictEqual(one.voyage.purpose,'explore',tag+' 出航紀錄標記為撥出開圖');
       assert.strictEqual(explorerCards(one.after).length,0,tag+' QA1 出港後名額已滿，不能再撥 QA2：'+one.after.cards.map(c=>c.title).join(' | '));
-      assert.strictEqual(one.after.cards.filter(c=>c.title.includes('已達 Rank 85')).length,3,tag+' 其他三艘照常 O → J');
+      assert.strictEqual(one.after.cards.filter(c=>c.title.includes('O → J 收益')).length,3,tag+' 其他三艘照常 O → J');
       assert.ok(one.after.cards[0].text.includes('開圖中（計入「畢業船撥去開圖」名額）'),one.after.cards[0].text);
       assert.ok(one.after.hint.includes('已有 1 艘撥出的畢業船出港開圖'),tag+' '+one.after.hint);
       // 換成建議配置後不再顯示換裝比較（以前會拿開圖航線去比練等航線，顯示 -96%）。

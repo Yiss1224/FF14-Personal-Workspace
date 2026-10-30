@@ -84,7 +84,7 @@ const closedWithZ=new Set([27,...closed]);
     assert.strictEqual(b.length,1,'撥出一艘開剩餘航點：'+balanced.cards.map(c=>c.title).join(' | '));
     assert.ok(b[0].title.includes('潛水艇 1'));
     assert.ok(opens(b[0])>=1&&rate(b[0])>0,b[0].text);
-    assert.strictEqual(balanced.cards.filter(c=>c.title.includes('已達 Rank 85')).length,2,'其他兩艘畢業船照常 O → J');
+    assert.strictEqual(balanced.cards.filter(c=>c.title.includes('O → J 收益')).length,2,'其他兩艘畢業船照常 O → J');
     assert.ok(balanced.cards.some(c=>c.title.includes('潛水艇 4')&&c.title.includes('升等優先')),'練等船不受影響');
     assert.ok(balanced.hint.includes('其中 4 個的前置點已開'),balanced.hint);
     assert.strictEqual(explorerCards(balanced.afterReset).length,0,'改回待命後即時重算');

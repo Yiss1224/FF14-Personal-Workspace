@@ -66,13 +66,13 @@ const count=(titles,text)=>titles.filter(t=>t.includes(text)).length;
   try{
     const none=await run(browser,base,0);
     assert.strictEqual(none.select,'0');
-    assert.strictEqual(count(none.titles,'已達 Rank 85'),3,'預設三艘畢業船都跑 O → J');
+    assert.strictEqual(count(none.titles,'O → J 收益'),3,'預設三艘畢業船都跑 O → J');
     assert.strictEqual(count(none.titles,'畢業船開圖'),0);
 
     const two=await run(browser,base,2);
     assert.strictEqual(two.select,'2');
     assert.strictEqual(count(two.titles,'畢業船開圖'),2,'撥出兩艘畢業船開圖：'+two.titles.join(' | '));
-    assert.strictEqual(count(two.titles,'已達 Rank 85'),1,'剩一艘畢業船跑 O → J');
+    assert.strictEqual(count(two.titles,'O → J 收益'),1,'剩一艘畢業船跑 O → J');
     assert.ok(two.titles.some(t=>t.includes('潛水艇 1')&&t.includes('畢業船開圖')),'Rank 最高的船優先撥出');
     assert.ok(two.titles.some(t=>t.includes('潛水艇 4')&&t.includes('升等優先')),'練等船不必再負責開圖');
     assert.strictEqual(count(two.afterReset,'畢業船開圖'),0,'改回 0 艘後即時重算');
