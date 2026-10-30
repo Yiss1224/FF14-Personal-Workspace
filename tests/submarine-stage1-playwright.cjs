@@ -396,11 +396,12 @@ async function main(){
     seed.unlocks=Object.fromEntries(Array.from({length:20},(_,i)=>['sector-'+(i+1),true]));seed.plannerSettings={targetRank:85};
     const card=page=>page.evaluate(()=>[...document.querySelectorAll('#calc-result .route-card')].find(c=>c.querySelector('h3').textContent.startsWith('潛水艇 1')).textContent);
     let ctx=await context(seed),page=await open(ctx);
-    assert.match(await card(page),/跑 O → J 以 3124（.*）\s*平均每天的飾品估值最高：平均每天約 [\d,]+ Gil（每趟約 [\d,]+ Gil/);
-    assert.match(await card(page),/建議換裝：1121 → 3124/);
+    assert.match(await card(page),/O → J 收益：溺沒海 O → J.*建議配置 3124（/);
+    assert.match(await card(page),/約 [\d,]+ Gil\/趟（飾品估值）平均每天約 [\d,]+ Gil/);
+    assert.match(await card(page),/本趟建議換裝：1121 → 3124/);
     await page.click('[data-apply-build="0"][data-new-build="3124"]');
     assert.strictEqual((await stored(page)).ships[0].currentBuild,'3124');
-    assert.match(await card(page),/已登記為 3124，無需換裝/);
+    assert.match(await card(page),/本趟使用 3124，不用換裝/);
     assert.deepStrictEqual(page.errors,[]);
     await ctx.close();
     ctx=await context(seed);await ctx.route(/submarine-yield-data/,route=>route.abort());page=await open(ctx);
@@ -421,15 +422,16 @@ async function main(){
     // 仍略高於 24.4 小時的 1124（收集只到「普」，約 6.8 萬／天）。
     let ctx=await context(seed(full)),page=await open(ctx);
     let text=await card(page);
-    assert.match(text,/跑 O → J 以 5144（.*）\s*平均每天的飾品估值最高：平均每天約 70,830 Gil（每趟約 106,245 Gil、航行 26 小時 12 分，每天在窗口內收船時平均每 36 小時 0 分 收一趟）/);
-    assert.match(text,/目前 3124 在回航上限內跑不到 O → J/);
+    assert.match(text,/建議配置 5144（/);
+    assert.match(text,/約 106,245 Gil\/趟（飾品估值）平均每天約 70,830 Gil26 小時 12 分/);
+    assert.match(text,/本趟建議換裝：3124 → 5144/);
     assert.deepStrictEqual(page.errors,[]);
     await ctx.close();
     // 沒有希爾德里昂級船體就不推 5144，改推同收益、庫存組得出的 3421。
     ctx=await context(seed({...full,'5:0':0}));page=await open(ctx);
     text=await card(page);
     assert.doesNotMatch(text,/5144/);
-    assert.match(text,/以 3421（.*）\s*平均每天的飾品估值最高：平均每天約 70,830 Gil/);
+    assert.match(text,/建議配置 3421（.*平均每天約 70,830 Gil/);
     await ctx.close();
     // 回航上限 24 小時：Rank 80 沒有 24 小時內跑完 O → J 的配置。
     ctx=await context(seed(full,{maxHours:24}));page=await open(ctx);

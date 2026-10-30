@@ -852,7 +852,7 @@ function calculateNow(){
    const tie=best&&Math.abs(y.rate-best.rate)<=1e-9,swaps=partChanges(current,key)-(best?partChanges(current,best.key):0);
    if(!best||y.rate>best.rate+1e-9||tie&&(swaps<0||swaps===0&&y.time<best.time))best=y;
   }
-  ojPicks.set(ship.index,{best,current:ojRun(current,rank)});
+  ojPicks.set(ship.index,{best});
   if(best)ojUsage=allocate(best.key,without,total);
  }
  let fuel=0,html=[];
@@ -865,29 +865,28 @@ function calculateNow(){
    continue;
   }
   if(rank>=target&&!explorers.has(ship.index)){
-   const {best,current:now}=ojPicks.get(ship.index)||{},
-    gil=y=>'平均每天約 '+Math.round(y.rate*DAY).toLocaleString()+' Gil（每趟約 '+Math.round(y.gil).toLocaleString()+' Gil、航行 '+fmtTime(y.time)
-     +(daily?'，每天在窗口內收船時平均每 '+fmtTime(y.cycle)+' 收一趟':'')+'）';
-   const head='<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'：已達 Rank '+target+'</h3>';
+   const {best}=ojPicks.get(ship.index)||{};
    if(!best){
-    html.push(head+'<div class="route-meta">已達練等目標。'+(yieldData
+    html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'（Rank '+rank+'）</h3><div class="route-meta">'+(yieldData
       ?'目前的 Rank、已開航點、回航上限或剩餘部件組不出能跑 O → J 的配置；'+esc(current)+' 的部件仍算已安裝。'
       :'O → J 收益資料未載入，無法比較配置；'+esc(current)+' 的部件仍算已安裝。')+'</div></article>');
     continue;
    }
-   const same=best.key===current;fuel+=best.fuel;
-   html.push(head
-    +'<div class="route-meta">已達練等目標；剩餘庫存能組出的配置中，跑 O → J 以 <strong>'+esc(buildLabel(best.key))+'</strong> 平均每天的飾品估值最高：'
-    +esc(gil(best))+'；'+esc(best.detail)+(best.near?'，數值剛好壓在社群統計門檻上，屬估計':'')+'。'
-    +(same?' 已登記為 '+esc(current)+'，無需換裝。'
-      :' 目前 '+esc(current)+(now?' '+esc(gil(now)):' 在回航上限內跑不到 O → J')+'，部件仍算已安裝，換裝前不會借給別艘；請先在遊戲內換裝，再確認釋出配件。')
+   // 與練等船同一種卡片：航線、配置、時間、燃料、下次收船。
+   const key=best.key,switching=key!==current,stats=buildStats(key,rank);fuel+=best.fuel;
+   html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'：O → J 收益：'+esc(makeLabel(best.path))+'</h3>'
+    +'<div class="route-meta">Rank '+rank+' · 建議配置 <strong>'+esc(buildLabel(key))+'</strong> · 速度 '+stats.speed+' / 航程 '+stats.range+'</div>'
+    +(switching
+     ?'<div class="switch-advice"><strong>本趟建議換裝：'+esc(current)+' → '+esc(key)+'</strong><span>'+esc(changes(current,key))+'</span>'
+      +'<button type="button" data-apply-build="'+ship.index+'" data-new-build="'+key+'">已在遊戲換裝，更新紀錄</button></div>'
+     :'<div class="route-meta">本趟使用 '+esc(key)+'，不用換裝。</div>')
+    +'<div class="route-kpis"><span title="只計回收飾品 NPC 收購價；門檻與掉落率來自社群統計">約 '+Math.round(best.gil).toLocaleString()+' Gil/趟（飾品估值）</span>'
+    +'<span>平均每天約 '+Math.round(best.rate*DAY).toLocaleString()+' Gil</span>'
+    +'<span>'+fmtTime(best.time)+'</span><span>'+best.fuel+' 罐燃料</span>'
+    +(daily?'<span>最早可收／再派：'+esc(pickupLabel(best.time))+'</span><span>本趟收船週期 '+esc(fmtTime(pickupElapsed(best.time,true)))+'</span>':'')
     +'</div>'
-    +(same?'':'<div class="switch-advice"><strong>建議換裝：'+esc(current)+' → '+esc(best.key)+'</strong><span>'
-      +esc(changes(current,best.key))+'</span><button type="button" data-apply-build="'+ship.index
-      +'" data-new-build="'+best.key+'">已換成 '+best.key+'，更新紀錄</button></div>')
-    +'<small class="hint">飾品估值只計回收飾品的 NPC 收購價，寶石、錠等材料未計入；打撈門檻與掉落率來自社群統計，不含改造部件。</small>'
-    +stepBar([{label:same?'配置符合（'+best.key+'）':'遊戲內換裝 '+current+' → '+best.key+'，再按「更新紀錄」',done:same,current:!same},{label:'遊戲內派往 '+makeLabel(best.path),current:same},{label:'按「確認出航」開始計時'}])
-    +'<div class="voyage-depart-actions"><span class="route-meta">'+esc(makeLabel(best.path))+'，預計實際航行 '+esc(fmtTime(best.time))+'、'+best.fuel+' 罐燃料；完成遊戲內出航後再按下按鈕。</span>'
+    +stepBar([{label:switching?'遊戲內換裝 '+current+' → '+key+'，再按「更新紀錄」':'配置符合（'+key+'）',done:!switching,current:switching},{label:'遊戲內派往這條航線',current:!switching},{label:'按「確認出航」開始計時'}])
+    +'<div class="voyage-depart-actions"><span class="route-meta">預計實際航行 '+esc(fmtTime(best.time))+'；完成遊戲內出航後再按下按鈕。</span>'
     +'<button class="voyage-depart-button" type="button" data-depart-ship="'+ship.index+'">⚓ 確認出航</button></div>'
     +'</article>');
    continue;
