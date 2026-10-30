@@ -1,0 +1,45 @@
+name: Stamp version
+# 每次推上 main 後，把 commit / PR 編號 / 時間寫進 version.js 與 version.json，
+# GitHub Pages 隨之重新部署，頁首就能看到目前載入的是哪一版。
+# 同時把 HTML 引用本站 JS／CSS 的 ?v= 一律換成這次的 commit，避免瀏覽器沿用舊快取。
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - version.js
+      - version.json
+permissions:
+  contents: write
+  pull-requests: read
+concurrency:
+  group: stamp-version
+  cancel-in-progress: true
+jobs:
+  stamp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write version files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          pr=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/pulls" --jq '.[0].number // empty' 2>/dev/null || true)
+          if [ -z "$pr" ]; then
+            pr=$(git log -1 --format=%s "$SHA" | grep -oE '#[0-9]+' | head -1 | tr -d '#' || true)
+          fi
+          time=$(git log -1 --format=%cI "$SHA")
+          json=$(jq -cn --arg sha "$SHA" --arg short "${SHA:0:7}" --arg pr "$pr" --arg time "$time" \
+            '{sha:$sha,short:$short,pr:(if $pr=="" then null else ($pr|tonumber) end),time:$time}')
+          echo "$json" > version.json
+          printf '%s\n%s\n' '// 由 .github/workflows/stamp-version.yml 在每次推上 main 時自動改寫，請勿手動編輯。' "window.FF14_BUILD=${json};" > version.js
+          cat version.js
+          sed -i -E 's/((src|href)="[^"\/:]+\.(js|css))\?v=[^"]*"/\1?v='"${SHA:0:7}"'"/g' index.html submarine.html
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          git add version.js version.json index.html submarine.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Stamp version ${GITHUB_SHA::7} [skip ci]"
+          git push
