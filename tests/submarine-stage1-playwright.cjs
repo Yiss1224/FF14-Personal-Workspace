@@ -396,7 +396,7 @@ async function main(){
     seed.unlocks=Object.fromEntries(Array.from({length:20},(_,i)=>['sector-'+(i+1),true]));seed.plannerSettings={targetRank:85};
     const card=page=>page.evaluate(()=>[...document.querySelectorAll('#calc-result .route-card')].find(c=>c.querySelector('h3').textContent.startsWith('潛水艇 1')).textContent);
     let ctx=await context(seed),page=await open(ctx);
-    assert.match(await card(page),/跑 O → J 以 3124（.*）\s*的飾品估值最高：約 [\d,]+ Gil／趟/);
+    assert.match(await card(page),/跑 O → J 以 3124（.*）\s*平均每天的飾品估值最高：平均每天約 [\d,]+ Gil（每趟約 [\d,]+ Gil/);
     assert.match(await card(page),/建議換裝：1121 → 3124/);
     await page.click('[data-apply-build="0"][data-new-build="3124"]');
     assert.strictEqual((await stored(page)).ships[0].currentBuild,'3124');
@@ -405,6 +405,35 @@ async function main(){
     await ctx.close();
     ctx=await context(seed);await ctx.route(/submarine-yield-data/,route=>route.abort());page=await open(ctx);
     assert.match(await card(page),/收益資料未載入/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
+  await test('11. 畢業船以平均每天收益比較：Rank 80 依收船窗口換算週期，只推庫存組得出、回航上限內的配置',async()=>{
+    const full={};for(let c=1;c<=5;c++)for(let slot=0;slot<4;slot++)full[c+':'+slot]=4;
+    const seed=(partStock,settings={})=>{
+      const s=baseSeed();s.ships=[{registered:true,rank:80,exp:0,name:'',currentBuild:'3124'}];s.partStock=partStock;
+      s.unlocks=Object.fromEntries(Array.from({length:20},(_,i)=>['sector-'+(i+1),true]));
+      s.plannerSettings={targetRank:80,dailyPickup:true,pickupStart:'19:00',pickupEnd:'22:00',...settings};return s;
+    };
+    const card=page=>page.evaluate(()=>document.querySelector('#calc-result .route-card').textContent);
+    // 5144 航行 26.2 小時：19:00 出航隔天 21:12 收、再出航就落在窗口外，平均每 36 小時一趟（約 7.1 萬／天），
+    // 仍略高於 24.4 小時的 1124（收集只到「普」，約 6.8 萬／天）。
+    let ctx=await context(seed(full)),page=await open(ctx);
+    let text=await card(page);
+    assert.match(text,/跑 O → J 以 5144（.*）\s*平均每天的飾品估值最高：平均每天約 70,830 Gil（每趟約 106,245 Gil、航行 26 小時 12 分，每天在窗口內收船時平均每 36 小時 0 分 收一趟）/);
+    assert.match(text,/目前 3124 在回航上限內跑不到 O → J/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+    // 沒有希爾德里昂級船體就不推 5144，改推同收益、庫存組得出的 3421。
+    ctx=await context(seed({...full,'5:0':0}));page=await open(ctx);
+    text=await card(page);
+    assert.doesNotMatch(text,/5144/);
+    assert.match(text,/以 3421（.*）\s*平均每天的飾品估值最高：平均每天約 70,830 Gil/);
+    await ctx.close();
+    // 回航上限 24 小時：Rank 80 沒有 24 小時內跑完 O → J 的配置。
+    ctx=await context(seed(full,{maxHours:24}));page=await open(ctx);
+    assert.match(await card(page),/回航上限或剩餘部件組不出能跑 O → J 的配置/);
     assert.deepStrictEqual(page.errors,[]);
     await ctx.close();
   });
