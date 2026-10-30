@@ -438,6 +438,28 @@ async function main(){
     await ctx.close();
   });
 
+  await test('12. 畢業船可直接確認出航 O → J（配置不符時先要求換裝）',async()=>{
+    const seed=baseSeed();seed.ships=[{registered:true,rank:85,exp:0,name:'',currentBuild:'1121'}];
+    seed.unlocks=Object.fromEntries(Array.from({length:20},(_,i)=>['sector-'+(i+1),true]));seed.plannerSettings={targetRank:85};
+    const ctx=await context(seed),page=await open(ctx);
+    assert.ok(await page.$('[data-depart-ship="0"]'));
+    await page.click('[data-depart-ship="0"]');
+    await page.waitForSelector('#sub-dialog[open]');
+    assert.match(await page.textContent('#sub-dialog'),/請先在遊戲中完成換裝/);
+    await page.click('#sub-dialog [data-dialog-ok]');
+    assert.strictEqual((await stored(page)).ships[0].voyaging,undefined);
+    await page.click('[data-apply-build="0"][data-new-build="3124"]');
+    assert.match(await page.textContent('#calc-result'),/本輪建議消耗約 [1-9]\d* 罐燃料/);
+    await depart(page,'[data-depart-ship="0"]');
+    const ship=(await stored(page)).ships[0];
+    assert.strictEqual(ship.voyaging,true);
+    assert.strictEqual(ship.voyage.build,'3124');
+    assert.match(ship.voyage.route,/O → J/);
+    assert.ok(ship.voyage.durationSeconds>20*3600&&ship.voyage.durationSeconds<24*3600);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
   await browser.close();server.close();
   console.log(results.join('\n'));
   console.log(passed+' passed, '+(results.filter(r=>r.startsWith('FAIL')).length)+' failed');
