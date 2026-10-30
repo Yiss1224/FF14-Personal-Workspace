@@ -501,7 +501,7 @@ function ojYield(key,rank,open){
  const path=OJ_ROUTE.map(l=>open.find(p=>p.map===1&&p.letter===l));if(path.some(p=>!p||p.rank>rank))return null;
  const stats=buildStats(key,rank),m=routeMetrics(path,stats.speed,stats.range);if(!m)return null;
  const st=lootStats(key,rank),parts=path.map(p=>sectorYield(p.id,st));if(parts.some(x=>!x))return null;
- return {key,time:m.time,gil:parts.reduce((a,x)=>a+x.gil,0),near:parts.some(x=>x.near),
+ return {key,path,time:m.time,fuel:m.fuel,gil:parts.reduce((a,x)=>a+x.gil,0),near:parts.some(x=>x.near),
   detail:path.map((p,i)=>p.letter+' '+parts[i].label).join('；')};
 }
 
@@ -875,7 +875,7 @@ function calculateNow(){
       :'O → J 收益資料未載入，無法比較配置；'+esc(current)+' 的部件仍算已安裝。')+'</div></article>');
     continue;
    }
-   const same=best.key===current;
+   const same=best.key===current;fuel+=best.fuel;
    html.push(head
     +'<div class="route-meta">已達練等目標；剩餘庫存能組出的配置中，跑 O → J 以 <strong>'+esc(buildLabel(best.key))+'</strong> 平均每天的飾品估值最高：'
     +esc(gil(best))+'；'+esc(best.detail)+(best.near?'，數值剛好壓在社群統計門檻上，屬估計':'')+'。'
@@ -886,6 +886,9 @@ function calculateNow(){
       +esc(changes(current,best.key))+'</span><button type="button" data-apply-build="'+ship.index
       +'" data-new-build="'+best.key+'">已換成 '+best.key+'，更新紀錄</button></div>')
     +'<small class="hint">飾品估值只計回收飾品的 NPC 收購價，寶石、錠等材料未計入；打撈門檻與掉落率來自社群統計，不含改造部件。</small>'
+    +stepBar([{label:same?'配置符合（'+best.key+'）':'遊戲內換裝 '+current+' → '+best.key+'，再按「更新紀錄」',done:same,current:!same},{label:'遊戲內派往 '+makeLabel(best.path),current:same},{label:'按「確認出航」開始計時'}])
+    +'<div class="voyage-depart-actions"><span class="route-meta">'+esc(makeLabel(best.path))+'，預計實際航行 '+esc(fmtTime(best.time))+'、'+best.fuel+' 罐燃料；完成遊戲內出航後再按下按鈕。</span>'
+    +'<button class="voyage-depart-button" type="button" data-depart-ship="'+ship.index+'">⚓ 確認出航</button></div>'
     +'</article>');
    continue;
   }
@@ -992,7 +995,9 @@ function calculateNow(){
   $('calc-result').querySelectorAll('[data-clear-item-route]').forEach(btn=>btn.onclick=()=>{pendingItemDeparture=null;calculate()});
  }
  $('calc-result').querySelectorAll('[data-depart-ship]').forEach(btn=>btn.onclick=()=>{
-  const i=Number(btn.dataset.departShip),choice=selected.get(i),current=state(),ship=current.ships?.[i];
+  // 畢業船沒有練等航線，出航用 O → J 的推薦配置。
+  const i=Number(btn.dataset.departShip),oj=ojPicks.get(i)?.best,current=state(),ship=current.ships?.[i],
+   choice=selected.get(i)||(oj&&{key:oj.key,route:{path:oj.path,time:oj.time,fuel:oj.fuel}});
   if(!ship||!ship.registered||ship.voyaging||!choice){dialogs().alert('船隻狀態已變更，請重新計算航線。').then(calculate);return;}
   if(installed(ship)!==choice.key){dialogs().alert('請先在遊戲中完成換裝，並點選「已在遊戲換裝，更新紀錄」。');return;}
   const duration=Math.round(Number(choice.route.time));
