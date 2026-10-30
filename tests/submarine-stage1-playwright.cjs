@@ -462,6 +462,19 @@ async function main(){
     await ctx.close();
   });
 
+  await test('13. 開圖船換裝比較同時列出收船週期（開圖優先比週期，EXP 可能略低）',async()=>{
+    const full={};for(let c=1;c<=5;c++)for(let slot=0;slot<4;slot++)full[c+':'+slot]=4;
+    const seed=baseSeed();seed.partStock=full;
+    seed.ships=[{registered:true,rank:85,exp:0,name:'',currentBuild:'3124'},{registered:true,rank:60,exp:0,name:'',currentBuild:'1121'},{registered:false,rank:1,exp:0,name:''},{registered:false,rank:1,exp:0,name:''}];
+    seed.unlocks=Object.fromEntries(Array.from({length:20},(_,i)=>['sector-'+(i+1),true]));seed.plannerSettings={targetRank:85};
+    const ctx=await context(seed),page=await open(ctx);
+    const text=await page.evaluate(()=>document.querySelectorAll('#calc-result .route-card')[1].textContent);
+    assert.match(text,/開圖兼練等/);
+    assert.match(text,/比目前 1121 跑同目標（經過開圖前置點）的最佳航線 .*：收船週期 48 小時 0 分 → 26 小時 1 分，-\d+% EXP／收船週期/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
   await browser.close();server.close();
   console.log(results.join('\n'));
   console.log(passed+' passed, '+(results.filter(r=>r.startsWith('FAIL')).length)+' failed');

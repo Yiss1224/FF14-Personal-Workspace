@@ -828,7 +828,9 @@ function calculateNow(){
   if(choice.frontier&&exploreMode==='frontier')
    return '<span>'+head+'可開 '+basis.opens+' → '+choice.route.opens+' 個航點、收船週期 '+esc(fmtTime(basis.cycle))+' → '+esc(fmtTime(choice.route.cycle))+'</span>';
   const gil=choice.frontier&&exploreMode==='gil',d=gil?pct(choice.route.gilRate,basis.gilRate):pct(choice.route.score,basis.score);
-  return d===null?'':'<span>'+head+sign(d)+(gil?' Gil 估值':' EXP')+'／收船週期</span>';
+  // 開圖優先比的是多快回來開下一處，EXP 可能略低；把收船週期一起列出，避免只看到負的百分比。
+  const cycleText=choice.opening&&!choice.frontier?'收船週期 '+esc(fmtTime(pickupElapsed(basis.time,daily)))+' → '+esc(fmtTime(pickupElapsed(choice.route.time,daily)))+'，':'';
+  return d===null?'':'<span>'+head+cycleText+sign(d)+(gil?' Gil 估值':' EXP')+'／收船週期</span>';
  }
  const allocation=selectFleetAllocation(plans,fixedUsage,total,target,daily);
  const selected=allocation.chosen;
