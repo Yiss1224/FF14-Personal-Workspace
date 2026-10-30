@@ -110,9 +110,9 @@ function windowSettings(){
  return {start:from,end:to,departure:Math.min(to,Math.max(from,departure)),valid,
    departureInside:departure>=from&&departure<=to};
 }
-function pickupTiming(voyageSeconds){
+function pickupTiming(voyageSeconds,departSeconds){
  const {start,end,departure}=windowSettings();
- const depart=departure*60,arrival=depart+voyageSeconds;
+ const depart=departSeconds??departure*60,arrival=depart+voyageSeconds;
  const day=Math.floor(arrival/DAY),time=arrival-day*DAY;
  const earliest=start*60,latest=end*60;
  const pickup=time<earliest?day*DAY+earliest:
@@ -122,6 +122,13 @@ function pickupTiming(voyageSeconds){
 }
 function pickupElapsed(voyageSeconds,daily){
  return daily?pickupTiming(voyageSeconds).elapsed:voyageSeconds;
+}
+// 長期每天在窗口內收船再派時，平均每趟占用多久：航程超過一天的船每次出航會往後推，
+// 推出窗口就要等到隔天窗口開始。從窗口開始出航模擬到再次回到窗口開始，取平均。
+function steadyCycle(voyageSeconds){
+ const first=windowSettings().start*60;let depart=first,total=0,runs=0;
+ do{const p=pickupTiming(voyageSeconds,depart);total+=p.elapsed;runs++;depart=p.clock}while(depart!==first&&runs<60);
+ return total/runs;
 }
 function fmtClock(seconds){
  const secs=((Math.round(seconds)%DAY)+DAY)%DAY;
@@ -825,8 +832,13 @@ function calculateNow(){
  }
  const allocation=selectFleetAllocation(plans,fixedUsage,total,target,daily);
  const selected=allocation.chosen;
- // 畢業船：在扣掉其他船占用（含本輪派船）後的庫存中，挑 O → J 飾品估值／收船週期最高的配置；
- // 同分時換裝件數少的優先，再比航行時間。換裝前部件仍算已安裝，不會借給練等船。
+ // 畢業船：在扣掉其他船占用（含本輪派船）後的庫存中，挑 O → J 平均每天飾品估值最高的配置
+ // （每天在窗口內收船時，以長期平均每趟占用的時間換算；超過回航上限的不算）；
+ // 目前配置也一起比，同分時換裝件數少的優先，再比航行時間。換裝前部件仍算已安裝，不會借給練等船。
+ const ojRun=(key,rank)=>{
+  const y=ojYield(key,rank,open);if(!y||y.time>hours*3600)return null;
+  y.cycle=daily?steadyCycle(y.time):y.time;y.rate=y.gil/y.cycle;return y;
+ };
  let ojUsage=fixedUsage;
  for(const choice of selected.values())ojUsage=allocate(choice.key,ojUsage,total)||ojUsage;
  const ojPicks=new Map();
@@ -836,12 +848,11 @@ function calculateNow(){
   let best=null;
   for(const key of allBuildKeys){
    if(!allocate(key,without,total))continue;
-   const y=ojYield(key,rank,open);if(!y)continue;
-   y.rate=y.gil/pickupElapsed(y.time,daily);
+   const y=ojRun(key,rank);if(!y)continue;
    const tie=best&&Math.abs(y.rate-best.rate)<=1e-9,swaps=partChanges(current,key)-(best?partChanges(current,best.key):0);
    if(!best||y.rate>best.rate+1e-9||tie&&(swaps<0||swaps===0&&y.time<best.time))best=y;
   }
-  ojPicks.set(ship.index,{best,current:ojYield(current,rank,open)});
+  ojPicks.set(ship.index,{best,current:ojRun(current,rank)});
   if(best)ojUsage=allocate(best.key,without,total);
  }
  let fuel=0,html=[];
@@ -854,20 +865,22 @@ function calculateNow(){
    continue;
   }
   if(rank>=target&&!explorers.has(ship.index)){
-   const {best,current:now}=ojPicks.get(ship.index)||{},gil=y=>'約 '+Math.round(y.gil).toLocaleString()+' Gil／趟';
+   const {best,current:now}=ojPicks.get(ship.index)||{},
+    gil=y=>'平均每天約 '+Math.round(y.rate*DAY).toLocaleString()+' Gil（每趟約 '+Math.round(y.gil).toLocaleString()+' Gil、航行 '+fmtTime(y.time)
+     +(daily?'，每天在窗口內收船時平均每 '+fmtTime(y.cycle)+' 收一趟':'')+'）';
    const head='<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'：已達 Rank '+target+'</h3>';
    if(!best){
     html.push(head+'<div class="route-meta">已達練等目標。'+(yieldData
-      ?'目前的 Rank、已開航點或剩餘部件組不出能跑 O → J 的配置；'+esc(current)+' 的部件仍算已安裝。'
+      ?'目前的 Rank、已開航點、回航上限或剩餘部件組不出能跑 O → J 的配置；'+esc(current)+' 的部件仍算已安裝。'
       :'O → J 收益資料未載入，無法比較配置；'+esc(current)+' 的部件仍算已安裝。')+'</div></article>');
     continue;
    }
    const same=best.key===current;
    html.push(head
-    +'<div class="route-meta">已達練等目標；跑 O → J 以 <strong>'+esc(buildLabel(best.key))+'</strong> 的飾品估值最高：'
-    +gil(best)+'（'+esc(best.detail)+'）'+(best.near?'，數值剛好壓在社群統計門檻上，屬估計':'')+'。'
+    +'<div class="route-meta">已達練等目標；剩餘庫存能組出的配置中，跑 O → J 以 <strong>'+esc(buildLabel(best.key))+'</strong> 平均每天的飾品估值最高：'
+    +esc(gil(best))+'；'+esc(best.detail)+(best.near?'，數值剛好壓在社群統計門檻上，屬估計':'')+'。'
     +(same?' 已登記為 '+esc(current)+'，無需換裝。'
-      :' 目前 '+esc(current)+(now?' '+gil(now):' 跑不到 O → J')+'，部件仍算已安裝，換裝前不會借給別艘；請先在遊戲內換裝，再確認釋出配件。')
+      :' 目前 '+esc(current)+(now?' '+esc(gil(now)):' 在回航上限內跑不到 O → J')+'，部件仍算已安裝，換裝前不會借給別艘；請先在遊戲內換裝，再確認釋出配件。')
     +'</div>'
     +(same?'':'<div class="switch-advice"><strong>建議換裝：'+esc(current)+' → '+esc(best.key)+'</strong><span>'
       +esc(changes(current,best.key))+'</span><button type="button" data-apply-build="'+ship.index
