@@ -657,36 +657,47 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
   .sort((a,b)=>a.rank-b.rank).map(x=>x.option)]));
  let best=null;
  const decisions=new Map();
- function evaluate(usage,gateCount,gateTurns){
+ // 同一輪：每天收船時看第幾天收得到；沒有收船窗口時，以出發後第幾個 24 小時計。
+ const gateRound=cost=>daily?cost:Math.ceil(cost-1e-9);
+ function evaluate(usage,gateCount,gateDays){
   const entries=[...decisions.values()];
   if(!entries.length)return;
   const etas=entries.map(({plan,option})=>estimatedFinishDays(plan,option,targetRank,daily));
   const sum=etas.reduce((a,b)=>a+b,0);
   const fleetBottleneck=Math.max(0,...etas);
   const switching=entries.filter(({plan,option})=>installed(plan.ship)!==option.key).length;
-  // 開圖優先：先保證盡可能多艘合格開圖船探索，再降低其派船週期。
+  // 開圖優先：先讓最早的一次開圖嘗試越早越好，再讓同一輪回來的開圖船越多越好（開圖有機率，
+  // 同輪多一艘就多一次機會）；比第一艘晚回來的開圖船不算加分，否則會為了湊兩艘開圖船，
+  // 讓第二艘跑慢好幾天、EXP 大減的航線。
   // 剩下的以可提前投入 OJ 的船日＋全艦隊完成日期評分；剩餘航點開圖以 penalty 表達航線偏好順序。
   const preference=entries.reduce((a,{option})=>a+(option.penalty||0),0);
   const objective=sum+fleetBottleneck*0.6+switching*0.002+preference;
-  const val={gateCount,gateTurns,objective,entries:entries.map(x=>({plan:x.plan,option:x.option}))};
-  if(!best||val.gateCount>best.gateCount||
-     (val.gateCount===best.gateCount&&val.gateTurns<best.gateTurns)||
-     (val.gateCount===best.gateCount&&val.gateTurns===best.gateTurns&&val.objective<best.objective))best=val;
+  const gateRoundFirst=gateDays.length?Math.min(...gateDays.map(gateRound)):Infinity;
+  const gateSameRound=gateDays.filter(d=>gateRound(d)===gateRoundFirst).length;
+  const val={gateCount,gateRoundFirst,gateSameRound,objective,entries:entries.map(x=>({plan:x.plan,option:x.option}))};
+  const better=!best||val.gateCount!==best.gateCount?!best||val.gateCount>best.gateCount
+   :val.gateRoundFirst!==best.gateRoundFirst?val.gateRoundFirst<best.gateRoundFirst
+   :val.gateSameRound!==best.gateSameRound?val.gateSameRound>best.gateSameRound
+   :val.objective<best.objective;
+  if(better)best=val;
  }
- function walk(i,usage,count,turns){
-  if(i>=ready.length){evaluate(usage,count,turns);return}
-  const p=ready[i];let tried=0;
+ // 指定的開圖船也保留練等選項：開圖與練等各試前幾個庫存仍可組出的選項。
+ function walk(i,usage,count,days){
+  if(i>=ready.length){evaluate(usage,count,days);return}
+  const p=ready[i],tried={open:0,level:0};
   for(const option of order.get(p)){
-   if(tried>=CHOICES_PER_SHIP)break;
+   const kind=option.opening?'open':'level';
+   if(tried[kind]>=CHOICES_PER_SHIP)continue;
    const updated=allocate(option.key,usage,availableStock);
    if(!updated)continue;
-   tried++;
+   tried[kind]++;
    decisions.set(p.ship.index,{plan:p,option});
-   walk(i+1,updated,count+Number(option.opening),turns+(option.opening&&!option.frontier?gateCost(option.route.time,daily):0));
+   const gate=option.opening&&!option.frontier;
+   walk(i+1,updated,count+Number(Boolean(option.frontier)),gate?days.concat(gateCost(option.route.time,daily)):days);
    decisions.delete(p.ship.index);
   }
  }
- walk(0,fixedUsage,0,0);
+ walk(0,fixedUsage,0,[]);
  if(!best)return {chosen:new Map(),missing:ready.map(p=>shipLabel(p.ship.index,p.ship)),reason:'實際零件庫存不足，無法讓所有返航船同時配裝出航'};
  return {chosen:new Map(best.entries.map(x=>[x.plan.ship.index,x.option])),missing,best,reason:missing.length?'潛艇 '+missing.join('、')+' 找不到可行航線，其他船仍正常推薦。':null};
 }
@@ -808,7 +819,8 @@ function calculateNow(){
   for(const b of p.routeOptions){
    if(designated&&b.gate.length){
     for(const route of b.gate.slice(0,2))p.choices.push({key:b.key,route,alternates:b.normal,opening:true,frontier:exploring==='frontier'});
-   }else if(b.normal.length&&!p.explorer){
+   }
+   if(b.normal.length&&!p.explorer){
     p.choices.push({key:b.key,route:b.normal[0],alternates:b.normal,opening:false});
    }
   }
@@ -861,7 +873,8 @@ function calculateNow(){
   if(best)ojUsage=allocate(best.key,without,total);
  }
  // 開圖有機率：同一輪派往同一前置點的其他船，卡片上註明是一起提高機率。
- const partners=i=>[...selected].filter(([j,c])=>j!==i&&c.opening&&!c.frontier).map(([j])=>shipLabel(j,registered.find(x=>x.index===j)));
+ const sameGateRound=(a,b)=>daily?gateCost(a.route.time,true)===gateCost(b.route.time,true):Math.ceil(gateCost(a.route.time,false)-1e-9)===Math.ceil(gateCost(b.route.time,false)-1e-9);
+ const partners=i=>[...selected].filter(([j,c])=>j!==i&&c.opening&&!c.frontier&&sameGateRound(c,selected.get(i))).map(([j])=>shipLabel(j,registered.find(x=>x.index===j)));
  let fuel=0,html=[];
  for(const ship of registered){
   const rank=shipRank(ship),current=installed(ship);

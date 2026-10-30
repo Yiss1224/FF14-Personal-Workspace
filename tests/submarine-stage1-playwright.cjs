@@ -503,6 +503,24 @@ async function main(){
     await ctx.close();
   });
 
+  await test('16. 部件吃緊時，比第一艘晚好幾天回來的船不算同輪開圖，也不註明同時探索',async()=>{
+    // 每種部件 2 件：R85 的 3124 加上 R60 換 3122 後，R45 組不出同一天回來的開圖配置，
+    // 舊邏輯仍讓它跑 72 小時的開圖航線並寫「同時探索」，其實比第一艘晚兩天才回來。
+    const stock={};for(let c=1;c<=5;c++)for(let slot=0;slot<4;slot++)stock[c+':'+slot]=2;
+    const seed=baseSeed();seed.partStock=stock;
+    seed.ships=[{registered:true,rank:85,exp:0,name:'',currentBuild:'3124'},...[60,45,30].map(rank=>({registered:true,rank,exp:0,name:'',currentBuild:'1121'}))];
+    seed.unlocks=Object.fromEntries(Array.from({length:20},(_,i)=>['sector-'+(i+1),true]));seed.plannerSettings={targetRank:85};
+    const ctx=await context(seed),page=await open(ctx);
+    const cards=await page.evaluate(()=>[...document.querySelectorAll('#calc-result .route-card')].map(c=>c.textContent));
+    const pickup=text=>(text.match(/最早可收／再派：([^本]+)/)||[])[1];
+    const openers=cards.filter(t=>/開圖兼練等/.test(t));
+    assert.ok(openers.length>=1,'應至少有一艘開圖船');
+    const partnered=cards.filter(t=>/同時探索/.test(t));
+    assert.ok(partnered.length===0||new Set(partnered.map(pickup)).size===1,'註明同時探索的船應在同一天收船：'+partnered.map(pickup).join('／'));
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
   await browser.close();server.close();
   console.log(results.join('\n'));
   console.log(passed+' passed, '+(results.filter(r=>r.startsWith('FAIL')).length)+' failed');
