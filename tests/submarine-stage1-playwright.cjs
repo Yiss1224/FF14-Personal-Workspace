@@ -475,6 +475,20 @@ async function main(){
     await ctx.close();
   });
 
+  await test('14. 開圖船同一天收得到時比 EXP，不為了早一小時犧牲 EXP',async()=>{
+    // Rank 20、已開 溺沒海 A–K：1121 走 K → J（26 小時 43 分）和 1111 走 E → J（25 小時 36 分）都是隔天收，
+    // 應選 EXP 高的 K → J，而不是快一小時但 EXP 少三成的 E → J。
+    const seed=baseSeed();seed.ships=[{registered:true,rank:20,exp:0,name:'',currentBuild:'1121'}];
+    seed.unlocks=Object.fromEntries(Array.from({length:11},(_,i)=>['sector-'+(i+1),true]));seed.plannerSettings={targetRank:85};
+    const ctx=await context(seed),page=await open(ctx);
+    const text=await page.evaluate(()=>document.querySelector('#calc-result .route-card').textContent);
+    assert.match(text,/開圖兼練等：溺沒海 K → J/);
+    assert.match(text,/本趟使用 1121，不用換裝/);
+    assert.doesNotMatch(text,/\d+ 小時 60 分/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
   await browser.close();server.close();
   console.log(results.join('\n'));
   console.log(passed+' passed, '+(results.filter(r=>r.startsWith('FAIL')).length)+' failed');
