@@ -448,7 +448,12 @@ function bestFrontierRoutes(available,ship,buildKey,maxHours,s,parents,mode,beam
    targets:r.path.flatMap(p=>parents.get(p.id)||[])};
   if(!routes.has(label)||frontierOrder(mode)(route,routes.get(label))<0)routes.set(label,route);
  }
- return [...routes.values()].sort(frontierOrder(mode)).slice(0,3);
+ const sorted=[...routes.values()].sort(frontierOrder(mode));
+ if(mode!=='pin')return sorted.slice(0,3);
+ // 指定航點：每種「涵蓋哪些指定目標」各留最好的一條，多艘船才能分頭涵蓋不同目標。
+ const bySet=new Map();
+ for(const r of sorted){const k=[...new Set(r.targets.map(x=>x.target.id))].sort((a,b)=>a-b).join(',');if(!bySet.has(k))bySet.set(k,[]);if(bySet.get(k).length<2)bySet.get(k).push(r)}
+ return [...bySet.values()].flat().sort(frontierOrder(mode)).slice(0,6);
 }
 // 剩餘航點開圖的航線說明：經過哪些前置點、可能開出哪些航點。
 function frontierNote(route){
@@ -460,9 +465,78 @@ function frontierNote(route){
   +(route.unpriced>0.005?'（約 '+Math.round(route.unpriced/route.path.length*100)+'% 的掉落還沒有價格，未計入）':'')+'。</div>';
 }
 function frontierOrder(mode){
+ // 指定航點：先比涵蓋幾個指定目標，再比第幾天收得到（與開圖船相同），最後比 EXP。
+ if(mode==='pin')return (a,b)=>b.opens-a.opens||gateCost(a.time,Boolean($('daily-pickup')?.checked))-gateCost(b.time,Boolean($('daily-pickup')?.checked))||b.score-a.score;
  if(mode==='frontier')return (a,b)=>b.opens-a.opens||a.cycle-b.cycle||b.score-a.score;
  if(mode==='gil')return (a,b)=>b.gilRate-a.gilRate||b.opens-a.opens||b.score-a.score;
  return (a,b)=>b.score-a.score||b.opens-a.opens;
+}
+
+// 指定航點：已開的點＝本輪要經過；未開的點＝要開它。目標的前置點還沒開時，
+// 往前找第一個「前置點已開」的未開點，先經過那個前置點（例如指定 H 而 G 未開，就先經過 D 開 G）。
+function plannerPins(settings){
+ const raw=Array.isArray(settings?.pins)?settings.pins:[];
+ return raw.filter(x=>x&&Number.isInteger(Number(x.id))&&(x.mode==='open'||x.mode==='visit')).map(x=>({id:Number(x.id),mode:x.mode}));
+}
+function resolvePin(pin,openIds){
+ const target=data.sectors.find(p=>p.id===pin.id);if(!target)return null;
+ if(pin.mode==='visit')return openIds.has(target.id)?{pin,target,via:target,next:target}:null;
+ if(openIds.has(target.id))return null;
+ let next=target;const seen=new Set();
+ while(next&&!openIds.has(next.unlockedBy)){
+  if(seen.has(next.id))return null;seen.add(next.id);
+  next=data.sectors.find(p=>p.id===next.unlockedBy);
+ }
+ const via=next&&data.sectors.find(p=>p.id===next.unlockedBy);
+ return via?{pin,target,via,next}:null;
+}
+const sectorText=p=>seaName(p.map)+' '+p.letter+(sectorName(p.map,p.letter)?'（'+sectorName(p.map,p.letter)+'）':'');
+function pinGoalText(r){
+ if(r.pin.mode==='visit')return '經過指定航點 '+seaName(r.via.map)+' '+r.via.letter;
+ return '經過 '+seaName(r.via.map)+' '+r.via.letter+' 探索 '+sectorText(r.next)+(r.next.id!==r.target.id?'（往 '+seaName(r.target.map)+' '+r.target.letter+' 的前置點）':'');
+}
+function pinNote(route){
+ const opening=route.targets.some(r=>r.pin.mode==='open'),auto=route.targets.every(r=>r.pin.auto);
+ // 同一個前置點探索同一處的目標合併成一句：經過 B 探索 E（往 I、K 的前置點）。
+ const groups=new Map();
+ for(const r of route.targets){const k=r.pin.mode+':'+r.via.id+':'+r.next.id;if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r)}
+ const text=[...groups.values()].map(list=>{
+  const r=list[0];if(r.pin.mode==='visit')return pinGoalText(r);
+  const beyond=[...new Set(list.filter(x=>x.target.id!==x.next.id).map(x=>seaName(x.target.map)+' '+x.target.letter))];
+  return '經過 '+seaName(r.via.map)+' '+r.via.letter+' 探索 '+sectorText(r.next)+(beyond.length?'（往 '+beyond.join('、')+' 的前置點）':'');
+ });
+ return '<div class="route-meta">'+(auto?'練等關鍵點：':'指定航點：')+esc(text.join('；'))+'。'
+  +(opening?'開圖有機率，成功後請點地圖更新；開出後會自動改往下一個前置點，直到目標開啟。':'')+'</div>';
+}
+// 指定航點的選單與清單。已開的點加入後是「要經過」，未開的點是「要開它」。
+function renderPinPlanner(){
+ const select=$('pin-sector'),list=$('pin-list');if(!select||!list||!data)return;
+ const s=state(),pins=plannerPins(s.plannerSettings),openIds=new Set(unlockedSectors(s,145).map(p=>p.id)),pinned=new Set(pins.map(x=>x.id));
+ const current=select.value;
+ select.innerHTML='<option value="">選擇航點…</option>'+seaIds().map(map=>'<optgroup label="'+esc(seaName(map))+'">'
+  +data.sectors.filter(p=>p.map===map&&!pinned.has(p.id)).map(p=>'<option value="'+p.id+'">'+esc(p.letter+(sectorName(p.map,p.letter)?' '+sectorName(p.map,p.letter):'')+' · Rank '+p.rank+(openIds.has(p.id)?' · 已開（經過它）':' · 未開（去開它）'))+'</option>').join('')
+  +'</optgroup>').join('');
+ if(current&&!pinned.has(Number(current)))select.value=current;
+ $('pin-ships').value=[1,2].includes(Number(s.plannerSettings?.pinShips))?String(Number(s.plannerSettings.pinShips)):'1';
+ list.innerHTML=pins.length?pins.map(pin=>{
+  const p=data.sectors.find(x=>x.id===pin.id);if(!p)return '';
+  const r=resolvePin(pin,openIds),done=pin.mode==='open'&&openIds.has(p.id);
+  const status=done?'已開啟 ✓':r?pinGoalText(r):pin.mode==='visit'?'地圖上標為未開':'找不到已開的前置點';
+  return '<span class="pin-chip'+(done?' is-done':'')+'"><strong>'+esc(seaName(p.map)+' '+p.letter)+'</strong><small>'+esc(status)+'</small>'
+   +'<button type="button" data-pin-remove="'+p.id+'" aria-label="移除指定航點 '+esc(seaName(p.map)+' '+p.letter)+'">×</button></span>';
+ }).join(''):'<small class="hint">還沒有指定航點；推薦會照常以練等與下一張海圖為主。</small>';
+ list.querySelectorAll('[data-pin-remove]').forEach(btn=>btn.onclick=()=>{
+  const id=Number(btn.dataset.pinRemove);
+  persist(st=>{st.plannerSettings={...(st.plannerSettings||{}),pins:plannerPins(st.plannerSettings).filter(x=>x.id!==id)}});
+  calculate();
+ });
+}
+function addPin(){
+ const id=Number($('pin-sector')?.value);if(!id)return;
+ const s=state(),openIds=new Set(unlockedSectors(s,145).map(p=>p.id));
+ persist(st=>{const pins=plannerPins(st.plannerSettings).filter(x=>x.id!==id);
+  st.plannerSettings={...(st.plannerSettings||{}),pins:pins.concat({id,mode:openIds.has(id)?'visit':'open'})}});
+ $('pin-sector').value='';calculate();
 }
 
 // 畢業船跑 溺沒海 O → J 的收益，用社群統計的打撈門檻與掉落池（submarine-yield-data.json）：
@@ -643,7 +717,7 @@ const CHOICES_PER_SHIP=6;
 // 開圖船比的是多快回來開下一處：每天收船時以「第幾天收得到」計，同一天回來的再比 EXP；
 // 沒有收船窗口時才以實際航行時間比。
 function gateCost(time,daily){return daily?pickupTiming(time).day:pickupElapsed(time,false)/DAY}
-function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, daily){
+function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, daily, pinSlots=0, pins=[]){
  const requested=plans.filter(p=>!p.ship.voyaging&&(p.rank<targetRank||p.explorer));
  // 仍然替其他可派船計算；單艘沒有可行航線不應拖垮整個船隊。
  const missing=requested.filter(p=>!p.choices.length).map(p=>shipLabel(p.ship.index,p.ship));
@@ -653,13 +727,15 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
  // 每艘船的選項依自身效益排序（開圖優先、其次預估畢業日），
  // 逐船只嘗試前幾個庫存仍可組出的選項，避免全部組合相乘後爆量。
  const order=new Map(ready.map(p=>[p,p.choices.map(option=>({option,
-  rank:option.frontier?(option.penalty||0)-2e6:option.opening?gateCost(option.route.time,daily)*1e4-1e6+estimatedFinishDays(p,option,targetRank,daily):estimatedFinishDays(p,option,targetRank,daily)}))
+  rank:option.pinned?-3e6-option.route.opens*1e4+gateCost(option.route.time,daily)*100+estimatedFinishDays(p,option,targetRank,daily)
+   :option.frontier?(option.penalty||0)-2e6:option.opening?gateCost(option.route.time,daily)*1e4-1e6+estimatedFinishDays(p,option,targetRank,daily):estimatedFinishDays(p,option,targetRank,daily)}))
   .sort((a,b)=>a.rank-b.rank).map(x=>x.option)]));
  let best=null;
  const decisions=new Map();
  // 同一輪：每天收船時看第幾天收得到；沒有收船窗口時，以出發後第幾個 24 小時計。
  const gateRound=cost=>daily?cost:Math.ceil(cost-1e-9);
- function evaluate(usage,gateCount,gateDays){
+ function evaluate(usage,gateCount,gateDays,pinCovered,pinCount){
+  const userCovered=[...pinCovered].filter(id=>!autoIds.has(id)).length,autoCovered=pinCovered.size-userCovered;
   const entries=[...decisions.values()];
   if(!entries.length)return;
   const etas=entries.map(({plan,option})=>estimatedFinishDays(plan,option,targetRank,daily));
@@ -674,30 +750,42 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
   const objective=sum+fleetBottleneck*0.6+switching*0.002+preference;
   const gateRoundFirst=gateDays.length?Math.min(...gateDays.map(gateRound)):Infinity;
   const gateSameRound=gateDays.filter(d=>gateRound(d)===gateRoundFirst).length;
-  const val={gateCount,gateRoundFirst,gateSameRound,objective,entries:entries.map(x=>({plan:x.plan,option:x.option}))};
-  const better=!best||val.gateCount!==best.gateCount?!best||val.gateCount>best.gateCount
+  const val={userCovered,autoCovered,pinCount,gateCount,gateRoundFirst,gateSameRound,objective,entries:entries.map(x=>({plan:x.plan,option:x.option}))};
+  // 使用者指定的航點最優先：先涵蓋越多指定目標越好，再補滿設定的船數（同一處多一艘就多一次開圖機會）。
+  // 自動找出的練等關鍵點排在下一張海圖開圖之後，不搶開圖船。
+  const better=!best||val.userCovered!==best.userCovered?!best||val.userCovered>best.userCovered
+   :val.pinCount!==best.pinCount?val.pinCount>best.pinCount
+   :val.gateCount!==best.gateCount?val.gateCount>best.gateCount
    :val.gateRoundFirst!==best.gateRoundFirst?val.gateRoundFirst<best.gateRoundFirst
    :val.gateSameRound!==best.gateSameRound?val.gateSameRound>best.gateSameRound
+   :val.autoCovered!==best.autoCovered?val.autoCovered>best.autoCovered
    :val.objective<best.objective;
   if(better)best=val;
  }
  // 指定的開圖船也保留練等選項：開圖與練等各試前幾個庫存仍可組出的選項。
- function walk(i,usage,count,days){
-  if(i>=ready.length){evaluate(usage,count,days);return}
-  const p=ready[i],tried={open:0,level:0};
+ const autoIds=new Set(pins.filter(r=>r.pin.auto).map(r=>r.target.id));
+ // 任何航線（不只指定航點船）經過前置點，就算涵蓋了該目標。
+ const reaches=option=>pins.filter(r=>option.route.path.some(p=>p.id===r.via.id)).map(r=>r.target.id);
+ function walk(i,usage,count,days,pinCovered,pinCount){
+  if(i>=ready.length){evaluate(usage,count,days,pinCovered,pinCount);return}
+  const pinnedShips=[...decisions.values()].filter(x=>x.option.pinned).length;
+  const p=ready[i],tried={open:0,level:0,pin:0};
   for(const option of order.get(p)){
-   const kind=option.opening?'open':'level';
-   if(tried[kind]>=CHOICES_PER_SHIP)continue;
+   const kind=option.pinned?'pin':option.opening?'open':'level';
+   if(tried[kind]>=(kind==='pin'?4:CHOICES_PER_SHIP))continue;
+   if(option.pinned&&pinnedShips>=pinSlots)continue;
    const updated=allocate(option.key,usage,availableStock);
    if(!updated)continue;
    tried[kind]++;
    decisions.set(p.ship.index,{plan:p,option});
    const gate=option.opening&&!option.frontier;
-   walk(i+1,updated,count+Number(Boolean(option.frontier)),gate?days.concat(gateCost(option.route.time,daily)):days);
+   walk(i+1,updated,count+Number(Boolean(option.frontier)),gate?days.concat(gateCost(option.route.time,daily)):days,
+    pins.length?new Set([...pinCovered,...reaches(option)]):pinCovered,
+    pinCount+Number(Boolean(option.pinned&&option.route.targets.some(r=>!r.pin.auto))));
    decisions.delete(p.ship.index);
   }
  }
- walk(0,fixedUsage,0,[]);
+ walk(0,fixedUsage,0,[],new Set(),0);
  if(!best)return {chosen:new Map(),missing:ready.map(p=>shipLabel(p.ship.index,p.ship)),reason:'實際零件庫存不足，無法讓所有返航船同時配裝出航'};
  return {chosen:new Map(best.entries.map(x=>[x.plan.ship.index,x.option])),missing,best,reason:missing.length?'潛艇 '+missing.join('、')+' 找不到可行航線，其他船仍正常推薦。':null};
 }
@@ -722,6 +810,7 @@ function calculateNow(){
   daily=Boolean($('daily-pickup')?.checked),total=stock(s),
   explorersWanted=Math.max(0,Math.min(4,Number($('calc-explorers')?.value)||0)),
   exploreMode=['frontier','balanced','gil'].includes($('calc-explore-mode')?.value)?$('calc-explore-mode').value:'next';
+ renderPinPlanner();
  const w=windowSettings();
  if(daily&&!w.valid){$('calc-result').innerHTML='<p class="calc-warning">收船窗口結束時間必須晚於開始時間，且在同一天內。</p>';return}
  if(daily&&!w.departureInside){$('calc-result').innerHTML='<p class="calc-warning">預計本次派船時間應在收船窗口內；請調整時間後再計算。</p>';return}
@@ -730,6 +819,12 @@ function calculateNow(){
  // 下一張海圖的前置鏈優先；海圖入口都開後，依「開圖目標」決定撥出船是否改開剩餘航點。
  const frontier=!progress&&exploreMode!=='next'?frontierParents(open):null;
  const exploring=progress?.parent&&progress.step?'next':frontier?.size?'frontier':null;
+ // 使用者指定的航點：解析成「本輪要經過的點」；已開出的開圖目標不再列入。
+ const openIds=new Set(open.map(p=>p.id)),pinSettings=plannerPins(s.plannerSettings),
+  pinActive=pinSettings.map(pin=>resolvePin(pin,openIds)).filter(Boolean),pinParents=new Map(),autoPins=[];
+ const pinShipsWanted=[1,2].includes(Number(s.plannerSettings?.pinShips))?Number(s.plannerSettings.pinShips):1,
+  outPinned=registered.filter(x=>x.voyaging&&x.voyage?.purpose==='pin');
+ let pinSlots=0;
  if(!registered.length){$('calc-result').innerHTML='<span class="calc-warning">目前沒有已登記潛艇。</span>';return}
  // 航線只取決於 Rank、速度、航程與目標：同數值的不同配置只搜尋一次。
  const cache=new Map(),gilTable=exploring==='frontier'?sectorGilTable():new Map();
@@ -760,14 +855,22 @@ function calculateNow(){
   return cache.get(k);
  }
  // 剩餘航點開圖同樣先窄搜尋粗排，只對開圖目標排序最前面的幾種數值做完整搜尋。
- function frontierRoutes(ship,keys){
+ function frontierRoutes(ship,keys,get=getFrontierRoutes,mode=exploreMode){
   const point=key=>{const b=buildInfos.get(key);return b.speed+','+b.range};
   const firstKey=new Map();for(const key of keys)if(!firstKey.has(point(key)))firstKey.set(point(key),key);
-  if(firstKey.size<=FULL_POINTS)return new Map(keys.map(key=>[key,getFrontierRoutes(ship,key)]));
-  const order=frontierOrder(exploreMode),none={opens:0,score:0,gilRate:0,cycle:Infinity};
-  const ranked=[...firstKey.entries()].sort((a,b)=>order(getFrontierRoutes(ship,a[1],SCREEN_BEAM)[0]||none,getFrontierRoutes(ship,b[1],SCREEN_BEAM)[0]||none));
-  const full=new Set(ranked.slice(0,FULL_POINTS).map(x=>x[0]));
-  return new Map(keys.map(key=>[key,getFrontierRoutes(ship,key,full.has(point(key))?0:SCREEN_BEAM)]));
+  if(firstKey.size<=FULL_POINTS)return new Map(keys.map(key=>[key,get(ship,key)]));
+  const order=frontierOrder(mode),none={opens:0,score:0,gilRate:0,cycle:Infinity,time:Infinity};
+  const ranked=[...firstKey.entries()].sort((a,b)=>order(get(ship,a[1],SCREEN_BEAM)[0]||none,get(ship,b[1],SCREEN_BEAM)[0]||none));
+  const full=new Set(ranked.slice(0,FULL_POINTS).map(x=>x[0]).concat(mode==='pin'?[point(installed(ship))]:[]));
+  return new Map(keys.map(key=>[key,get(ship,key,full.has(point(key))?0:SCREEN_BEAM)]));
+ }
+ // 指定航點的航線：至少經過一個指定目標的前置點（或指定的已開航點）。
+ function getPinRoutes(ship,key,beam){
+  const b=buildInfos.get(key);if(!b)return [];
+  beam=beam||250;
+  const k=['P',shipRank(ship),b.speed,b.range,beam].join(':');
+  if(!cache.has(k))cache.set(k,bestFrontierRoutes(open,ship,key,hours,s,pinParents,'pin',beam));
+  return cache.get(k);
  }
  // 自動模式：從扣掉其他船占用後的庫存中，列出這艘船能組出的配置。
  function options(ship,used){
@@ -781,7 +884,7 @@ function calculateNow(){
   const keys=options(ship,used).filter(key=>validBuild(key,rank)),routes=gateOnly?new Map():normalRoutes(ship,keys),
    far=exploring==='frontier'&&rank>=target?frontierRoutes(ship,keys):null;
   return keys.map(key=>({key,normal:routes.get(key)||[],
-    gate:exploring==='next'?getRoutes(ship,key,progress.parent.id):far?far.get(key):[]}));
+    gate:exploring==='next'?getRoutes(ship,key,progress.parent.id):far?far.get(key):[],pin:[]}));
  }
  // 航行中的船部件一定占著；判斷誰能撥去開圖時先扣掉這些。
  let voyagingUsage={};
@@ -810,6 +913,40 @@ function calculateNow(){
   const rank=shipRank(ship),routeOptions=gateOptions(ship,fixedUsage,explorers.has(ship.index));
   return {ship,rank,routeOptions,canOpen:routeOptions.some(o=>o.gate.length>0),explorer:explorers.has(ship.index),choices:[]};
  });
+ // 練等關鍵點：假設 Rank 夠的點都開好了，這艘船的最佳練等航線若用到未開的點，
+ // 且 EXP／收船週期明顯較好，就把那些點當成要開的目標（不在下一張海圖鏈上的支線也會開）。
+ const AUTO_GAIN=1.05;
+ for(const p of plans){
+  if(p.explorer||p.rank>=target)continue;
+  const now=Math.max(0,...p.routeOptions.map(b=>b.normal[0]?.score||0));if(!now)continue;
+  const seas=new Set(open.map(x=>x.map));
+  const hypo=data.sectors.filter(x=>x.rank<=p.rank&&seas.has(x.map)&&(openIds.has(x.id)||resolvePin({id:x.id,mode:'open'},openIds)));
+  if(hypo.length===open.filter(x=>x.rank<=p.rank).length)continue;
+  const point=key=>{const b=buildInfos.get(key);return b.speed+','+b.range};
+  const keys=[...new Map(p.routeOptions.map(b=>[point(b.key),b])).values()].sort((a,b)=>(b.normal[0]?.score||0)-(a.normal[0]?.score||0)).slice(0,FULL_POINTS).map(b=>b.key);
+  let ideal=null;
+  for(const key of keys){
+   const b=buildInfos.get(key),k=['I',p.rank,b.speed,b.range].join(':');
+   if(!cache.has(k))cache.set(k,bestRoutes(hypo,p.ship,key,hours,s,null,180)[0]||null);
+   const r=cache.get(k);if(r&&(!ideal||r.score>ideal.score))ideal={...r,ship:p.ship};
+  }
+  if(!ideal||ideal.score<now*AUTO_GAIN)continue;
+  for(const x of ideal.path.filter(x=>!openIds.has(x.id))){
+   const old=autoPins.find(a=>a.pin.id===x.id);
+   if(old){old.gain=Math.max(old.gain,ideal.score/now);continue}
+   if(pinSettings.some(pin=>pin.id===x.id))continue;
+   const r=resolvePin({id:x.id,mode:'open',auto:true},openIds);
+   if(r)autoPins.push({...r,gain:ideal.score/now,route:ideal.path,rank:p.rank});
+  }
+ }
+ pinActive.push(...autoPins);
+ for(const r of pinActive){if(!pinParents.has(r.via.id))pinParents.set(r.via.id,[]);pinParents.get(r.via.id).push(r)}
+ const userPinsActive=pinActive.some(r=>!r.pin.auto);
+ pinSlots=pinActive.length?Math.max(0,(userPinsActive?pinShipsWanted:1)-outPinned.length):0;
+ if(pinSlots>0)for(const p of plans){
+  const pinned=frontierRoutes(p.ship,p.routeOptions.map(b=>b.key),getPinRoutes,'pin');
+  for(const b of p.routeOptions)b.pin=pinned.get(b.key)||[];
+ }
  // 延續開圖原則：開圖船合計最多兩艘（撥出的畢業船優先），其餘由練等中最高 Rank 的合格船補上；
  // 各船用哪組部件由整隊配置評分決定。
  const openers=exploring==='next'?plans.filter(p=>p.canOpen&&!p.explorer)
@@ -817,6 +954,7 @@ function calculateNow(){
  for(const p of plans){
   const designated=p.explorer||openers.includes(p.ship.index);
   for(const b of p.routeOptions){
+   for(const route of b.pin)p.choices.push({key:b.key,route,alternates:b.normal,opening:false,pinned:true});
    if(designated&&b.gate.length){
     for(const route of b.gate.slice(0,2))p.choices.push({key:b.key,route,alternates:b.normal,opening:true,frontier:exploring==='frontier'});
    }
@@ -830,13 +968,13 @@ function calculateNow(){
    p.choices.sort((a,b)=>order(a.route,b.route)).forEach((c,i)=>{c.penalty=i*0.05});
   }
  }
- const ownBestRate=p=>Math.max(0,...p.choices.filter(c=>!c.opening).map(c=>c.route.actualXp/(pickupElapsed(c.route.time,daily)/DAY)));
+ const ownBestRate=p=>Math.max(0,...p.choices.filter(c=>!c.opening&&!c.pinned).map(c=>c.route.actualXp/(pickupElapsed(c.route.time,daily)/DAY)));
  // 換裝效益：拿目前配置在「同一個目標」（練等／前置點／剩餘航點開圖）下的最佳航線比較，
  // 不拿開圖航線去比練等航線，否則差距反映的是航線目標不同，不是配置好壞。
  function buildComparison(ship,current,choice){
-  const basis=choice.frontier?getFrontierRoutes(ship,current)[0]
+  const basis=choice.pinned?getPinRoutes(ship,current)[0]:choice.frontier?getFrontierRoutes(ship,current)[0]
    :getRoutes(ship,current,choice.opening&&progress?.parent?progress.parent.id:null)[0];
-  const goal=choice.frontier?'開剩餘航點':choice.opening?'經過開圖前置點':'練等';
+  const goal=choice.pinned?'指定航點':choice.frontier?'開剩餘航點':choice.opening?'經過開圖前置點':'練等';
   if(!basis)return '<span>目前 '+esc(current)+' 在回航上限內找不到'+goal+'航線</span>';
   const pct=(a,b)=>b>0?Math.round((a/b-1)*100):null,sign=n=>(n>=0?'+':'')+n+'%';
   const head='比目前 '+esc(current)+' 跑同目標（'+goal+'）的最佳航線 '+esc(makeLabel(basis.path))+'：';
@@ -844,10 +982,10 @@ function calculateNow(){
    return '<span>'+head+'可開 '+basis.opens+' → '+choice.route.opens+' 個航點、收船週期 '+esc(fmtTime(basis.cycle))+' → '+esc(fmtTime(choice.route.cycle))+'</span>';
   const gil=choice.frontier&&exploreMode==='gil',d=gil?pct(choice.route.gilRate,basis.gilRate):pct(choice.route.score,basis.score);
   // 開圖優先比的是多快回來開下一處，EXP 可能略低；把收船週期一起列出，避免只看到負的百分比。
-  const cycleText=choice.opening&&!choice.frontier?'收船週期 '+esc(fmtTime(pickupElapsed(basis.time,daily)))+' → '+esc(fmtTime(pickupElapsed(choice.route.time,daily)))+'，':'';
+  const cycleText=(choice.opening||choice.pinned)&&!choice.frontier?'收船週期 '+esc(fmtTime(pickupElapsed(basis.time,daily)))+' → '+esc(fmtTime(pickupElapsed(choice.route.time,daily)))+'，':'';
   return d===null?'':'<span>'+head+cycleText+sign(d)+(gil?' Gil 估值':' EXP')+'／收船週期</span>';
  }
- const allocation=selectFleetAllocation(plans,fixedUsage,total,target,daily);
+ const allocation=selectFleetAllocation(plans,fixedUsage,total,target,daily,pinSlots,pinActive);
  const selected=allocation.chosen;
  // 畢業船：在扣掉其他船占用（含本輪派船）後的庫存中，挑 O → J 平均每天飾品估值最高的配置
  // （每天在窗口內收船時，以長期平均每趟占用的時間換算；超過回航上限的不算）；
@@ -880,7 +1018,7 @@ function calculateNow(){
   const rank=shipRank(ship),current=installed(ship);
   if(ship.voyaging){
    html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'（Rank '+rank+'）</h3>'
-    +'<div class="route-meta">'+(ship.voyage?.purpose==='explore'?'開圖中（計入「畢業船撥去開圖」名額），':ship.voyage?.purpose==='open'?'開圖中（計入開圖船上限），':'航行中，')
+    +'<div class="route-meta">'+(ship.voyage?.purpose==='pin'?'跑指定航點中（計入「由幾艘船跑」），':ship.voyage?.purpose==='explore'?'開圖中（計入「畢業船撥去開圖」名額），':ship.voyage?.purpose==='open'?'開圖中（計入開圖船上限），':'航行中，')
     +esc(current)+' 配件已占用。無法在返航前轉移配件；下次收船後取消「航行中」再計算。</div></article>');
    continue;
   }
@@ -922,7 +1060,10 @@ function calculateNow(){
   const runs=remaining?Math.ceil(remaining/Math.max(1,route.actualXp)):0;
   const explorer=explorers.has(ship.index),switching=current!==key;
   const compareText=switching?buildComparison(ship,current,choice):'';
-  const reason=explorer
+  const reason=choice.pinned
+   ?(route.targets.every(r=>r.pin.auto)?'練等最佳航線會用到還沒開的點，先派這艘去開；在經過前置點的航線中，先比第幾天收得到，再比 EXP。'
+     :'依你指定的航點安排；在經過指定點的航線中，先比第幾天收得到，再比 EXP。')
+   :explorer
    ?(exploring==='frontier'?'依設定從畢業船撥出開剩餘航點，練等船不受影響。':'依設定從畢業船撥出開後續海域，練等船不受影響。')
    :opening
    ?'優先完成必要開圖，避免全隊受前置航點阻塞。'
@@ -935,7 +1076,7 @@ function calculateNow(){
        +'<button type="button" data-apply-build="'+ship.index+'" data-new-build="'+key+'">已在遊戲換裝，更新紀錄</button></div>'
     :'<div class="route-meta">本趟使用 '+esc(key)+'，不用換裝。'+esc(reason)+'</div>';
   fuel+=route.fuel;
-  html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'：'+(explorer?'畢業船開圖：':opening?'開圖兼練等：':'升等優先：')+esc(makeLabel(route.path))+'</h3>'
+  html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'：'+(choice.pinned?(route.targets.every(r=>r.pin.auto)?'開練等關鍵點：':'指定航點：'):explorer?'畢業船開圖：':opening?'開圖兼練等：':'升等優先：')+esc(makeLabel(route.path))+'</h3>'
    +'<div class="route-meta">Rank '+rank+' · 建議配置 <strong>'+esc(buildLabel(key))+'</strong> · 速度 '+stats.speed+' / 航程 '+stats.range+'</div>'
    +swapText
    +'<div class="route-kpis"><span>'+route.actualXp.toLocaleString()+' EXP/趟'+(route.usedExp?'（實測）':'（基礎值）')+'</span>'
@@ -944,8 +1085,8 @@ function calculateNow(){
    +compareText+'</div>'
    +(explorer
     ?'<div class="route-meta">已達 Rank '+target+'，本趟暫停 O → J 改去開圖；開完或不想開時，把「畢業船撥去開圖」調低即可回到 O → J。</div>'
-     +(choice.frontier?frontierNote(route):'')
-    :'<div class="route-meta">至 Rank '+target+' 尚需 '+remaining.toLocaleString()+' EXP；若一直跑這條約 '+runs+' 趟（升級與開圖後會改變）。</div>')
+     +(choice.frontier?frontierNote(route):choice.pinned?pinNote(route):'')
+    :(choice.pinned?pinNote(route):'')+'<div class="route-meta">至 Rank '+target+' 尚需 '+remaining.toLocaleString()+' EXP；若一直跑這條約 '+runs+' 趟（升級與開圖後會改變）。</div>')
    +(opening&&!choice.frontier?'<div class="route-meta">本輪探索 '+esc(seaName(progress.step.map)+' '+progress.step.letter)+' 的前置點；'
      +(partners(ship.index).length?'與 '+esc(partners(ship.index).join('、'))+' 同時探索，提高本輪開圖機率；':'')+'成功開圖後請點地圖更新。</div>':'')
    +stepBar([{label:switching?'遊戲內換裝 '+current+' → '+key+'，再按「更新紀錄」':'配置符合（'+key+'）',done:!switching,current:switching},{label:'遊戲內派往這條航線',current:!switching},{label:'按「確認出航」開始計時'}])
@@ -966,6 +1107,38 @@ function calculateNow(){
      :outExploring.length?'其他船照常練等／跑 O → J。':'最多兩艘合格船負責開圖，其他船優先練等。')
    +(explorerSlots>explorers.size?'（設定撥出 '+explorersWanted+' 艘，扣掉已出港的 '+outExploring.length+' 艘後還差 '+explorerSlots+' 艘，但目前只有 '+explorers.size+' 艘返航中的畢業船能跑到開圖前置點。）':'')+'</p>'
   :'<p class="hint">'+(progress?'下一張海圖前置已完成，返航的船會以練等／OJ 營運為目標分配。':remainingNote())+'</p>';
+ // 指定航點的總覽：哪些已開、這輪由誰跑、沒排到的原因。
+ function pinSummary(){
+  if(!pinSettings.length&&!autoPins.length)return '';
+  const covered=new Set(pinActive.filter(r=>[...selected.values()].some(c=>c.route.path.some(p=>p.id===r.via.id))).map(r=>r.target.id));
+  const pinCount=[...selected.values()].filter(c=>c.pinned).length;
+  const done=pinSettings.filter(pin=>pin.mode==='open'&&openIds.has(pin.id)).map(pin=>data.sectors.find(p=>p.id===pin.id)).filter(Boolean);
+  const lost=pinSettings.filter(pin=>pin.mode==='visit'&&!openIds.has(pin.id)).map(pin=>data.sectors.find(p=>p.id===pin.id)).filter(Boolean);
+  const missed=pinActive.filter(r=>!r.pin.auto&&!covered.has(r.target.id));
+  const ready=registered.filter(x=>!x.voyaging&&(shipRank(x)<target||explorers.has(x.index)));
+  const why=r=>{
+   if(!pinSlots)return '已有 '+outPinned.length+' 艘在跑指定航點／練等關鍵點';
+   if(!ready.some(x=>shipRank(x)>=r.via.rank))return '要經過的 '+seaName(r.via.map)+' '+r.via.letter+' 需要 Rank '+r.via.rank+'，返航中的練等船還不夠';
+   if(pinCount>=pinSlots)return pinShipsWanted<2?'本輪指定船數已用完，可把「由幾艘船跑」調成 2 艘':'兩艘船都排給涵蓋較多指定點的航線';
+   return '回航上限、航程或零件庫存內排不進去';
+  };
+  const parts=[],userActive=pinActive.filter(r=>!r.pin.auto);
+  if(autoPins.length){
+   const best=autoPins.reduce((a,r)=>r.gain>a.gain?r:a);
+   const name=r=>seaName(r.target.map)+' '+r.target.letter,
+    on=autoPins.filter(r=>covered.has(r.target.id)),off=autoPins.filter(r=>!covered.has(r.target.id));
+   parts.push('練等關鍵點 '+autoPins.map(name).join('、')+'：Rank '+best.rank+' 的船若這些點都開了，最佳練等航線是 '
+    +makeLabel(best.route)+'，EXP／收船週期約多 '+Math.round((best.gain-1)*100)+'%，所以自動安排去開。'
+    +(on.length?'本輪有船經過 '+on.map(name).join('、')+' 的前置點。':'')
+    +(off.length?off.map(name).join('、')+' 本輪'+(pinSlots?'排不進去（回航上限、航程或零件庫存不夠，或前置點 Rank 太高）':'已有船在路上')+'。':''));
+  }
+  if(userActive.length)parts.push('指定航點 '+userActive.map(r=>seaName(r.target.map)+' '+r.target.letter).join('、')
+   +'：本輪'+(pinCount?'由 '+pinCount+' 艘船負責（設定 '+pinShipsWanted+' 艘'+(outPinned.length?'，另有 '+outPinned.length+' 艘已出港':'')+'）':'沒有船負責')+'。');
+  if(missed.length)parts.push('沒排到：'+missed.map(r=>seaName(r.target.map)+' '+r.target.letter+'（'+why(r)+'）').join('；')+'。');
+  if(done.length)parts.push(done.map(p=>seaName(p.map)+' '+p.letter).join('、')+' 已開啟，可從指定清單移除。');
+  if(lost.length)parts.push(lost.map(p=>seaName(p.map)+' '+p.letter).join('、')+' 目前地圖上標為未開，暫不安排。');
+  return '<p class="hint'+(missed.length?' calc-warning':'')+'">'+esc(parts.join(''))+'</p>';
+ }
  function remainingNote(){
   const openIds=new Set(open.map(p=>p.id)),closed=data.sectors.filter(p=>!openIds.has(p.id)).length;
   const head='目前資料內的海圖入口都已開啟；之後新增海圖時，撥出的畢業船會自動改去開新海域。';
@@ -978,7 +1151,7 @@ function calculateNow(){
    +(explorerSlots>explorers.size&&explorers.size?'（設定撥出 '+explorersWanted+' 艘，扣掉已出港的 '+outExploring.length+' 艘後還差 '+explorerSlots+' 艘，但目前只有 '+explorers.size+' 艘返航中的畢業船能跑到前置點。）':'');
  }
  const warning=allocation.reason?'<p class="calc-warning">'+esc(allocation.reason)+'</p>':'';
- $('calc-result').innerHTML=header+progressNote+warning+html.join('')
+ $('calc-result').innerHTML=header+progressNote+pinSummary()+warning+html.join('')
   +'<p class="hint">本輪建議消耗約 '+fuel+' 罐燃料（庫存 '+(Number(s.fuel)||0)+'）。'
   +(daily?'每天可收／派船窗口 '+fmtClock(windowSettings().start*60)+'～'+fmtClock(windowSettings().end*60)+'；考慮實際預計出航時間與下一次可收船時間。':'以 EXP／實際時間比較。')
   +' 智慧分配屬逐趟前瞻估算，不是保證全球最短畢業日；實際開圖 RNG、EXP 獎勵及未來航點變化仍會改變最佳選擇。</p>'
@@ -1026,7 +1199,7 @@ function calculateNow(){
   dialogs().confirm({title:'確認出航',message:'已在 FF14 中將「'+label+'」實際派往「'+routeText+'」嗎？\n確認後開始計時；燃料與物資會在返航結算時扣除。',
    details:[['航線',routeText],['配置',choice.key],['航行時間',fmtTime(choice.route.time)],['預計返航',fmtEta(Date.now()+duration*1000)],['燃料',choice.route.fuel+' 罐']],ok:'⚓ 確認出航'}).then(ok=>{
    if(!ok)return;
-   recordDeparture(i,choice.route,routeText,choice.key,explorers.has(i)?'explore':choice.opening?'open':undefined);
+   recordDeparture(i,choice.route,routeText,choice.key,choice.pinned?'pin':explorers.has(i)?'explore':choice.opening?'open':undefined);
    renderBuilds();calculate();
   });
  });
@@ -1088,6 +1261,8 @@ async function init(){
   }
   function updatePlanner(){savePlannerSettings(manuallySelectedDeparture);calculate()}
   $('calc-routes').onclick=()=>{refreshDepartureClock();updatePlanner()};
+  $('pin-add').onclick=addPin;
+  $('pin-ships').onchange=()=>{persist(st=>{st.plannerSettings={...(st.plannerSettings||{}),pinShips:Number($('pin-ships').value)===2?2:1}});calculate()};
   ['calc-hours','calc-target-rank','calc-explorers','calc-explore-mode','daily-pickup','pickup-start','pickup-end'].forEach(id=>{
    const ctrl=$(id);if(ctrl)ctrl.onchange=updatePlanner;
   });
