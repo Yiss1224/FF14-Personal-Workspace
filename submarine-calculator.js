@@ -333,14 +333,18 @@ function measuredTable(logs){
  }
  return table;
 }
-function measuredExp(path,s){
+// 航點 EXP 是固定值（遊戲內的預估與航線資料一致），排名一律用基礎值。
+// 實測紀錄只拿來核對：和基礎值差超過 5% 的多半是結算時填錯，卡片上提醒去檢查。
+const MEASURED_TOLERANCE=0.05;
+function measuredExp(path,s,base){
  const route=makeLabel(path),shortRoute=path.map(p=>p.letter).join(' → ');
  const table=measuredTable(s.logs||[]),full=table.get(route)||[],short=route===shortRoute?[]:table.get(shortRoute)||[];
  if(!full.length&&!short.length)return null;
  // 兩組依原始紀錄順序合併後再加總，與逐筆過濾的加總順序相同，平均值完全一致。
  const matches=[];let i=0,j=0;
  while(i<full.length||j<short.length)matches.push(j>=short.length||(i<full.length&&full[i].index<short[j].index)?full[i++]:short[j++]);
- return matches.reduce((a,x)=>a+x.exp,0)/matches.length;
+ const off=base>0?matches.filter(x=>Math.abs(x.exp/base-1)>MEASURED_TOLERANCE):[];
+ return {count:matches.length,ignored:off.length,sample:off[0]?.exp};
 }
 function bestRoutes(available,ship,buildKey,maxHours,s,requiredId=null,beamLimit=180){
  const rank=shipRank(ship);if(!validBuild(buildKey,rank))return [];
@@ -372,9 +376,9 @@ function bestRoutes(available,ship,buildKey,maxHours,s,requiredId=null,beamLimit
  const routes=new Map();
  for(const r of results){
   if(requiredId!==null&&!r.path.some(p=>p.id===requiredId))continue;
-  const label=makeLabel(r.path),observed=measuredExp(r.path,s),xp=observed||r.xp;
+  const label=makeLabel(r.path),m=measuredExp(r.path,s,r.xp),xp=r.xp;
   const score=xp/pickupElapsed(r.time,daily);
-  if(!routes.has(label)||routes.get(label).score<score)routes.set(label,{...r,actualXp:xp,usedExp:Boolean(observed),score,build:buildKey});
+  if(!routes.has(label)||routes.get(label).score<score)routes.set(label,{...r,actualXp:xp,usedExp:false,ignoredExp:m?.ignored||0,oddExp:m?.sample,score,build:buildKey});
  }
  return [...routes.values()].sort((a,b)=>b.score-a.score).slice(0,3);
 }
@@ -443,8 +447,8 @@ function bestFrontierRoutes(available,ship,buildKey,maxHours,s,parents,mode,beam
  }
  const routes=new Map();
  for(const r of results){
-  const label=makeLabel(r.path),observed=measuredExp(r.path,s),xp=observed||r.xp;
-  const cycle=pickupElapsed(r.time,daily),score=xp/cycle,route={...r,actualXp:xp,usedExp:Boolean(observed),score,gilRate:r.gil/cycle,cycle,build:buildKey,
+  const label=makeLabel(r.path),m=measuredExp(r.path,s,r.xp),xp=r.xp;
+  const cycle=pickupElapsed(r.time,daily),score=xp/cycle,route={...r,actualXp:xp,usedExp:false,ignoredExp:m?.ignored||0,oddExp:m?.sample,score,gilRate:r.gil/cycle,cycle,build:buildKey,
    targets:r.path.flatMap(p=>parents.get(p.id)||[])};
   if(!routes.has(label)||frontierOrder(mode)(route,routes.get(label))<0)routes.set(label,route);
  }
@@ -1079,7 +1083,8 @@ function calculateNow(){
   html.push('<article class="route-card"><h3>'+esc(shipLabel(ship.index,ship))+'：'+(choice.pinned?(route.targets.every(r=>r.pin.auto)?'開練等關鍵點：':'指定航點：'):explorer?'畢業船開圖：':opening?'開圖兼練等：':'升等優先：')+esc(makeLabel(route.path))+'</h3>'
    +'<div class="route-meta">Rank '+rank+' · 建議配置 <strong>'+esc(buildLabel(key))+'</strong> · 速度 '+stats.speed+' / 航程 '+stats.range+'</div>'
    +swapText
-   +'<div class="route-kpis"><span>'+route.actualXp.toLocaleString()+' EXP/趟'+(route.usedExp?'（實測）':'（基礎值）')+'</span>'
+   +'<div class="route-kpis"><span>'+route.actualXp.toLocaleString()+' EXP/趟'+'（航點固定值）</span>'
+   +(route.ignoredExp?'<span title="遊戲內每個航點的 EXP 固定，這條航線應為 '+route.xp.toLocaleString()+'；請到返航結算紀錄核對">有 '+route.ignoredExp+' 筆結算紀錄和固定值不符（例如 '+Math.round(route.oddExp).toLocaleString()+'），未採用</span>':'')
    +'<span>'+fmtTime(route.time)+'</span><span>'+route.fuel+' 罐燃料</span><span>航程 '+route.range+'</span>'
    +(daily?'<span>最早可收／再派：'+esc(pickupLabel(route.time))+'</span><span>本趟收船週期 '+esc(fmtTime(pickupElapsed(route.time,true)))+'</span>':'')
    +compareText+'</div>'
