@@ -521,6 +521,53 @@ async function main(){
     await ctx.close();
   });
 
+  await test('17. 指定航點：未開的 H 會先經過 D 開 G；指定船數用完後不再多派；出航後計入名額',async()=>{
+    // 溺沒海 A–F 已開：自動推薦只追下一張海圖的鏈（經過 E），D → G → H 支線從不安排。
+    const seed=baseSeed();
+    seed.ships=[15,13,11,9].map(rank=>({registered:true,rank,exp:0,name:'',currentBuild:'1111'}));
+    seed.unlocks=Object.fromEntries([3,4,5,6].map(id=>['sector-'+id,true]));
+    seed.plannerSettings={targetRank:85,pins:[{id:8,mode:'open'}]};
+    const ctx=await context(seed),page=await open(ctx);
+    const cards=()=>page.evaluate(()=>[...document.querySelectorAll('#calc-result .route-card')].map(c=>c.textContent));
+    let list=await cards();
+    const pinned=list.filter(t=>/指定航點：/.test(t));
+    assert.strictEqual(pinned.length,1,'設定 1 艘，只應有一艘指定航點船');
+    assert.match(pinned[0],/指定航點：溺沒海 [A-F →]*D/);
+    assert.match(pinned[0],/經過 溺沒海 D 探索 溺沒海 G.*往 溺沒海 H 的前置點/);
+    assert.match(await page.textContent('#pin-list'),/溺沒海 H/);
+    // 出航後重算：名額已滿，不再派第二艘。
+    const idx=list.findIndex(t=>/指定航點：/.test(t));
+    const shipIndex=await page.evaluate(i=>document.querySelectorAll('#calc-result .route-card')[i].querySelector('[data-depart-ship]').dataset.departShip,idx);
+    await depart(page,'#calc-result [data-depart-ship="'+shipIndex+'"]');
+    await page.waitForFunction(()=>JSON.parse(localStorage.getItem('ff14_submarine_planner_v1')).ships.some(s=>s.voyage?.purpose==='pin'),null,{timeout:5000});
+    await page.waitForTimeout(300);
+    list=await cards();
+    assert.ok(!list.some(t=>/指定航點：/.test(t)),'已有一艘在跑，不應再派');
+    assert.ok(list.some(t=>/跑指定航點中/.test(t)));
+    // 開出 H 後清單顯示已開啟、不再安排。
+    await page.evaluate(()=>{const k='ff14_submarine_planner_v1',s=JSON.parse(localStorage.getItem(k));s.unlocks['sector-7']=true;s.unlocks['sector-8']=true;localStorage.setItem(k,JSON.stringify(s));window.dispatchEvent(new Event('submarine-state-updated'))});
+    await page.waitForTimeout(300);
+    assert.match(await page.textContent('#pin-list'),/已開啟 ✓/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
+  await test('18. 練等關鍵點：最佳練等航線用到不在海圖鏈上的未開點（G、H），自動派一艘經過 D 去開',async()=>{
+    const seed=baseSeed();
+    seed.ships=[15,13,11,9].map(rank=>({registered:true,rank,exp:0,name:'',currentBuild:'1111'}));
+    seed.unlocks=Object.fromEntries([3,4,5,6].map(id=>['sector-'+id,true]));seed.plannerSettings={targetRank:85};
+    const ctx=await context(seed),page=await open(ctx);
+    const cards=await page.evaluate(()=>[...document.querySelectorAll('#calc-result .route-card')].map(c=>c.textContent));
+    const auto=cards.filter(t=>/開練等關鍵點：/.test(t));
+    assert.strictEqual(auto.length,1);
+    assert.match(auto[0],/開練等關鍵點：溺沒海 [A-F →]*D/);
+    assert.match(auto[0],/經過 溺沒海 D 探索 溺沒海 G/);
+    assert.strictEqual(cards.filter(t=>/開圖兼練等/.test(t)).length,2,'下一張海圖的開圖船不受影響');
+    assert.match(await page.textContent('#calc-result'),/練等關鍵點 .*溺沒海 G.*最佳練等航線是/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
   await browser.close();server.close();
   console.log(results.join('\n'));
   console.log(passed+' passed, '+(results.filter(r=>r.startsWith('FAIL')).length)+' failed');

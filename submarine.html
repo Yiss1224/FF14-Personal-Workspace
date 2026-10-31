@@ -102,6 +102,15 @@
         <label>每天可收船開始 <input id="pickup-start" type="time" value="19:00"></label>
         <label>每天可收船結束 <input id="pickup-end" type="time" value="22:00"></label>
         <label>預計本次派船時間 <input id="calc-departure-time" type="time" value="19:00"></label>
+        <div class="pin-planner">
+          <div class="pin-planner-controls">
+            <label>指定要跑的航點 <select id="pin-sector"><option value="">載入航點…</option></select></label>
+            <label>由幾艘船跑 <select id="pin-ships"><option value="1" selected>1 艘</option><option value="2">2 艘（同一處多一次開圖機會）</option></select></label>
+            <button id="pin-add" type="button">加入指定航點</button>
+          </div>
+          <div id="pin-list" class="pin-list"></div>
+          <small class="hint">已開的點：派船經過它。未開的點：派船去開它；前置點也沒開時，會先經過最近一個已開的前置點，一路往目標開。</small>
+        </div>
         <button id="calc-routes" type="button">計算全艦隊配件與派船建議</button>
         
       </div>
