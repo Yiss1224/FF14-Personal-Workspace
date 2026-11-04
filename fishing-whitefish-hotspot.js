@@ -52,6 +52,7 @@
     const box=ensureBox();if(!box)return;
     const my=++renderToken;
     const catalog=read('fishCatalog',[])||[],done=caught(),skip=skipped();
+    if(!catalog.length){box.innerHTML='<span class="muted">魚資料還在讀取中，讀好後會自動統計。</span>';return;}
     if(typeof window.ff14FishingWindowInfo!=='function'){
       box.innerHTML='<span class="muted">魚窗資料尚未準備好，稍後再重算一次。</span>';return;
     }
