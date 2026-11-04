@@ -67,7 +67,7 @@ function restore(data,{scope,source='restore'}={}){
 }
 
 function exportBackup(scope){return{app:APP,schema:SCHEMA,scope:scope||'all',exportedAt:new Date().toISOString(),data:snapshot(scope)}}
-// 接受本工具的備份格式，也接受舊 Supabase 同步存的「資料鍵在最上層」格式。
+// 接受本工具的備份格式，也接受舊版「資料鍵在最上層」的平面格式。
 function parseBackup(obj,scope){
  if(!obj||typeof obj!=='object'||Array.isArray(obj))throw new Error('不是有效的 JSON 備份');
  const data=obj.app===APP&&obj.data&&typeof obj.data==='object'?obj.data:obj;

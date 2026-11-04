@@ -63,7 +63,7 @@ const server=require('../server/server.js');
       await other.close();
     });
 
-    await step('舊 Supabase 同步格式（資料鍵在最上層）也能匯入',async()=>{
+    await step('舊版平面格式（資料鍵在最上層）也能匯入',async()=>{
       const ctx=await browser.newContext();await isolate(ctx);
       const page=await ctx.newPage();await page.goto(base+'/index.html');await page.waitForFunction(()=>window.FF14Data);
       const out=await page.evaluate(()=>FF14Data.parseBackup({fishSkippedIds:[7],unrelated:1},'workspace'));
