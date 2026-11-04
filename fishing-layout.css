@@ -58,3 +58,7 @@
   #fishing .fish-primary:hover{background:#6bbad4}
   #fishing .fish-onboard-steps span{color:#c3c8cf}
 }
+#fishing .fish-wait{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-radius:10px;background:var(--fish-accent-soft);font-size:14px;line-height:1.5}
+#fishing .fish-spinner{width:16px;height:16px;flex:none;border:2px solid var(--fish-accent-line);border-top-color:var(--fish-accent);border-radius:50%;animation:fish-spin .8s linear infinite}
+@keyframes fish-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#fishing .fish-spinner{animation:none}}
