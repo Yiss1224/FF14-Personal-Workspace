@@ -16,8 +16,8 @@
     if(!s){
       const count=typeof currentFishCount==='function'?currentFishCount():known;
       const countInput=document.getElementById('fish-count');
-      if(countInput)countInput.value=count||300;
-      if(result)result.innerHTML=`魚糕／手動已知 ID：<strong>${known}</strong>。先按「記錄今天」建立 ETA 基準。`;
+      if(countInput)countInput.value=count||'';
+      if(result)result.innerHTML=`已知已釣：<strong>${known}</strong> 種。按「記錄今天」開始記錄，累積幾天後就能估算完成日期。`;
       if(sum)sum.innerHTML='尚未建立 ETA';
       if(hist)hist.innerHTML='—';
       return;

@@ -41,7 +41,7 @@
     const summary=document.getElementById('fish-map-summary');if(!summary)return;
     const catalog=read('fishCatalog',[]),caught=new Set(ids()),skipped=new Set(typeof window.getSkippedIds==='function'?window.getSkippedIds():read('fishSkippedIds',[]));
     const ordinaryRemaining=uniqueCount(catalog.filter(x=>!caught.has(Number(x.itemId))&&!x.bigFish&&!skipped.has(Number(x.itemId))));
-    summary.innerHTML=`外部圖鑑：${uniqueCount(catalog)} 種　｜　已知已釣 ID：${caught.size}　｜　<strong>未記錄普通魚：${ordinaryRemaining}</strong>　｜　先跳過：${skipped.size}<br><span class="muted">同一魚種可出現在多個釣場，但圖鑑總數只算一次。魚糕可能漏記，所以「未記錄」不等於一定沒釣過。</span>`;
+    summary.innerHTML=`圖鑑：${uniqueCount(catalog)} 種　｜　已釣：${caught.size}　｜　<strong>還沒釣的一般魚：${ordinaryRemaining}</strong>　｜　先跳過：${skipped.size}<br><span class="muted">同一魚種可出現在多個釣場，但圖鑑總數只算一次。魚糕可能漏記，所以「未記錄」不等於一定沒釣過。</span>`;
   }
   function decrementBadge(details){
     const badge=details?.querySelector?.(':scope > summary .badge');if(!badge)return;
