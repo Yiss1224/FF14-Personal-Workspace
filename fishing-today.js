@@ -60,10 +60,10 @@
   function ensureBox(){
     let box=document.getElementById('fish-today-result');
     if(box)return box;
-    const summary=document.getElementById('fish-map-summary');if(!summary)return null;
+    const slot=document.getElementById('fish-today-slot'),summary=document.getElementById('fish-map-summary');if(!slot&&!summary)return null;
     const section=document.createElement('div');section.className='fish-today-card';
-    section.innerHTML=`<div class="fish-today-head"><div><strong>今天釣什麼</strong><div class="muted">用你這次能玩的時間，直接判斷現在先去哪個漁場；未釣正在窗口 ×${CURRENT_WINDOW_WEIGHT}、時段內會開窗 ×${SOON_WINDOW_WEIGHT}、普通魚 ×1。已釣魚排除，只有未完成目標需要的直感前置窗口會例外提醒。</div></div><div class="fish-today-actions"><label class="fish-today-session-label">可釣時間<select id="fish-today-session"><option value="60">60 分</option><option value="90" selected>90 分</option><option value="120">120 分</option></select></label><label class="inline-check"><input id="fish-today-big" type="checkbox"> 包含魚王</label><button id="fish-today-refresh" type="button">現在去哪釣</button></div></div><div id="fish-today-result" class="fish-today-result"><span class="muted">要開始釣時再按「現在去哪釣」計算。</span></div>`;
-    summary.insertAdjacentElement('afterend',section);
+    section.innerHTML=`<div class="fish-today-head"><div><strong class="fish-today-title">🎣 今天釣什麼</strong><div class="muted">選這次能玩多久，挑出現在最值得去的地圖和釣點。正在開窗的限時魚最優先，接著是這段時間內會開窗的，最後才是一般魚；已經釣到的不算。</div></div><div class="fish-today-actions"><label class="fish-today-session-label">可釣時間<select id="fish-today-session"><option value="60">60 分</option><option value="90" selected>90 分</option><option value="120">120 分</option></select></label><label class="inline-check"><input id="fish-today-big" type="checkbox"> 包含魚王</label><button id="fish-today-refresh" type="button">現在去哪釣</button></div></div><div id="fish-today-result" class="fish-today-result"><span class="muted">要開始釣時再按「現在去哪釣」計算。</span></div>`;
+    if(slot)slot.appendChild(section);else summary.insertAdjacentElement('afterend',section);
     section.querySelector('#fish-today-refresh').addEventListener('click',render);
     return section.querySelector('#fish-today-result');
   }
