@@ -53,23 +53,8 @@
   // Compatibility alias; policy and matching live in the shared fishing runtime.
   window.isOceanFishingRouteStop=window.FF14Fishing.isOceanLocation;
 
-  function regexEsc(v){return String(v).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
-  if(typeof ff14TcReplaceTextNode==='function'&&typeof ff14TcCache!=='undefined'){
-    ff14TcReplaceTextNode=function(node){
-      const raw=node?.nodeValue;
-      if(!raw||!/[A-Za-z]/.test(raw))return;
-      let next=raw;
-      const maps=[ff14TcCache.itemEnglish||{},ff14TcCache.places||{},ff14TcCache.weather||{}];
-      for(const map of maps){
-        for(const [en,tc] of Object.entries(map)){
-          if(!en||!tc||!next.includes(en))continue;
-          const re=new RegExp(`(^|[^A-Za-z])${regexEsc(en)}(?=$|[^A-Za-z])`,'g');
-          next=next.replace(re,(match,prefix)=>prefix+tc);
-        }
-      }
-      if(next!==raw)node.nodeValue=next;
-    };
-  }
+  // ff14TcReplaceTextNode lives in tc-terms.js (longest-name-first). An older override here
+  // replaced names in ID order and produced "Northeast 石綠湖"; do not re-add it.
 
   function hasCurrentSessionRoute(){
     const model=window.__fishingSessionRouteModel,p=pickerSelection();
