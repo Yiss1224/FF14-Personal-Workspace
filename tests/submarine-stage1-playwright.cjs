@@ -568,6 +568,21 @@ async function main(){
     await ctx.close();
   });
 
+  await test('19. 速度 ≤ 0 的配置（Rank 45 的 2335 速度 -20）不會被推薦成負數航行時間',async()=>{
+    // 庫存只剩組得出 2335 的部件：舊邏輯會用負速度算出比 12 小時還短的航線並推薦它。
+    const stock={};for(let c=1;c<=5;c++)for(let slot=0;slot<4;slot++)stock[c+':'+slot]=0;
+    Object.assign(stock,{'2:0':1,'3:1':1,'3:2':1,'5:3':1});
+    const seed=baseSeed();seed.partStock=stock;
+    seed.ships=[{registered:true,rank:45,exp:0,name:'',currentBuild:'2335'}];
+    seed.unlocks=Object.fromEntries(Array.from({length:20},(_,i)=>['sector-'+(i+1),true]));seed.plannerSettings={targetRank:85};
+    const ctx=await context(seed),page=await open(ctx);
+    const text=await page.evaluate(()=>document.getElementById('calc-result').textContent);
+    assert.doesNotMatch(text,/配置 2335/);
+    assert.doesNotMatch(text,/-\d+:\d\d|NaN|Infinity/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
   await browser.close();server.close();
   console.log(results.join('\n'));
   console.log(passed+' passed, '+(results.filter(r=>r.startsWith('FAIL')).length)+' failed');
