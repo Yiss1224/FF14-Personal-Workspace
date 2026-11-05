@@ -17,3 +17,7 @@ assert.equal(run('Bronze Lakes'),'Bronze Lakes','no partial-word replacement');
 t.setCache({ts:2,items:{},weather:{},itemEnglish:{},places:{'Bronze Lake':'石綠湖'}});
 assert.equal(run('Northeast Bronze Lake'),'Northeast 石綠湖');
 console.log('tc terms longest-match smoke passed');
+// No other script may override the shared matcher with an ID-order copy (fishing-progress-fix.js used to).
+for(const f of fs.readdirSync('.').filter(f=>f.endsWith('.js')&&f!=='tc-terms.js'))
+  assert.ok(!/ff14TcReplaceTextNode\s*=/.test(fs.readFileSync(f,'utf8')),`${f} must not override ff14TcReplaceTextNode`);
+console.log('tc terms override guard passed');
