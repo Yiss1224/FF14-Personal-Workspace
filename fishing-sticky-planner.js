@@ -27,6 +27,8 @@
       #fish-floating-planner-dock .fish-map-head{margin-top:0}
       .fish-floating-planner-drag{display:flex;align-items:center;justify-content:center;gap:6px;margin:-2px -2px 8px;padding:7px 10px;border-radius:9px;background:rgba(127,127,127,.10);font-size:12px;font-weight:700;user-select:none;-webkit-user-select:none;touch-action:none;cursor:grab}
       .fish-floating-planner-drag:active{cursor:grabbing}
+      .fish-floating-planner-drag{justify-content:space-between}.fish-floating-planner-toggle{padding:3px 10px;font-size:12px;cursor:pointer}
+      #fish-floating-planner-dock.is-collapsed{width:auto;min-width:220px;overflow:hidden}#fish-floating-planner-dock.is-collapsed .fish-floating-planner-drag{margin-bottom:-2px}#fish-floating-planner-dock.is-collapsed #fish-zone-map{display:none}
       .fish-sticky-placeholder{width:100%;pointer-events:none}
       @media(min-width:701px) and (max-width:1100px){#fish-floating-planner-dock{right:8px;top:8px;width:min(54vw,520px);max-height:calc(100vh - 16px);padding:9px 10px 10px}.fish-floating-planner-drag{min-height:34px;font-size:13px}}
       @media(max-width:700px){#fish-floating-planner-dock{display:none!important}.fish-sticky-placeholder{display:none!important}}
@@ -53,7 +55,7 @@
   }
 
   function beginDrag(e){
-    if(!floating||!dock||e.button>0)return;
+    if(!floating||!dock||e.button>0||e.target.closest?.('button'))return;
     e.preventDefault();
     const rect=dock.getBoundingClientRect();
     dock.style.transformOrigin='top left';
@@ -90,7 +92,11 @@
     dock.hidden=true;
     dragHandle=document.createElement('div');
     dragHandle.className='fish-floating-planner-drag';
-    dragHandle.textContent='⋮⋮ 拖曳地圖';
+    dragHandle.innerHTML='<span>⋮⋮ 拖曳地圖</span><button type="button" class="fish-floating-planner-toggle" aria-expanded="true">收起</button>';
+    const toggle=dragHandle.querySelector('button');
+    let collapsed=false;try{collapsed=localStorage.getItem('fishFloatingMapCollapsed')==='1'}catch{}
+    const applyCollapsed=()=>{dock.classList.toggle('is-collapsed',collapsed);toggle.textContent=collapsed?'展開地圖':'收起';toggle.setAttribute('aria-expanded',collapsed?'false':'true');if(!collapsed)try{window.refreshFishingSessionRouteMap?.()}catch{}};
+    toggle.addEventListener('click',e=>{e.stopPropagation();collapsed=!collapsed;try{localStorage.setItem('fishFloatingMapCollapsed',collapsed?'1':'0')}catch{}applyCollapsed();clampDock()});
     dragHandle.setAttribute('role','button');
     dragHandle.setAttribute('aria-label','拖曳浮動地圖');
     dragHandle.addEventListener('pointerdown',beginDrag);
@@ -99,6 +105,7 @@
     dragHandle.addEventListener('pointercancel',endDrag);
     dock.appendChild(dragHandle);
     document.body.appendChild(dock);
+    applyCollapsed();
     return dock;
   }
 

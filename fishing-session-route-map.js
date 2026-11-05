@@ -45,12 +45,13 @@
     document.querySelectorAll('#fish-zone-map-body .ff14-map-marker.session-route').forEach(marker=>{marker.classList.remove('session-route');marker.querySelector('.ff14-route-orders')?.remove()});
     document.querySelectorAll('#fish-zone-map-body .fish-map-fallback [data-map-spot].session-route-fallback').forEach(btn=>{btn.classList.remove('session-route-fallback');delete btn.dataset.routeOrder});
     document.querySelector('#fish-zone-map-body .ff14-route-line-layer')?.remove();
+    document.querySelector('#fish-zone-map-body .ff14-map-markers')?.classList.remove('has-route');
     document.getElementById('fish-session-route-map-note')?.remove();
   }
 
-  function addOrders(marker,labels){
+  function addOrders(marker,labels,first){
     if(!marker||!labels.length)return;
-    marker.classList.add('session-route');
+    marker.classList.add('session-route');marker.classList.toggle('route-start',!!first);
     const wrap=document.createElement('span');wrap.className='ff14-route-orders';
     const badge=document.createElement('span');badge.className='ff14-route-order';badge.textContent=labels.join(' ');wrap.appendChild(badge);
     marker.appendChild(wrap);
@@ -88,13 +89,15 @@
     svg.setAttribute('viewBox',`0 0 ${wrapRect.width.toFixed(2)} ${wrapRect.height.toFixed(2)}`);
     svg.setAttribute('preserveAspectRatio','none');
     const defs=document.createElementNS(ns,'defs'),marker=document.createElementNS(ns,'marker');
-    marker.setAttribute('id','ff14-route-arrow');marker.setAttribute('viewBox','0 0 10 10');marker.setAttribute('refX','5');marker.setAttribute('refY','5');marker.setAttribute('markerWidth','5.5');marker.setAttribute('markerHeight','5.5');marker.setAttribute('orient','auto');
+    marker.setAttribute('id','ff14-route-arrow');marker.setAttribute('viewBox','0 0 10 10');marker.setAttribute('refX','5');marker.setAttribute('refY','5');marker.setAttribute('markerWidth','4');marker.setAttribute('markerHeight','4');marker.setAttribute('orient','auto');
     const arrow=document.createElementNS(ns,'path');arrow.setAttribute('d','M 0 0 L 10 5 L 0 10 z');arrow.setAttribute('class','ff14-route-arrow-head');marker.appendChild(arrow);defs.appendChild(marker);svg.appendChild(defs);
 
     for(let i=0;i<points.length-1;i++){
       const a=points[i].point,b=points[i+1].point;if(Math.abs(a.x-b.x)<1&&Math.abs(a.y-b.y)<1)continue;
-      const q=shortenedSegment(a,b),path=document.createElementNS(ns,'path');
-      path.setAttribute('d',`M ${q.sx.toFixed(2)} ${q.sy.toFixed(2)} L ${q.mx.toFixed(2)} ${q.my.toFixed(2)} L ${q.ex.toFixed(2)} ${q.ey.toFixed(2)}`);
+      const q=shortenedSegment(a,b),d=`M ${q.sx.toFixed(2)} ${q.sy.toFixed(2)} L ${q.mx.toFixed(2)} ${q.my.toFixed(2)} L ${q.ex.toFixed(2)} ${q.ey.toFixed(2)}`;
+      const casing=document.createElementNS(ns,'path');casing.setAttribute('d',d);casing.setAttribute('class','ff14-route-casing');svg.appendChild(casing);
+      const path=document.createElementNS(ns,'path');
+      path.setAttribute('d',d);
       path.setAttribute('class','ff14-route-line');path.setAttribute('marker-mid','url(#ff14-route-arrow)');svg.appendChild(path);
     }
     markersWrap.prepend(svg);
@@ -107,11 +110,13 @@
     const groups=routeGroups().filter(x=>(!region||!x.region||x.region===region)&&(!x.zone||x.zone===zone));if(!groups.length)return;
     const bySpot=new Map();for(const group of groups){if(!bySpot.has(group.spot))bySpot.set(group.spot,[]);bySpot.get(group.spot).push(orderLabel(group.orders))}
     const markerMap=new Map([...body.querySelectorAll('.ff14-map-marker[data-map-spot]')].map(m=>[m.dataset.mapSpot,m]));
-    for(const [spot,labels] of bySpot)addOrders(markerMap.get(spot),labels);
-    drawRouteLines(body.querySelector('.ff14-map-markers'),groups,markerMap);
+    for(const [spot,labels] of bySpot)addOrders(markerMap.get(spot),labels,spot===groups[0].spot);
+    const layer=body.querySelector('.ff14-map-markers');layer?.classList.add('has-route');
+    try{window.ff14DeclutterMapLabels?.()}catch{}
+    drawRouteLines(layer,groups,markerMap);
     body.querySelectorAll('.fish-map-fallback [data-map-spot]').forEach(btn=>{const labels=bySpot.get(btn.dataset.mapSpot)||[];if(!labels.length)return;btn.classList.add('session-route-fallback');btn.dataset.routeOrder=labels.join(' ')});
     const title=body.querySelector('.fish-map-title');
-    if(title){const note=document.createElement('div');note.id='fish-session-route-map-note';note.className='fish-session-route-map-note';note.innerHTML=`<strong>釣點順序</strong> ${groups.map(g=>`<span>${esc(orderLabel(g.orders))}. ${esc(tc(g.spot))}</span>`).join('<span class="route-map-arrow">→</span>')}`;title.insertAdjacentElement('afterend',note)}
+    if(title){const note=document.createElement('div');note.id='fish-session-route-map-note';note.className='fish-session-route-map-note';note.innerHTML=`<strong>釣點順序</strong> ${groups.map(g=>`<span class="route-chip"><b>${esc(orderLabel(g.orders))}</b>${esc(tc(g.spot))}</span>`).join('<span class="route-map-arrow">→</span>')}`;title.insertAdjacentElement('afterend',note)}
   }
 
   function overlayMissing(){
@@ -125,14 +130,23 @@
     if(document.getElementById('fish-session-route-map-style'))return;
     const style=document.createElement('style');style.id='fish-session-route-map-style';style.textContent=`
       .ff14-map-marker.session-route{z-index:4}
-      .ff14-route-orders{position:absolute;left:10px;top:-24px;display:flex;gap:2px;pointer-events:none}
-      .ff14-route-order{display:grid;place-items:center;min-width:20px;height:20px;padding:0 7px;border-radius:999px;background:Canvas;color:CanvasText;border:2px solid currentColor;font-size:11px;font-weight:900;line-height:1;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.45)}
+      .ff14-map-marker.session-route .ff14-map-dot{display:none}
+      .ff14-map-markers.has-route .ff14-map-marker:not(.session-route){opacity:.55}
+      .ff14-map-markers.has-route .ff14-map-marker:not(.session-route) .ff14-map-dot{width:11px;height:11px;border-width:2px}
+      .ff14-route-orders{display:flex;gap:2px;pointer-events:none}
+      .ff14-route-order{display:grid;place-items:center;min-width:24px;height:24px;padding:0 7px;border-radius:999px;background:#e8590c;color:#fff;border:2px solid #fff;font-size:12px;font-weight:900;line-height:1;white-space:nowrap;box-shadow:0 1px 5px rgba(0,0,0,.55)}
+      .ff14-map-marker.route-start .ff14-route-order{background:#2b8a3e}
+      .ff14-map-marker.session-route .ff14-map-label{background:rgba(20,22,26,.85)}
       .ff14-route-line-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;overflow:visible}
-      .ff14-route-line{fill:none;stroke:CanvasText;stroke-width:2.4;stroke-linecap:round;opacity:.62;vector-effect:non-scaling-stroke}
-      .ff14-route-arrow-head{fill:CanvasText;opacity:.82}
-      .fish-session-route-map-note{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin:-2px 0 8px;font-size:12px}
-      .fish-session-route-map-note>span{white-space:nowrap}.route-map-arrow{opacity:.55}
-      .fish-map-fallback [data-map-spot].session-route-fallback::before{content:attr(data-route-order);display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-right:5px;border-radius:999px;border:1px solid currentColor;font-size:10px;font-weight:800;white-space:nowrap}
+      .ff14-route-casing{fill:none;stroke:#fff;stroke-width:6.5;stroke-linecap:round;stroke-linejoin:round;opacity:.85;vector-effect:non-scaling-stroke}
+      .ff14-route-line{fill:none;stroke:#e8590c;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+      .ff14-route-arrow-head{fill:#e8590c;stroke:#fff;stroke-width:1}
+      .fish-session-route-map-note{display:flex;gap:4px 6px;align-items:center;flex-wrap:wrap;margin:-2px 0 10px;font-size:12px}
+      .fish-session-route-map-note .route-chip{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;padding:2px 8px 2px 2px;border-radius:999px;background:rgba(127,127,127,.12)}
+      .fish-session-route-map-note .route-chip b{display:grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#e8590c;color:#fff;font-size:11px}
+      .fish-session-route-map-note .route-chip:first-of-type b{background:#2b8a3e}
+      .route-map-arrow{opacity:.5}
+      .fish-map-fallback [data-map-spot].session-route-fallback::before{content:attr(data-route-order);display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-right:5px;border-radius:999px;background:#e8590c;color:#fff;font-size:10px;font-weight:800;white-space:nowrap}
     `;document.head.appendChild(style);
   }
 

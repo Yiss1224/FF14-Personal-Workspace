@@ -118,6 +118,65 @@
     bindSpotButtons(body);refreshSessionOverlay();
   }
 
+  // 地圖放大到釣點範圍：回傳以整張地圖為 0–100 的裁切框。
+  const ZOOM_KEY='fishMapFitSpots';
+  function zoomPref(){try{return localStorage.getItem(ZOOM_KEY)!=='0'}catch{return true}}
+  function setZoomPref(on){try{localStorage.setItem(ZOOM_KEY,on?'1':'0')}catch{}}
+  function fitBox(points){
+    if(!points.length)return null;
+    let x0=Math.min(...points.map(p=>p.x)),x1=Math.max(...points.map(p=>p.x)),y0=Math.min(...points.map(p=>p.y)),y1=Math.max(...points.map(p=>p.y));
+    const PAD=9,MIN=34;
+    x0-=PAD;x1+=PAD;y0-=PAD;y1+=PAD;
+    const grow=(a,b,min)=>{const d=b-a;if(d>=min)return[a,b];const m=(min-d)/2;return[a-m,b+m]};
+    [x0,x1]=grow(x0,x1,MIN);[y0,y1]=grow(y0,y1,MIN);
+    // 長寬比限制在 0.75–1.6，太扁或太高就補另一邊
+    let w=x1-x0,h=y1-y0;
+    if(w/h>1.6)[y0,y1]=grow(y0,y1,w/1.6);else if(w/h<.75)[x0,x1]=grow(x0,x1,h*.75);
+    const clamp=(a,b)=>{const d=Math.min(100,b-a);let s=Math.max(0,Math.min(100-d,a));return[s,s+d]};
+    [x0,x1]=clamp(x0,x1);[y0,y1]=clamp(y0,y1);
+    w=x1-x0;h=y1-y0;
+    if(w>82&&h>82)return null; // 放大不到 1.2 倍就直接看全圖
+    return{x0,y0,w,h};
+  }
+  function applyZoom(body){
+    const wrap=body.querySelector('.ff14-map-wrap'),canvas=wrap?.querySelector('.ff14-map-canvas'),btn=body.querySelector('[data-map-zoom]');
+    if(!wrap||!canvas)return;
+    let box=null;try{box=JSON.parse(wrap.dataset.fit||'null')}catch{}
+    const on=!!box&&zoomPref();
+    if(on){
+      wrap.style.aspectRatio=`${box.w} / ${box.h}`;
+      Object.assign(canvas.style,{width:`${10000/box.w}%`,height:`${10000/box.h}%`,left:`${-box.x0/box.w*100}%`,top:`${-box.y0/box.h*100}%`});
+    }else{
+      wrap.style.aspectRatio='1 / 1';
+      Object.assign(canvas.style,{width:'100%',height:'100%',left:'0',top:'0'});
+    }
+    wrap.classList.toggle('is-zoomed',on);
+    if(btn){btn.hidden=!box;btn.textContent=on?'顯示全圖':'放大到釣點';btn.setAttribute('aria-pressed',on?'true':'false')}
+  }
+  // 名稱互相壓到時，依序改放右、左、上、下。
+  function rectsOverlap(a,b){return a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top}
+  function declutterLabels(root){
+    const layer=root?.querySelector?.('.ff14-map-markers');if(!layer)return;
+    const markers=[...layer.querySelectorAll('.ff14-map-marker')];
+    markers.sort((a,b)=>(b.classList.contains('session-route')?1:0)-(a.classList.contains('session-route')?1:0));
+    const sides=['label-right','label-left','label-top','label-bottom'];
+    const taken=markers.map(m=>(m.querySelector('.ff14-route-orders')||m.querySelector('.ff14-map-dot')||m).getBoundingClientRect());
+    const view=(layer.closest('.ff14-map-wrap')||layer).getBoundingClientRect();
+    const inside=r=>r.left>=view.left+2&&r.right<=view.right-2&&r.top>=view.top+2&&r.bottom<=view.bottom-2;
+    for(const m of markers){
+      const label=m.querySelector('.ff14-map-label');if(!label)continue;
+      let chosen=sides[0];
+      for(const side of sides){
+        m.classList.remove(...sides);m.classList.add(side);
+        const r=label.getBoundingClientRect();
+        if(inside(r)&&!taken.some(t=>rectsOverlap(r,t))){chosen=side;break}
+      }
+      m.classList.remove(...sides);m.classList.add(chosen);
+      taken.push(label.getBoundingClientRect());
+    }
+  }
+  window.ff14DeclutterMapLabels=()=>declutterLabels(document.getElementById('fish-zone-map-body'));
+
   async function renderMap(){
     ensureMap();
     const body=document.getElementById('fish-zone-map-body');if(!body)return;
@@ -133,11 +192,14 @@
     if(!url){renderFallback(body,region,zone,spots);return}
 
     const plotted=spots.filter(s=>Number.isFinite(s.x)&&Number.isFinite(s.y)&&s.x>0&&s.y>0);
-    const markers=plotted.map(s=>{const left=coordPct(s.x),top=coordPct(s.y),sel=s.name===selected?' selected':'';return `<button type="button" class="ff14-map-marker${sel}" data-map-spot="${esc(s.name)}" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}%" title="${esc(tc(s.name))} · X ${s.x.toFixed(0)} Z ${s.y.toFixed(0)} · ${s.fish} 種"><span class="ff14-map-dot"></span><span class="ff14-map-label">${esc(tc(s.name))}</span></button>`}).join('');
+    const markers=plotted.map(s=>{const left=coordPct(s.x),top=coordPct(s.y),sel=s.name===selected?' selected':'';return `<button type="button" class="ff14-map-marker label-right${sel}" data-map-spot="${esc(s.name)}" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}%" title="${esc(tc(s.name))} · X ${s.x.toFixed(0)} Z ${s.y.toFixed(0)} · ${s.fish} 種"><span class="ff14-map-dot"></span><span class="ff14-map-label">${esc(tc(s.name))}</span></button>`}).join('');
+    const fit=fitBox(plotted.map(s=>({x:coordPct(s.x),y:coordPct(s.y)})));
     const noCoords=!plotted.length?`<div class="muted fish-map-warning">這批釣點目前沒有可用 X/Z，所以先顯示釣場按鈕。</div>${spotButtons(spots)}`:'';
-    body.innerHTML=`<div class="fish-map-title">${esc(tc(region))} / <strong>${esc(tc(zone))}</strong> · ${spots.length} 個釣點</div><div class="ff14-map-wrap"><img class="ff14-map-image" src="${esc(url)}" alt="${esc(tc(zone))} FF14 地圖"><div class="ff14-map-markers">${markers}</div></div><div class="muted fish-map-note">底圖：FF14 遊戲地圖素材（XIVAPI） · Map.Id: <code>${esc(mapId)}</code> · 釣點：${plotted.length}/${spots.length}</div>${noCoords}`;
-    const img=body.querySelector('.ff14-map-image');if(img)img.addEventListener('error',()=>renderFallback(body,region,zone,spots,`Map.Id ${mapId} 圖片載入失敗。`),{once:true});
-    bindSpotButtons(body);refreshSessionOverlay();
+    body.innerHTML=`<div class="fish-map-title"><span>${esc(tc(region))} / <strong>${esc(tc(zone))}</strong> · ${spots.length} 個釣點</span><button type="button" class="fish-map-zoom" data-map-zoom hidden>顯示全圖</button></div><div class="ff14-map-wrap" data-fit="${esc(JSON.stringify(fit))}"><div class="ff14-map-canvas"><img class="ff14-map-image" src="${esc(url)}" alt="${esc(tc(zone))} FF14 地圖"><div class="ff14-map-markers">${markers}</div></div></div><div class="muted fish-map-note">底圖：FF14 遊戲地圖素材（XIVAPI） · Map.Id: <code>${esc(mapId)}</code> · 釣點：${plotted.length}/${spots.length}</div>${noCoords}`;
+    const img=body.querySelector('.ff14-map-image');if(img){img.addEventListener('error',()=>renderFallback(body,region,zone,spots,`Map.Id ${mapId} 圖片載入失敗。`),{once:true});img.addEventListener('load',()=>{declutterLabels(body);refreshSessionOverlay()},{once:true})}
+    applyZoom(body);
+    body.querySelector('[data-map-zoom]')?.addEventListener('click',()=>{setZoomPref(!zoomPref());applyZoom(body);requestAnimationFrame(()=>{declutterLabels(body);refreshSessionOverlay()})});
+    bindSpotButtons(body);declutterLabels(body);refreshSessionOverlay();
   }
 
   function ensureNpcMapDialog(){
@@ -167,13 +229,18 @@
     if(document.getElementById('fish-zone-map-style'))return;
     const s=document.createElement('style');s.id='fish-zone-map-style';s.textContent=`
       .fish-zone-map{margin-top:14px;padding-top:14px;border-top:1px solid var(--border,#d8d8df)}
-      .fish-map-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:10px}.fish-map-title{margin-bottom:8px}
-      .ff14-map-wrap{position:relative;width:min(100%,760px);margin:auto;border:1px solid var(--border,#d8d8df);border-radius:12px;overflow:hidden;background:#222}
-      .ff14-map-image{display:block;width:100%;height:auto}.ff14-map-markers{position:absolute;inset:0;pointer-events:none}
-      .ff14-map-marker{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;border:0;background:transparent;padding:0;display:flex;align-items:center;gap:5px;cursor:pointer;z-index:2}
-      .ff14-map-dot{width:15px;height:15px;border-radius:50%;background:#fff;border:3px solid #222;box-shadow:0 1px 4px rgba(0,0,0,.65);flex:0 0 auto}
-      .ff14-map-label{font-weight:700;font-size:12px;white-space:nowrap;color:#fff;text-shadow:-1px -1px 2px #000,1px -1px 2px #000,-1px 1px 2px #000,1px 1px 2px #000}
-      .ff14-map-marker.selected .ff14-map-dot{width:20px;height:20px}.ff14-map-marker:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:4px}
+      .fish-map-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:10px}.fish-map-title{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}.fish-map-zoom{padding:5px 10px;font-size:13px}
+      .ff14-map-wrap{position:relative;width:min(100%,760px);aspect-ratio:1/1;margin:auto;border:1px solid var(--border,#d8d8df);border-radius:12px;overflow:hidden;background:#222}
+      .ff14-map-canvas{position:absolute;left:0;top:0;width:100%;height:100%}
+      .ff14-map-image{display:block;width:100%;height:100%}.ff14-map-markers{position:absolute;inset:0;pointer-events:none}
+      .ff14-map-marker{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;border:0;background:transparent;padding:0;display:block;cursor:pointer;z-index:2;color:#fff}
+      .ff14-map-dot{display:block;width:15px;height:15px;border-radius:50%;background:#fff;border:3px solid #222;box-shadow:0 1px 4px rgba(0,0,0,.65)}
+      .ff14-map-label{position:absolute;top:50%;left:calc(100% + 5px);transform:translateY(-50%);font-weight:700;font-size:12px;white-space:nowrap;color:#fff;padding:1px 6px;border-radius:6px;background:rgba(20,22,26,.62);text-shadow:0 1px 2px #000}
+      .ff14-map-marker.label-left .ff14-map-label{left:auto;right:calc(100% + 5px)}
+      .ff14-map-marker.label-top .ff14-map-label{top:auto;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%)}
+      .ff14-map-marker.label-bottom .ff14-map-label{top:calc(100% + 4px);left:50%;transform:translateX(-50%)}
+      .ff14-map-marker:hover{z-index:6}.ff14-map-marker:hover .ff14-map-label{background:rgba(20,22,26,.9)}
+      .ff14-map-marker.selected .ff14-map-dot{width:20px;height:20px;border-color:#1f6f8b}.ff14-map-marker.selected .ff14-map-label{background:#1f6f8b}.ff14-map-marker:focus-visible{outline:2px solid #fff;outline-offset:3px;border-radius:50%}
       .fish-map-scroll{overflow:auto;border:1px solid var(--border,#d8d8df);border-radius:12px;background:rgba(127,127,127,.04)}.fish-map-svg{display:block;width:100%;min-width:620px;height:auto}.fish-map-point{cursor:pointer}.fish-map-point circle{fill:currentColor;opacity:.65;stroke:Canvas;stroke-width:3}.fish-map-point text{font-size:13px;fill:currentColor;paint-order:stroke;stroke:Canvas;stroke-width:3px}.fish-map-note{margin-top:7px}.fish-map-warning{margin-top:9px}.fish-map-fallback{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.fish-map-fallback button span{opacity:.6;margin-left:5px}
       .ff14-npc-map-dialog{width:min(94vw,820px);max-width:820px;border:1px solid var(--border,#d8d8df);border-radius:14px;padding:14px;background:Canvas;color:CanvasText}.ff14-npc-map-dialog::backdrop{background:rgba(0,0,0,.58)}
       .ff14-npc-map-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}.ff14-npc-map-head button{font-size:24px;line-height:1;border:0;background:transparent;color:inherit;cursor:pointer;padding:2px 8px}.ff14-npc-map-body{min-height:80px}.ff14-npc-map-marker{cursor:default}.ff14-npc-map-marker .ff14-map-dot{width:20px;height:20px}
