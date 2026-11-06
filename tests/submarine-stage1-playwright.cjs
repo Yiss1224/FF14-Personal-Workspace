@@ -42,7 +42,12 @@ const baseSeed=()=>({
 
 let browser,base,passed=0;
 const results=[];
+// 出發時間預設會取「現在」（若在收船窗口內），測試結果就會隨執行時刻改變；
+// 物件種子一律固定 19:00 出發，個別測試再用 #calc-departure-time 自行指定。
+const fixedDeparture=seed=>seed&&typeof seed==='object'
+  ?{...seed,plannerSettings:{departureTime:'19:00',manualDeparture:true,...(seed.plannerSettings||{})}}:seed;
 async function context(seed){
+  seed=fixedDeparture(seed);
   const ctx=await browser.newContext();
   await ctx.route(/imgur|universalis/,route=>route.abort());
   if(seed!==undefined){
