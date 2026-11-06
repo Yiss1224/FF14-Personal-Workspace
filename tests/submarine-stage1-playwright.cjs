@@ -590,10 +590,25 @@ async function main(){
     const ctx=await context(seed),page=await open(ctx);
     await setField(page,'#calc-departure-time','21:41');
     await page.waitForFunction(()=>/本趟使用 1121/.test(document.querySelector('#calc-result .route-card')?.textContent||''),null,{timeout:10000});
+    assert.match(await page.textContent('#calc-result'),/關鍵點：第一次探索會開第 2 艘船位/);
     const card=await page.textContent('#calc-result .route-card');
     assert.match(card,/開圖兼練等：[^\n]*溺沒海 [A-K →]*J/);
     assert.match(card,/最早可收／再派：明天/);
     assert.doesNotMatch(card,/本趟建議換裝/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
+  await test('21. 一般前置點（J 的第 2 艘船位已開）不強求早回來：開圖船照 EXP／收船週期選長線',async()=>{
+    const seed=baseSeed();
+    seed.ships=[{registered:true,rank:20,exp:0,name:'',currentBuild:'1121'},{registered:true,rank:1,exp:0,name:''},{registered:false,rank:1},{registered:false,rank:1}];
+    seed.unlocks=Object.fromEntries([1,2,3,4,5,6,7,9,10,11].map(id=>['sector-'+id,true]));seed.plannerSettings={targetRank:85};
+    const ctx=await context(seed),page=await open(ctx);
+    await setField(page,'#calc-departure-time','21:41');
+    await page.waitForFunction(()=>/一般前置點/.test(document.getElementById('calc-result').textContent),null,{timeout:10000});
+    const card=await page.textContent('#calc-result .route-card');
+    assert.match(card,/開圖兼練等：[^\n]*溺沒海 [A-K →]* → J/);
+    assert.match(card,/最早可收／再派：後天/);
     assert.deepStrictEqual(page.errors,[]);
     await ctx.close();
   });

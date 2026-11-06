@@ -729,8 +729,10 @@ function nextMapProgress(open){
 const CHOICES_PER_SHIP=6;
 // 開圖船比的是多快回來開下一處：每天收船時以「第幾天收得到」計，同一天回來的再比 EXP；
 // 沒有收船窗口時才以實際航行時間比。
+// 第一次探索會開出新潛水艇船位的點（溺沒海）：J＝第 2 艘、O＝第 3 艘、T＝第 4 艘。
+const SLOT_POINTS={J:2,O:3,T:4};
 function gateCost(time,daily){return daily?pickupTiming(time).day:pickupElapsed(time,false)/DAY}
-function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, daily, pinSlots=0, pins=[]){
+function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, daily, pinSlots=0, pins=[], urgentGate=true){
  const requested=plans.filter(p=>!p.ship.voyaging&&(p.rank<targetRank||p.explorer));
  // 仍然替其他可派船計算；單艘沒有可行航線不應拖垮整個船隊。
  const missing=requested.filter(p=>!p.choices.length).map(p=>shipLabel(p.ship.index,p.ship));
@@ -741,7 +743,7 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
  // 逐船只嘗試前幾個庫存仍可組出的選項，避免全部組合相乘後爆量。
  const order=new Map(ready.map(p=>[p,p.choices.map(option=>({option,
   rank:option.pinned?-3e6-option.route.opens*1e4+gateCost(option.route.time,daily)*100+estimatedFinishDays(p,option,targetRank,daily)
-   :option.frontier?(option.penalty||0)-2e6:option.opening?gateCost(option.route.time,daily)*1e4-1e6+estimatedFinishDays(p,option,targetRank,daily):estimatedFinishDays(p,option,targetRank,daily)}))
+   :option.frontier?(option.penalty||0)-2e6:option.opening?(urgentGate?gateCost(option.route.time,daily)*1e4:0)-1e6+estimatedFinishDays(p,option,targetRank,daily):estimatedFinishDays(p,option,targetRank,daily)}))
   .sort((a,b)=>a.rank-b.rank).map(x=>x.option)]));
  let best=null;
  const decisions=new Map();
@@ -761,8 +763,10 @@ function selectFleetAllocation(plans, fixedUsage, availableStock, targetRank, da
   // 剩下的以可提前投入 OJ 的船日＋全艦隊完成日期評分；剩餘航點開圖以 penalty 表達航線偏好順序。
   const preference=entries.reduce((a,{option})=>a+(option.penalty||0),0);
   const objective=sum+fleetBottleneck*0.6+switching*0.002+preference;
-  const gateRoundFirst=gateDays.length?Math.min(...gateDays.map(gateRound)):Infinity;
-  const gateSameRound=gateDays.filter(d=>gateRound(d)===gateRoundFirst).length;
+  // 關鍵開圖點（開新船位、進下一張海圖）才比「第幾天收得到」；一般前置點只要有船去，其餘照 EXP 比。
+  const firstRound=gateDays.length?Math.min(...gateDays.map(gateRound)):Infinity;
+  const gateRoundFirst=urgentGate||!gateDays.length?firstRound:0;
+  const gateSameRound=gateDays.filter(d=>gateRound(d)===firstRound).length;
   const val={userCovered,autoCovered,pinCount,gateCount,gateRoundFirst,gateSameRound,objective,entries:entries.map(x=>({plan:x.plan,option:x.option}))};
   // 使用者指定的航點最優先：先涵蓋越多指定目標越好，再補滿設定的船數（同一處多一艘就多一次開圖機會）。
   // 自動找出的練等關鍵點排在下一張海圖開圖之後，不搶開圖船。
@@ -829,6 +833,10 @@ function calculateNow(){
  if(daily&&!w.departureInside){$('calc-result').innerHTML='<p class="calc-warning">預計本次派船時間應在收船窗口內；請調整時間後再計算。</p>';return}
  const registered=ships.map((ship,i)=>({...ship,index:i})).filter(x=>x.registered);
  const progress=nextMapProgress(open);
+ // 關鍵開圖點：第一次探索會開新船位的點（溺沒海 J／O／T → 第 2／3／4 艘，船位還沒開時），
+ // 或這一步就是開出下一張海圖入口。只有這些點才要「早點回來再試」，其他前置點照 EXP 比。
+ const slotPoint=progress?.parent&&progress.parent.map===1&&SLOT_POINTS[progress.parent.letter];
+ const urgentGate=Boolean(progress?.step&&(progress.step.id===progress.target.id||(slotPoint&&ships.filter(x=>x.registered).length<slotPoint)));
  // 下一張海圖的前置鏈優先；海圖入口都開後，依「開圖目標」決定撥出船是否改開剩餘航點。
  const frontier=!progress&&exploreMode!=='next'?frontierParents(open):null;
  const exploring=progress?.parent&&progress.step?'next':frontier?.size?'frontier':null;
@@ -969,7 +977,7 @@ function calculateNow(){
   for(const b of p.routeOptions){
    for(const route of b.pin)p.choices.push({key:b.key,route,alternates:b.normal,opening:false,pinned:true});
    if(designated&&b.gate.length){
-    const gates=b.gate.slice(0,2),earliest=exploring==='next'&&b.gate.length>2?b.gate.at(-1):null;
+    const gates=b.gate.slice(0,2),earliest=urgentGate&&exploring==='next'&&b.gate.length>2?b.gate.at(-1):null;
     if(earliest&&gates.every(r=>gateCost(earliest.time,daily)<gateCost(r.time,daily)))gates.push(earliest);
     for(const route of gates)p.choices.push({key:b.key,route,alternates:b.normal,opening:true,frontier:exploring==='frontier'});
    }
@@ -1000,7 +1008,7 @@ function calculateNow(){
   const cycleText=(choice.opening||choice.pinned)&&!choice.frontier?'收船週期 '+esc(fmtTime(pickupElapsed(basis.time,daily)))+' → '+esc(fmtTime(pickupElapsed(choice.route.time,daily)))+'，':'';
   return d===null?'':'<span>'+head+cycleText+sign(d)+(gil?' Gil 估值':' EXP')+'／收船週期</span>';
  }
- const allocation=selectFleetAllocation(plans,fixedUsage,total,target,daily,pinSlots,pinActive);
+ const allocation=selectFleetAllocation(plans,fixedUsage,total,target,daily,pinSlots,pinActive,urgentGate);
  const selected=allocation.chosen;
  // 畢業船：在扣掉其他船占用（含本輪派船）後的庫存中，挑 O → J 平均每天飾品估值最高的配置
  // （每天在窗口內收船時，以長期平均每趟占用的時間換算；超過回航上限的不算）；
@@ -1119,6 +1127,7 @@ function calculateNow(){
  const progressNote=progress?.step
   ?'<p class="hint">下一張海圖目標：'+esc(seaName(progress.target.map)+' '+progress.target.letter)
    +'；優先探索 '+esc(progress.parent?seaName(progress.parent.map)+' '+progress.parent.letter:'尚未開出的前置點')
+   +(urgentGate?'（關鍵點：'+(slotPoint&&progress.step.id!==progress.target.id?'第一次探索會開第 '+slotPoint+' 艘船位':'開出下一張海圖')+'，開圖船優先選早點收得到的路線）':'（一般前置點：開圖船照 EXP／收船週期選路線）')
    +'。'+outNote+(explorers.size?'本輪撥出 '+explorers.size+' 艘畢業船開圖'+(explorers.size+outExploring.length+outOpening.length<2?'，練等船最多再補 1 艘':'')+'，其他船照常練等／跑 O → J。'
      :outExploring.length?'其他船照常練等／跑 O → J。':'最多兩艘合格船負責開圖，其他船優先練等。')
    +(explorerSlots>explorers.size?'（設定撥出 '+explorersWanted+' 艘，扣掉已出港的 '+outExploring.length+' 艘後還差 '+explorerSlots+' 艘，但目前只有 '+explorers.size+' 艘返航中的畢業船能跑到開圖前置點。）':'')+'</p>'
