@@ -131,12 +131,13 @@
       for(const row of notebookRows)spears.push(...spearsFromNotebook(row));
       if(!spears.length)throw new Error('SpearfishingNotebook 沒有解析出任何刺魚；先保留舊快取');
 
-      const merged=mergeSpears(existing,spears),links=merged.reduce((n,x)=>n+(Array.isArray(x?.spots)&&x.spots.length?x.spots.length:1),0);
+      // Re-read: the main XIVAPI download may have finished while we were fetching; merging into the
+      // snapshot taken above used to overwrite ~1800 fish with the old (often empty) catalog.
+      const merged=mergeSpears(read('fishCatalog',[]),spears),links=merged.reduce((n,x)=>n+(Array.isArray(x?.spots)&&x.spots.length?x.spots.length:1),0);
       write('fishCatalog',merged);
       write('fishCatalogUpdatedAt',Date.now());
       write('fishSpearCatalogSchema',SPEAR_CACHE_SCHEMA);
-      // Keep the legacy app.js cache schema satisfied; this compatibility layer owns spear schema separately.
-      write('fishCatalogSchema',2);
+      // Never write fishCatalogSchema here: that told app.js a spear-only catalog was a fresh full download.
       if(status)status.textContent=statusText(merged,links);
       try{if(typeof window.renderFishCatalog==='function')window.renderFishCatalog();else if(typeof renderFishCatalog==='function')renderFishCatalog()}catch(e){console.warn('render catalog after spear repair failed',e)}
       refreshPicker();
@@ -160,6 +161,7 @@
   try{refreshFishCatalog=fixedRefresh}catch{}
   const refreshBtn=document.getElementById('refresh-fish-data');if(refreshBtn)refreshBtn.onclick=()=>fixedRefresh(true);
 
-  const start=()=>setTimeout(()=>rebuild(false),0);
+  // Wait for app.js's own catalog download so the two never race; if it just re-downloaded, redo the spear merge.
+  const start=()=>{let sawLoading=false,tries=0;const tick=()=>{if(window.__fishCatalogState==='loading'&&tries++<360){sawLoading=true;setTimeout(tick,500);return}rebuild(sawLoading)};setTimeout(tick,0)};
   if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();

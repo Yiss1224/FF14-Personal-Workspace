@@ -9,7 +9,7 @@ const DEFAULT_ROULETTES=[
 ];
 const XIVAPI='https://v2.xivapi.com/api';
 const CATALOG_CACHE_MS=7*24*60*60*1000;
-const FISH_CATALOG_SCHEMA=2;
+const FISH_CATALOG_SCHEMA=3; // 3: forces one re-download for caches clobbered by the old spearfishing race
 // 讀寫統一經過 ff14-data.js 資料層。
 const store={get:(k,d)=>FF14Data.read(k,d),set:(k,v)=>FF14Data.write(k,v)};
 function today(){const d=new Date();const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
