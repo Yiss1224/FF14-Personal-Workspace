@@ -568,6 +568,21 @@ async function main(){
     await ctx.close();
   });
 
+  await test('19. 開圖船：每種配置都帶上最早收得到的開圖路線，不為了它換成較慢的配置（1121 晚上 21:41 出發）',async()=>{
+    const seed=baseSeed();
+    seed.ships=[{registered:true,rank:20,exp:0,name:'',currentBuild:'1121'},{registered:false,rank:1},{registered:false,rank:1},{registered:false,rank:1}];
+    seed.unlocks=Object.fromEntries([1,2,3,4,5,6,7,9,10,11].map(id=>['sector-'+id,true]));seed.plannerSettings={targetRank:85};
+    const ctx=await context(seed),page=await open(ctx);
+    await setField(page,'#calc-departure-time','21:41');
+    await page.waitForFunction(()=>/本趟使用 1121/.test(document.querySelector('#calc-result .route-card')?.textContent||''),null,{timeout:10000});
+    const card=await page.textContent('#calc-result .route-card');
+    assert.match(card,/開圖兼練等：[^\n]*溺沒海 [A-K →]*J/);
+    assert.match(card,/最早可收／再派：明天/);
+    assert.doesNotMatch(card,/本趟建議換裝/);
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
   await browser.close();server.close();
   console.log(results.join('\n'));
   console.log(passed+' passed, '+(results.filter(r=>r.startsWith('FAIL')).length)+' failed');

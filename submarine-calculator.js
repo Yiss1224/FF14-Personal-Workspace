@@ -380,7 +380,14 @@ function bestRoutes(available,ship,buildKey,maxHours,s,requiredId=null,beamLimit
   const score=xp/pickupElapsed(r.time,daily);
   if(!routes.has(label)||routes.get(label).score<score)routes.set(label,{...r,actualXp:xp,usedExp:false,ignoredExp:m?.ignored||0,oddExp:m?.sample,score,build:buildKey});
  }
- return [...routes.values()].sort((a,b)=>b.score-a.score).slice(0,3);
+ const sorted=[...routes.values()].sort((a,b)=>b.score-a.score),top=sorted.slice(0,3);
+ // 開圖路線比的是多快回來（gateCost）：EXP／週期前幾名可能都要多等一天，
+ // 把「最早收得到」的那條也帶上，否則會為了它改用較慢的配置（例：1121 只去 J 被 1111 取代）。
+ if(requiredId!==null&&sorted.length){
+  const early=sorted.reduce((best,r)=>gateCost(r.time,daily)<gateCost(best.time,daily)?r:best);
+  if(!top.includes(early))top.push(early);
+ }
+ return top;
 }
 // 海圖入口都開後的剩餘開圖：未開航點中「前置點已開」者是現在就能探索到的邊界。
 // 回傳 前置點 id → 經過它可能開出的未開航點。
@@ -960,7 +967,9 @@ function calculateNow(){
   for(const b of p.routeOptions){
    for(const route of b.pin)p.choices.push({key:b.key,route,alternates:b.normal,opening:false,pinned:true});
    if(designated&&b.gate.length){
-    for(const route of b.gate.slice(0,2))p.choices.push({key:b.key,route,alternates:b.normal,opening:true,frontier:exploring==='frontier'});
+    const gates=b.gate.slice(0,2),earliest=exploring==='next'&&b.gate.length>2?b.gate.at(-1):null;
+    if(earliest&&gates.every(r=>gateCost(earliest.time,daily)<gateCost(r.time,daily)))gates.push(earliest);
+    for(const route of gates)p.choices.push({key:b.key,route,alternates:b.normal,opening:true,frontier:exploring==='frontier'});
    }
    if(b.normal.length&&!p.explorer){
     p.choices.push({key:b.key,route:b.normal[0],alternates:b.normal,opening:false});
