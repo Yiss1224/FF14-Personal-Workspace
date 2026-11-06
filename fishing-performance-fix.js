@@ -70,7 +70,7 @@
     ].map(Number));
     const skipped=new Set((readStore('fishSkippedIds',[])||[]).map(Number));
     const ordinaryRemaining=uniqCount(catalog.filter(x=>!caught.has(Number(x.itemId))&&!x.bigFish&&!skipped.has(Number(x.itemId))));
-    summary.innerHTML=`外部圖鑑：${uniqCount(catalog)} 種　｜　已知已釣 ID：${caught.size}　｜　<strong>未記錄普通魚：${ordinaryRemaining}</strong>　｜　先跳過：${skipped.size}<br><span class="muted">為避免一次建立整本圖鑑造成卡頓，請先選到「地圖」，或直接搜尋魚名／釣點後再顯示魚清單。</span>`;
+    summary.innerHTML=`圖鑑：${uniqCount(catalog)} 種　｜　已釣：${caught.size}　｜　<strong>還沒釣的一般魚：${ordinaryRemaining}</strong>　｜　先跳過：${skipped.size}<br><span class="muted">先選一張地圖，或直接搜尋魚名／釣點，下面就會列出魚。</span>`;
   }
 
   function value(id){return String(document.getElementById(id)?.value||'').trim()}

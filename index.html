@@ -5,19 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>FF14 Personal Workspace</title>
-  <script src="version.js?v=88b2b08"></script>
-  <script defer src="app-version.js?v=88b2b08"></script>
-  <link rel="stylesheet" href="styles.css?v=88b2b08">
-  <link rel="stylesheet" href="tonight.css?v=88b2b08">
-  <link rel="stylesheet" href="fishing-guide.css?v=88b2b08">
-  <script src="ff14-config.js?v=88b2b08"></script>
-  <script src="ff14-data.js?v=88b2b08" data-scope="workspace"></script>
+  <script src="version.js?v=f50faf5"></script>
+  <script defer src="app-version.js?v=f50faf5"></script>
+  <link rel="stylesheet" href="styles.css?v=f50faf5">
+  <link rel="stylesheet" href="tonight.css?v=f50faf5">
+  <link rel="stylesheet" href="fishing-guide.css?v=f50faf5">
+  <link rel="stylesheet" href="fishing-layout.css?v=f50faf5">
+  <script src="ff14-config.js?v=f50faf5"></script>
+  <script src="ff14-data.js?v=f50faf5" data-scope="workspace"></script>
   <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
 <style>.tab-link{display:inline-block;padding:10px 14px;text-decoration:none;color:inherit;border-radius:8px;background:#eef2f8;margin:6px}@media(prefers-color-scheme:dark){.tab-link{background:#303845}}</style>
 </head>
 <body>
   <header>
-    <div><h1>FF14 Personal Workspace</h1><p>日課、練等、釣魚進度集中管理 · v2026.09.07.54</p></div>
+    <div><h1>FF14 Personal Workspace</h1><p>日課、練等、釣魚進度集中管理</p></div>
     <div id="sync-box" class="sync-box"><span id="sync-status">本機模式</span><button id="workspace-export" title="下載首頁全部進度（日課、練等、今晚、釣魚）">匯出備份</button><button id="workspace-import" title="用備份檔覆蓋這台裝置的首頁進度">匯入備份</button><button id="sync-token" hidden>同步金鑰</button><input id="workspace-backup-file" type="file" accept="application/json,.json" hidden></div>
   </header>
 
@@ -119,29 +120,54 @@
     </section>
 
     <section id="fishing" class="tab">
-      <article>
-        <h2>輝煌釣竿進度</h2>
-        <div class="row">
-          <label>目前圖鑑魚種 <input id="fish-count" type="number" min="0" value="300"></label>
-          <label>目標 <input id="fish-target" type="number" min="1" value="1140"></label>
+      <div id="fish-onboarding" class="fish-onboard" hidden>
+        <div class="fish-onboard-head">
+          <div><h2>第一次使用？三步就能開始</h2><p class="hint">資料只存在這個瀏覽器，不用註冊。記得偶爾按右上角「匯出備份」。</p></div>
+          <button type="button" id="fish-onboard-close" class="fish-ghost">知道了，收起來</button>
+        </div>
+        <ol class="fish-onboard-steps">
+          <li><strong>匯入已經釣到的魚</strong><span>到 <a href="https://fish.ffmomola.com/" target="_blank" rel="noreferrer">魚糕</a> 匯出已釣紀錄（JSON 檔），再從這裡匯入。沒用魚糕也可以，之後在魚清單上自己勾。</span><button type="button" class="fish-primary" data-fish-onboard="import">匯入魚糕 JSON</button></li>
+          <li><strong>看「今天釣什麼」</strong><span>選這次能玩多久，它會挑出現在最值得去的地圖和釣點，正在開窗的魚優先。</span><button type="button" data-fish-onboard="today">跳到今天釣什麼</button></li>
+          <li><strong>選地圖，照著釣</strong><span>在「掃圖導航」選好地圖，下面會列出那裡還沒釣到的魚、推薦魚餌、時間和天氣。</span><button type="button" data-fish-onboard="map">跳到掃圖導航</button></li>
+        </ol>
+      </div>
+
+      <article class="fish-progress-card">
+        <div class="fish-card-head">
+          <h2>輝煌釣竿進度</h2>
+          <button type="button" id="fish-onboard-open" class="fish-ghost fish-small">怎麼用？</button>
         </div>
         <div class="row">
+          <label>目前圖鑑魚種 <input id="fish-count" type="number" min="0" value="" placeholder="例：300"></label>
+          <label>目標 <input id="fish-target" type="number" min="1" value="1140"></label>
+        </div>
+        <div class="row fish-progress-actions">
+          <button id="import-fishcake" class="fish-primary">匯入魚糕 JSON</button>
           <button id="save-fish">記錄今天</button>
-          <button id="import-fishcake">匯入魚糕 JSON</button>
-          <button id="export-fishcake">匯出魚糕 JSON</button>
+          <button id="export-fishcake">匯出成魚糕格式</button>
           <input id="fishcake-file" type="file" accept="application/json,.json" hidden>
         </div>
         <div id="fish-result" class="result"></div>
-        <div id="fish-import-status" class="hint">支援魚糕常見格式 <code>{"completed":[itemId,…]}</code>。匯入採聯集；匯出會包含魚糕匯入與本工具手動標記的全部已知魚種。</div>
+        <div id="fish-import-status" class="hint">支援魚糕匯出的 JSON（<code>{"completed":[…]}</code>）。重複匯入只會補上新釣到的魚，不會刪掉已經勾的。「記錄今天」會存下今天的數量，累積幾天後就能估算還要多久。</div>
 
-        <h3>歷史</h3>
-        <div id="fish-history"></div>
+        <details class="fish-history-box">
+          <summary>每日紀錄</summary>
+          <div id="fish-history"></div>
+        </details>
+      </article>
 
+      <div id="fish-today-slot" class="fish-today-slot"></div>
+      <details id="fish-more-tools" class="fish-more-tools">
+        <summary>沒有限時魚的時候：去哪張圖清最多一般魚</summary>
+        <div id="fish-more-tools-body"></div>
+      </details>
+
+      <article class="fish-explore-card">
         <div class="section-head">
-          <div><h3>掃圖導航</h3><p class="hint">XIVAPI 提供遊戲靜態魚類／釣點資料；你的「釣過沒」仍以魚糕匯入與手動標記為準。</p></div>
+          <div><h3 id="fish-explore-title">掃圖導航</h3><p class="hint">依地區 → 地圖 → 釣點，列出你還沒釣到的魚。「釣過沒」以匯入的魚糕紀錄和你手動勾選為準。</p></div>
           <button id="refresh-fish-data">更新外部魚資料</button>
         </div>
-        <div id="fish-catalog-status" class="muted">尚未讀取外部資料</div>
+        <div id="fish-catalog-status" class="muted">正在讀取魚資料…</div>
         <div class="filter-bar">
           <label class="inline-check"><input id="fish-only-missing" type="checkbox" checked> 只看未記錄</label>
           <label class="inline-check"><input id="fish-hide-big" type="checkbox" checked> 隱藏魚王</label>
@@ -152,7 +178,7 @@
         <div id="fish-map-summary" class="result"></div>
 
         <div class="section-head">
-          <div><h3>魚餌／釣法／秒數</h3><p class="hint">先選地圖或釣點，再自動顯示該範圍的推薦餌／泳餌路線、! / !! / !!!、提鉤、ET 時間與天氣。</p></div>
+          <div><h3>魚餌／釣法／秒數</h3><p class="hint">選好地圖或釣點後，這裡會列出推薦魚餌、以小釣大路線、! / !! / !!!、提鉤方式、ET 時間與天氣。</p></div>
           <button id="refresh-fish-methods">更新釣法資料</button>
         </div>
         <div id="fish-method-status" class="muted fish-method-status-note">尚未讀取釣法資料</div>
@@ -168,31 +194,32 @@
     </section>
   </main>
 
-  <script src="fishing-shared.js?v=88b2b08"></script>
-  <script src="fishing-performance-fix.js?v=88b2b08"></script>
-  <script src="app.js?v=88b2b08"></script>
-  <script src="fishing-spearfishing-fix.js?v=88b2b08"></script>
-  <script src="fishing-guide.js?v=88b2b08"></script>
-  <script src="leveling.js?v=88b2b08"></script>
-  <script src="tonight.js?v=88b2b08"></script>
-  <script src="workspace-data.js?v=88b2b08"></script>
-  <script src="tc-terms.js?v=88b2b08"></script>
-  <script src="fishing-npc-tc.js?v=88b2b08"></script>
-  <script src="fishing-ui-v2.js?v=88b2b08"></script>
-  <script src="fishing-caught-toggle.js?v=88b2b08"></script>
-  <script src="fishing-guide-scope.js?v=88b2b08"></script>
-  <script src="fishing-map-groups.js?v=88b2b08"></script>
-  <script src="fishing-map.js?v=88b2b08"></script>
-  <script src="fishing-guide-renderer.js?v=88b2b08"></script>
-  <script src="fishing-bite-auto.js?v=88b2b08"></script>
-  <script src="fishing-window.js?v=88b2b08"></script>
-  <script src="fishing-spot-window.js?v=88b2b08"></script>
-  <script src="fishing-today.js?v=88b2b08"></script>
-  <script src="fishing-whitefish-hotspot.js?v=88b2b08"></script>
-  <script src="fishing-map-recommend.js?v=88b2b08"></script>
-  <script src="fishing-session-route.js?v=88b2b08"></script>
-  <script src="fishing-session-route-map.js?v=88b2b08"></script>
-  <script src="fishing-sticky-planner.js?v=88b2b08"></script>
-  <script src="fishing-progress-fix.js?v=88b2b08"></script>
+  <script src="fishing-shared.js?v=f50faf5"></script>
+  <script src="fishing-performance-fix.js?v=f50faf5"></script>
+  <script src="app.js?v=f50faf5"></script>
+  <script src="fishing-spearfishing-fix.js?v=f50faf5"></script>
+  <script src="fishing-guide.js?v=f50faf5"></script>
+  <script src="leveling.js?v=f50faf5"></script>
+  <script src="tonight.js?v=f50faf5"></script>
+  <script src="workspace-data.js?v=f50faf5"></script>
+  <script src="tc-terms.js?v=f50faf5"></script>
+  <script src="fishing-npc-tc.js?v=f50faf5"></script>
+  <script src="fishing-ui-v2.js?v=f50faf5"></script>
+  <script src="fishing-caught-toggle.js?v=f50faf5"></script>
+  <script src="fishing-guide-scope.js?v=f50faf5"></script>
+  <script src="fishing-map-groups.js?v=f50faf5"></script>
+  <script src="fishing-map.js?v=f50faf5"></script>
+  <script src="fishing-guide-renderer.js?v=f50faf5"></script>
+  <script src="fishing-bite-auto.js?v=f50faf5"></script>
+  <script src="fishing-window.js?v=f50faf5"></script>
+  <script src="fishing-spot-window.js?v=f50faf5"></script>
+  <script src="fishing-today.js?v=f50faf5"></script>
+  <script src="fishing-whitefish-hotspot.js?v=f50faf5"></script>
+  <script src="fishing-map-recommend.js?v=f50faf5"></script>
+  <script src="fishing-session-route.js?v=f50faf5"></script>
+  <script src="fishing-session-route-map.js?v=f50faf5"></script>
+  <script src="fishing-sticky-planner.js?v=f50faf5"></script>
+  <script src="fishing-progress-fix.js?v=f50faf5"></script>
+  <script src="fishing-layout.js?v=f50faf5"></script>
 </body>
 </html>

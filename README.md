@@ -88,7 +88,7 @@
 
 - `SCOPES` 登記每一頁的資料鍵：`workspace`（首頁）與 `submarine`（潛水艇頁）。新增需要保存或同步的資料時，把鍵加到這裡。
 - `read / write / readRaw / writeRaw`：讀寫本機資料；舊模組直接呼叫 `localStorage.setItem` 也會被攔截並通知同步層。
-- `snapshot / restore / exportBackup / parseBackup`：整頁快照、還原與備份格式 `{app, schema, scope, exportedAt, data}`；也接受舊 Supabase 同步的「資料鍵在最上層」格式。
+- `snapshot / restore / exportBackup / parseBackup`：整頁快照、還原與備份格式 `{app, schema, scope, exportedAt, data}`；也接受舊版「資料鍵在最上層」的平面格式。
 - `sync`：遠端同步插槽。`ff14-config.js` 的 `apiBase` 留空為純本機模式；填入網址後，頁面載入時先從伺服器讀取，伺服器沒有資料就上傳本機資料，之後每次修改 0.8 秒後自動上傳。
 - 快取類資料（魚類目錄、台服名詞、地圖快取等）不登記，不會進備份或同步。
 

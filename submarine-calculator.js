@@ -39,7 +39,9 @@ const builds={
 };
 const buildPieces=key=>isBuild(key)?[...key].map((c,i)=>c+':'+i):[];
 const partNames=['船體','船尾','船首','艦橋'],classNames={1:'鯊級',2:'雲鯨級',3:'鯨級',4:'腔棘魚級',5:'希爾德里昂級'};
-function validBuild(key,rank){const b=buildInfos.get(key),rec=rankRec(rank);return Boolean(b&&rec&&rank>=b.min&&rec.cap>=b.cost)}
+// 速度 ≤ 0 的組合（如 Rank 45–79 的 2335、1355）在公式裡會算出負數或無限大的航行時間，
+// 被誤排成「超快」航線；遊戲實際怎麼處理沒有實測資料，總之不能用，直接排除。
+function validBuild(key,rank){const b=buildInfos.get(key),rec=rankRec(rank);return Boolean(b&&rec&&rank>=b.min&&rec.cap>=b.cost&&b.speed+(rec.v||0)>0)}
 function legacyPartStock(parts){
  const result={};for(let cls=1;cls<=5;cls++)for(let slot=0;slot<4;slot++)result[cls+':'+slot]=0;
  for(let slot=0;slot<4;slot++)result['1:'+slot]=Math.max(0,Number(parts?.['1111'])||0);

@@ -19,13 +19,13 @@
   function ensureBox(){
     let section=document.getElementById('fish-whitefish-hotspot');
     if(section)return section.querySelector('#fish-whitefish-hotspot-result');
-    const anchor=document.querySelector('.fish-today-card')||document.getElementById('fish-map-summary');
-    if(!anchor)return null;
+    const slot=document.getElementById('fish-more-tools-body'),anchor=document.querySelector('.fish-today-card')||document.getElementById('fish-map-summary');
+    if(!slot&&!anchor)return null;
     section=document.createElement('div');
     section.id='fish-whitefish-hotspot';
     section.className='fish-whitefish-hotspot';
-    section.innerHTML=`<div class="fish-whitefish-head"><div><strong>🐟 剩餘白魚最多的地圖</strong><div class="muted">只算未釣、非魚王、非刺魚、非窗口、非先跳過；同一魚在同一張地圖只算一次。</div></div><button id="fish-whitefish-refresh" type="button">重算</button></div><div id="fish-whitefish-hotspot-result" class="fish-whitefish-result"><span class="muted">正在統計…</span></div>`;
-    anchor.insertAdjacentElement('afterend',section);
+    section.innerHTML=`<div class="fish-whitefish-head"><div><strong>🐟 一般魚剩最多的地圖</strong><div class="muted">只算隨時都釣得到的一般魚（不含魚王、刺魚、限時魚和先跳過的），適合想慢慢清圖、不想等時間的時候。</div></div><button id="fish-whitefish-refresh" type="button">重算</button></div><div id="fish-whitefish-hotspot-result" class="fish-whitefish-result"><span class="muted">正在統計…</span></div>`;
+    if(slot)slot.appendChild(section);else anchor.insertAdjacentElement('afterend',section);
     section.querySelector('#fish-whitefish-refresh')?.addEventListener('click',render);
     return section.querySelector('#fish-whitefish-hotspot-result');
   }
@@ -52,6 +52,7 @@
     const box=ensureBox();if(!box)return;
     const my=++renderToken;
     const catalog=read('fishCatalog',[])||[],done=caught(),skip=skipped();
+    if(!catalog.length){box.innerHTML='<span class="muted">魚資料還在讀取中，讀好後會自動統計。</span>';return;}
     if(typeof window.ff14FishingWindowInfo!=='function'){
       box.innerHTML='<span class="muted">魚窗資料尚未準備好，稍後再重算一次。</span>';return;
     }
@@ -75,7 +76,7 @@
     }
     if(my!==renderToken)return;
     const rows=[...maps.values()].filter(x=>x.fish.size).sort((a,b)=>b.fish.size-a.fish.size||a.zone.localeCompare(b.zone)).slice(0,LIMIT);
-    if(!rows.length){box.innerHTML='<span class="muted">沒有找到符合條件的剩餘白魚。QAQ</span>';return;}
+    if(!rows.length){box.innerHTML='<span class="muted">目前範圍內沒有剩下的一般魚，可以去追限時魚了。</span>';return;}
     box.innerHTML=rows.map((row,i)=>{
       const names=[...row.fish.values()].slice(0,8).map(f=>esc(itemText(f.name||`Item ${f.itemId}`))).join('、');
       const more=row.fish.size>8?`、…另 ${row.fish.size-8} 種`:'';

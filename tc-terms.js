@@ -22,7 +22,9 @@ function ff14TcItemText(v){const s=String(v||'').trim();return ff14TcCache.itemE
 window.ff14TcPlaceText=ff14TcPlaceText;
 window.ff14TcWeatherText=ff14TcWeatherText;
 window.ff14TcItemText=ff14TcItemText;
-function ff14TcReplaceTextNodeWithMaps(node,maps){const raw=node.nodeValue;if(!raw||!/[A-Za-z]/.test(raw))return;let next=raw;for(const map of maps)for(const[en,tc]of Object.entries(map)){if(!en||!tc)continue;const escaped=en.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');next=next.replace(new RegExp(`(^|[^A-Za-z])(${escaped})(?=$|[^A-Za-z])`,'g'),(_,prefix)=>prefix+tc)}if(next!==raw)node.nodeValue=next}
+const ff14TcReplaceCompiled=[];function ff14TcCompileReplaceMaps(maps){const ts=ff14TcCache&&ff14TcCache.ts;for(const c of ff14TcReplaceCompiled)if(c.ts===ts&&c.maps.length===maps.length&&c.maps.every((m,i)=>m===maps[i]))return c;const dict=Object.create(null);for(const map of maps)for(const[en,tc]of Object.entries(map||{})){if(en&&tc&&!(en in dict))dict[en]=tc}const keys=Object.keys(dict).sort((a,b)=>b.length-a.length);const re=keys.length?new RegExp(`(^|[^A-Za-z])(${keys.map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')})(?=$|[^A-Za-z])`,'g'):null;const c={ts,maps:maps.slice(),re,dict};ff14TcReplaceCompiled.unshift(c);ff14TcReplaceCompiled.length=Math.min(ff14TcReplaceCompiled.length,4);return c}
+// Longest English name wins, in one pass: otherwise "Bronze Lake" was replaced before "Northeast Bronze Lake", leaving "Northeast 石綠湖".
+function ff14TcReplaceTextNodeWithMaps(node,maps){const raw=node.nodeValue;if(!raw||!/[A-Za-z]/.test(raw))return;const{re,dict}=ff14TcCompileReplaceMaps(maps);if(!re)return;re.lastIndex=0;const next=raw.replace(re,(_,prefix,en)=>prefix+dict[en]);if(next!==raw)node.nodeValue=next}
 function ff14TcReplaceTextNode(node){ff14TcReplaceTextNodeWithMaps(node,[ff14TcCache.itemEnglish,ff14TcCache.places,ff14TcCache.weather])}
 function ff14TcReplaceItemTextNode(node){ff14TcReplaceTextNodeWithMaps(node,[ff14TcCache.itemEnglish])}
 function ff14TcWalkWith(root,fn){const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),nodes=[];while(w.nextNode())nodes.push(w.currentNode);nodes.forEach(fn)}
