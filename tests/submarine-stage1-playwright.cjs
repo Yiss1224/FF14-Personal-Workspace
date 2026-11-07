@@ -82,8 +82,15 @@ async function depart(page,selector){
   await page.click(selector);
   await page.waitForSelector('#sub-dialog[open]');
   page.dialogs.push(await page.evaluate(()=>[...document.querySelectorAll('#sub-dialog-message p')].map(p=>p.textContent).join('\n')));
+  await clickDialogOk(page);
+}
+// 對話框的結果在 dialog 的 close 事件才交回頁面（之後才存檔），而 close 事件比 [open] 消失晚一個 task；
+// 只等 [open] 消失就讀 localStorage，在較慢的機器上會讀到存檔前的資料。這裡等 close 事件處理完再往下。
+async function clickDialogOk(page){
+  await page.evaluate(()=>{const d=document.getElementById('sub-dialog');
+    window.__subDialogClosed=new Promise(r=>d.addEventListener('close',()=>setTimeout(r,0),{once:true}))});
   await page.click('#sub-dialog [data-dialog-ok]');
-  await page.waitForFunction(()=>!document.querySelector('#sub-dialog[open]'));
+  await page.evaluate(()=>window.__subDialogClosed);
 }
 async function tooltip(page,index){
   await page.hover('[data-harbor-ship="'+index+'"]',{force:true});
@@ -453,7 +460,7 @@ async function main(){
     await page.click('[data-depart-ship="0"]');
     await page.waitForSelector('#sub-dialog[open]');
     assert.match(await page.textContent('#sub-dialog'),/請先在遊戲中完成換裝/);
-    await page.click('#sub-dialog [data-dialog-ok]');
+    await clickDialogOk(page);
     assert.strictEqual((await stored(page)).ships[0].voyaging,undefined);
     await page.click('[data-apply-build="0"][data-new-build="3124"]');
     assert.match(await page.textContent('#calc-result'),/本輪建議消耗約 [1-9]\d* 罐燃料/);
