@@ -625,6 +625,22 @@ async function main(){
     await ctx.close();
   });
 
+  await test('22. 手動指定的出發時間只在當天有效：隔天打開改回自動（窗口外為窗口開始）',async()=>{
+    const seed=baseSeed();
+    seed.plannerSettings={departureTime:'21:41',manualDeparture:true,manualDepartureDay:'2000-01-01'};
+    const ctx=await context(seed),page=await open(ctx);
+    const now=await page.evaluate(()=>{const d=new Date();return d.getHours()*60+d.getMinutes()});
+    const value=await page.inputValue('#calc-departure-time');
+    if(now<19*60||now>22*60)assert.strictEqual(value,'19:00');else assert.notStrictEqual(value,'21:41');
+    await setField(page,'#calc-departure-time','20:30');
+    const saved=(await stored(page)).plannerSettings;
+    assert.strictEqual(saved.manualDeparture,true);
+    assert.match(saved.manualDepartureDay,/^\d{4}-\d{2}-\d{2}$/);
+    assert.notStrictEqual(saved.manualDepartureDay,'2000-01-01');
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
   await browser.close();server.close();
   console.log(results.join('\n'));
   console.log(passed+' passed, '+(results.filter(r=>r.startsWith('FAIL')).length)+' failed');

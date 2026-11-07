@@ -1253,14 +1253,16 @@ function plannerControls(settings){
  $('pickup-start').value=validClock(s.pickupStart,'19:00');
  $('pickup-end').value=validClock(s.pickupEnd,'22:00');
  $('calc-departure-time').value=validClock(s.departureTime,'19:00');
- return s.manualDeparture===true;
+ // 手動指定的出發時間只在指定當天有效；隔天打開頁面改回自動取現在時刻（舊資料沒有日期時照舊沿用）。
+ return s.manualDeparture===true&&(!s.manualDepartureDay||s.manualDepartureDay===localDay());
 }
+function localDay(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function savePlannerSettings(manualDeparture){
  const snapshot={
   maxHours:Number($('calc-hours').value),targetRank:Number($('calc-target-rank').value),explorers:Number($('calc-explorers').value)||0,exploreMode:$('calc-explore-mode').value,
   dailyPickup:!!$('daily-pickup').checked,pickupStart:$('pickup-start').value,
   pickupEnd:$('pickup-end').value,departureTime:$('calc-departure-time').value,
-  manualDeparture:!!manualDeparture,expandedLongRoutes:true
+  manualDeparture:!!manualDeparture,manualDepartureDay:manualDeparture?(state().plannerSettings?.manualDepartureDay||localDay()):null,expandedLongRoutes:true
  };
  persist(s=>{s.plannerSettings={...(s.plannerSettings||{}),...snapshot}});
 }
@@ -1291,7 +1293,7 @@ async function init(){
   ['calc-hours','calc-target-rank','calc-explorers','calc-explore-mode','daily-pickup','pickup-start','pickup-end'].forEach(id=>{
    const ctrl=$(id);if(ctrl)ctrl.onchange=updatePlanner;
   });
-  $('calc-departure-time').onchange=()=>{manuallySelectedDeparture=true;updatePlanner()};
+  $('calc-departure-time').onchange=()=>{manuallySelectedDeparture=true;persist(st=>{st.plannerSettings={...(st.plannerSettings||{}),manualDepartureDay:localDay()}});updatePlanner()};
   // 匯出前把目前表單值一併寫回 JSON；匯入完整備份後再套用時間與偏好。
   window.addEventListener('submarine-export-requested',()=>savePlannerSettings(manuallySelectedDeparture));
   window.addEventListener('submarine-data-imported',()=>{
