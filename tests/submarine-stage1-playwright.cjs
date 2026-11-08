@@ -625,18 +625,38 @@ async function main(){
     await ctx.close();
   });
 
-  await test('22. 手動指定的出發時間只在當天有效：隔天打開改回自動（窗口外為窗口開始）',async()=>{
+  await test('22. 手動指定的出發時間只在當天有效：隔天打開改回自動（取現在時刻，窗口外也一樣）',async()=>{
     const seed=baseSeed();
     seed.plannerSettings={departureTime:'21:41',manualDeparture:true,manualDepartureDay:'2000-01-01'};
     const ctx=await context(seed),page=await open(ctx);
     const now=await page.evaluate(()=>{const d=new Date();return d.getHours()*60+d.getMinutes()});
     const value=await page.inputValue('#calc-departure-time');
-    if(now<19*60||now>22*60)assert.strictEqual(value,'19:00');else assert.notStrictEqual(value,'21:41');
+    const [h,m]=value.split(':').map(Number);assert.ok(Math.abs(h*60+m-now)<=1,'auto departure should be now, got '+value);
     await setField(page,'#calc-departure-time','20:30');
     const saved=(await stored(page)).plannerSettings;
     assert.strictEqual(saved.manualDeparture,true);
     assert.match(saved.manualDepartureDay,/^\d{4}-\d{2}-\d{2}$/);
     assert.notStrictEqual(saved.manualDepartureDay,'2000-01-01');
+    assert.deepStrictEqual(page.errors,[]);
+    await ctx.close();
+  });
+
+  await test('23. 窗口外派船（早上 06:00 收船再派）照實際時間算，不擋、不當成窗口開始',async()=>{
+    const seed=baseSeed();
+    seed.ships=[{registered:true,rank:20,exp:0,name:'',currentBuild:'1121'},{registered:true,rank:1,exp:0,name:''},{registered:false,rank:1},{registered:false,rank:1}];
+    seed.unlocks=Object.fromEntries([1,2,3,4,5,6,7,9,10,11].map(id=>['sector-'+id,true]));seed.plannerSettings={targetRank:85};
+    const ctx=await context(seed),page=await open(ctx);
+    await setField(page,'#calc-departure-time','06:00');
+    await page.waitForFunction(()=>document.querySelector('#calc-result .route-card'),null,{timeout:10000});
+    const result=await page.textContent('#calc-result');
+    assert.doesNotMatch(result,/應在收船窗口內/);
+    // 06:00 出發：pickupTiming 以 06:00 起算；回來的時間若在 19:00 前，要等到當天 19:00。
+    const check=await page.evaluate(()=>{
+      const labels=[...document.querySelectorAll('#calc-result .route-card')].map(c=>(c.textContent.match(/最早可收／再派：(\S+ \d\d:\d\d)/)||[])[1]).filter(Boolean);
+      return labels;
+    });
+    assert.ok(check.length>0,'pickup labels expected');
+    for(const label of check)assert.match(label,/(19|2[0-2]):\d\d$/);
     assert.deepStrictEqual(page.errors,[]);
     await ctx.close();
   });

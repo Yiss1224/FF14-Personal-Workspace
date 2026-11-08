@@ -108,9 +108,9 @@ function windowSettings(){
  const start=clockMinutes('pickup-start',19*60),end=clockMinutes('pickup-end',22*60);
  const valid=end>start;
  const from=valid?start:19*60,to=valid?end:22*60;
+ // 本次派船可以在窗口外（例如早上起床收船再派）；之後的收船才套用窗口。
  const departure=clockMinutes('calc-departure-time',from);
- return {start:from,end:to,departure:Math.min(to,Math.max(from,departure)),valid,
-   departureInside:departure>=from&&departure<=to};
+ return {start:from,end:to,departure,valid};
 }
 function pickupTiming(voyageSeconds,departSeconds){
  const {start,end,departure}=windowSettings();
@@ -830,7 +830,6 @@ function calculateNow(){
  renderPinPlanner();
  const w=windowSettings();
  if(daily&&!w.valid){$('calc-result').innerHTML='<p class="calc-warning">收船窗口結束時間必須晚於開始時間，且在同一天內。</p>';return}
- if(daily&&!w.departureInside){$('calc-result').innerHTML='<p class="calc-warning">預計本次派船時間應在收船窗口內；請調整時間後再計算。</p>';return}
  const registered=ships.map((ship,i)=>({...ship,index:i})).filter(x=>x.registered);
  const progress=nextMapProgress(open);
  // 關鍵開圖點：第一次探索會開新船位的點（溺沒海 J／O／T → 第 2／3／4 艘，船位還沒開時），
@@ -1281,10 +1280,9 @@ async function init(){
   if(state().plannerSettings?.expandedLongRoutes!==true)savePlannerSettings(manuallySelectedDeparture);
   function refreshDepartureClock(){
    if(manuallySelectedDeparture)return;
-   const now=new Date(),minute=now.getHours()*60+now.getMinutes(),w=windowSettings();
-   $('calc-departure-time').value=minute>=w.start&&minute<=w.end
-    ?String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')
-    :fmtClock(w.start*60);
+   // 「確認出航」記錄的是按下當下的時間，所以自動模式一律取現在時刻（窗口外也一樣）。
+   const now=new Date();
+   $('calc-departure-time').value=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   }
   function updatePlanner(){savePlannerSettings(manuallySelectedDeparture);calculate()}
   $('calc-routes').onclick=()=>{refreshDepartureClock();updatePlanner()};
