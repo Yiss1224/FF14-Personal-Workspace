@@ -1,0 +1,77 @@
+/* Bridge FX v1: styles for submarine-fx.js. Presentation only.
+   Every rule that changes existing elements is scoped under .fx-ready (set by the script),
+   so the page looks exactly as before if the script does not run. */
+
+/* 1. Hero canvas and the title anchor */
+.fx-hero{position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+.fx-anchor{display:inline-block;margin-right:.28em;cursor:pointer;transform-origin:50% 12%;user-select:none;-webkit-user-select:none;
+  transition:transform .35s cubic-bezier(.3,1.6,.5,1),filter .25s}
+.fx-anchor:hover{transform:rotate(-14deg) scale(1.08);filter:drop-shadow(0 0 10px rgba(120,236,232,.65))}
+.fx-ready header h1{white-space:nowrap}
+@media(max-width:420px){.fx-ready header h1{white-space:normal}}
+
+/* 2. Navigation highlight that slides between sections, and the page progress line */
+.bridge-nav.fx-nav{position:relative}
+.fx-nav-pill{position:absolute;left:0;top:0;z-index:0;border-radius:9px;pointer-events:none;opacity:0;
+  background:var(--ui-teal-soft);border:1px solid var(--ui-border);box-shadow:0 2px 8px rgba(0,127,134,.1)}
+.fx-nav-pill.is-live{transition:transform .34s cubic-bezier(.3,1.2,.4,1),width .34s cubic-bezier(.3,1.2,.4,1),opacity .2s}
+.bridge-nav.fx-nav a{position:relative;z-index:1}
+.bridge-nav.fx-nav a.is-active{background:transparent;border-color:transparent}
+.fx-scroll-progress{position:absolute;left:0;right:0;bottom:-1px;height:2px;transform-origin:0 50%;transform:scaleX(0);pointer-events:none;
+  background:linear-gradient(90deg,var(--ui-teal),#5dd6d0 70%,var(--ui-gold))}
+
+/* 3. Sections rise into view */
+.fx-reveal{opacity:0;transform:translateY(22px)}
+.fx-reveal-in{animation:fx-rise .55s cubic-bezier(.2,.75,.25,1) both}
+@keyframes fx-rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+
+/* 4. Pointer light on cards; the metric tiles also lean toward the pointer */
+@media(hover:hover) and (pointer:fine){
+  .fx-ready .ops-metric::after,.fx-ready .panel::after,.fx-ready .route-card::after,.fx-ready .ship::after,.fx-ready .fleet-card::after{
+    content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .3s;z-index:0;
+    background:radial-gradient(240px circle at var(--fx-x,50%) var(--fx-y,50%),rgba(0,160,168,.09),transparent 70%)}
+  .fx-ready .panel::after{background:radial-gradient(520px circle at var(--fx-x,50%) var(--fx-y,50%),rgba(0,160,168,.05),transparent 70%)}
+  .fx-ready .fx-lit::after{opacity:1}
+  .fx-ready .route-card,.fx-ready .fleet-card{position:relative}
+  .fx-ready .ops-overview{perspective:900px}
+  .fx-ready .ops-metric{transition:transform .25s ease-out,box-shadow .25s;transform:rotateX(var(--fx-rx,0deg)) rotateY(var(--fx-ry,0deg));will-change:transform}
+  .fx-ready .ops-metric.fx-lit{transition:transform .08s linear,box-shadow .25s;box-shadow:0 14px 34px rgba(15,35,54,.13)}
+  .fx-ready .route-card,.fx-ready .ship,.fx-ready .fleet-card{transition:transform .2s ease-out,box-shadow .2s,border-color .2s}
+  .fx-ready .route-card:hover,.fx-ready .fleet-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(15,35,54,.1)}
+}
+@media(prefers-color-scheme:dark){
+  .fx-ready .ops-metric::after,.fx-ready .route-card::after,.fx-ready .ship::after,.fx-ready .fleet-card::after{
+    background:radial-gradient(240px circle at var(--fx-x,50%) var(--fx-y,50%),rgba(93,214,208,.13),transparent 70%)}
+  .fx-ready .panel::after{background:radial-gradient(520px circle at var(--fx-x,50%) var(--fx-y,50%),rgba(93,214,208,.06),transparent 70%)}
+}
+
+/* 5. Press ripple (overlay above the pressed control) and button lift */
+.fx-ripple{position:fixed;z-index:95;overflow:hidden;pointer-events:none}
+.fx-ripple>span{position:absolute;border-radius:50%;background:rgba(0,127,134,.28);transform:translate(-50%,-50%) scale(0)}
+.fx-ripple>span.is-light{background:rgba(255,255,255,.45)}
+.fx-ready .primary-action,.fx-ready #calc-routes,.fx-ready .voyage-depart-button{transition:background .16s,transform .16s,border-color .16s,box-shadow .2s}
+@media(hover:hover){
+  .fx-ready .primary-action:hover:not(:disabled),.fx-ready #calc-routes:hover:not(:disabled),.fx-ready .voyage-depart-button:hover:not(:disabled){
+    transform:translateY(-1px);box-shadow:0 8px 20px rgba(0,114,122,.28)}
+}
+.fx-ready .primary-action:active:not(:disabled),.fx-ready #calc-routes:active:not(:disabled),.fx-ready .voyage-depart-button:active:not(:disabled){transform:translateY(1px) scale(.985)}
+.fx-ready .ops-metric-value{display:block;transform-origin:0 60%}
+
+/* 7. Rank-up celebration */
+.fx-burst{position:fixed;inset:0;width:100%;height:100%;z-index:96;pointer-events:none}
+.fx-rankup{position:fixed;left:50%;top:42%;z-index:97;pointer-events:none;text-align:center;white-space:nowrap;
+  padding:14px 34px 16px;border-radius:14px;color:#fff;
+  background:linear-gradient(135deg,rgba(12,32,56,.94),rgba(11,82,96,.94));border:1px solid rgba(246,213,138,.75);
+  box-shadow:0 18px 50px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.08);opacity:0}
+.fx-rankup strong{display:block;font-size:clamp(24px,5vw,38px);font-weight:820;letter-spacing:.14em;color:#f6d58a;text-shadow:0 0 18px rgba(246,213,138,.5)}
+.fx-rankup span{display:block;font-size:clamp(14px,2.4vw,18px);font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+
+@media(prefers-reduced-motion:reduce){
+  .fx-hero,.fx-ripple,.fx-burst,.fx-rankup{display:none}
+  .fx-anchor,.fx-nav-pill.is-live{transition:none}
+  .fx-anchor:hover{transform:none}
+  .fx-reveal{opacity:1;transform:none}
+  .fx-reveal-in{animation:none}
+  .fx-ready .ops-metric,.fx-ready .route-card,.fx-ready .ship,.fx-ready .fleet-card,
+  .fx-ready .primary-action,.fx-ready #calc-routes,.fx-ready .voyage-depart-button{transition:none;transform:none!important}
+}
