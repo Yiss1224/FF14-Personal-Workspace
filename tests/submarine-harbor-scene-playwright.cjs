@@ -91,7 +91,10 @@ async function main(){
       const boxes=[];for(let i=0;i<4;i++)boxes.push(await boatBox(page,i));
       const atSea=[boxes[1],boxes[2]];
       for(const b of atSea)assert.ok(b.width<40,'海上潛水艇應縮小：'+b.width);
-      assert.ok(Math.abs(atSea[0].cx-atSea[1].cx)>atSea[0].width,'海上兩艘潛水艇重疊：'+atSea.map(b=>b.cx));
+      // Position now follows voyage progress; boats are told apart by their own lane (distance) or by spacing.
+      assert.ok(Math.abs(atSea[0].cx-atSea[1].cx)>atSea[0].width||Math.abs(atSea[0].bottom-atSea[1].bottom)>=6,'海上兩艘潛水艇疊在同一點：'+atSea.map(b=>b.cx+','+b.bottom));
+      // Ship 2 is 9% into its voyage (outbound), ship 3 is 91% (inbound): both are near the dock side of the sea.
+      const w=viewport.width;for(const b of atSea)assert.ok(b.cx>0&&b.cx<w,'海上潛水艇超出畫面：'+b.cx);
       for(const i of [0,3]){
         const berth=await page.evaluate(i=>{const walls=[...document.querySelectorAll('.harbor-slip-wall')].map(w=>{const r=w.getBoundingClientRect();return r.left+r.width/2});return (walls[i]+walls[i+1])/2},i);
         assert.ok(Math.abs(boxes[i].cx-berth)<3,'第 '+(i+1)+' 艘未停在泊位');

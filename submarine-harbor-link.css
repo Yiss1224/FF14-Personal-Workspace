@@ -1,0 +1,48 @@
+/* Harbor link v1: captions over the boats, the departure trail, and the "waiting for settlement" marker.
+   Display only; styled like the harbor tooltip (navy panel, thin gold frame). */
+.harbor-captions{position:fixed;inset:0;z-index:85;pointer-events:none}
+.harbor-caption{position:fixed;left:0;top:0;transform:translate(-50%,-100%);max-width:min(280px,calc(100vw - 16px));
+  padding:6px 10px 7px;border-radius:5px;border:1px solid #c9a65a;color:#eef3f6;
+  background:linear-gradient(180deg,#1f2f4d 0%,#121c31 100%);
+  box-shadow:inset 0 0 0 1px #3d5a80,0 6px 16px rgba(0,0,0,.4);
+  font:600 12px/1.45 system-ui,sans-serif;white-space:nowrap;text-align:center;
+  animation:harbor-caption-in .28s cubic-bezier(.2,.9,.3,1.25) both}
+.harbor-caption:after{content:"";position:absolute;left:calc(var(--tail,50%) - 5px);bottom:-5px;width:8px;height:8px;
+  background:#121c31;border-right:1px solid #c9a65a;border-bottom:1px solid #c9a65a;transform:rotate(45deg)}
+.harbor-caption strong{display:block;color:#f1d48a;font-weight:750;overflow:hidden;text-overflow:ellipsis}
+.harbor-caption span{display:block;color:#cfe0ee;font-weight:550;font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.harbor-caption.is-depart strong:before{content:"⚓ "}
+.harbor-caption.is-arrive{border-color:#ffc24a}
+.harbor-caption.is-arrive strong{color:#ffd27a}
+.harbor-caption.is-rankup{border-color:#8fe3b0}
+.harbor-caption.is-rankup strong{color:#b6f2cc}
+.harbor-caption.is-rankup span{color:#fff3c4;font-weight:750;font-size:12px}
+.harbor-caption.is-leaving{animation:harbor-caption-out .24s ease-in both}
+@keyframes harbor-caption-in{from{opacity:0;transform:translate(-50%,-100%) translateY(6px) scale(.94)}to{opacity:1;transform:translate(-50%,-100%)}}
+@keyframes harbor-caption-out{to{opacity:0;transform:translate(-50%,-100%) translateY(-4px)}}
+
+/* Departure trail and its landing ring. */
+.harbor-trail,.harbor-trail-ring{position:fixed;z-index:86;pointer-events:none;border-radius:50%}
+.harbor-trail{width:12px;height:12px;background:radial-gradient(circle,#fffbe6 0 28%,#ffd87a 45%,rgba(255,216,122,0) 72%);
+  box-shadow:0 0 10px 3px rgba(255,214,120,.55),0 0 22px 8px rgba(95,224,138,.25)}
+.harbor-trail-ring{width:26px;height:26px;border:2px solid #fff3c4;box-shadow:0 0 8px rgba(255,214,120,.6)}
+
+/* A returned boat waiting for settlement is a shortcut to the settlement form. */
+#mini-harbor .harbor-submarine.is-awaiting{cursor:pointer}
+
+/* Voyage progress bar riding above each boat at sea (position on the sea shows the same thing). */
+#mini-harbor .harbor-progress{display:none;position:absolute;left:50%;bottom:calc(100% - 8px);width:30px;height:5px;margin-left:-15px;
+  background:#101a2c;border:1px solid #c9a65a;box-shadow:0 1px 0 rgba(10,16,28,.5);image-rendering:pixelated}
+#mini-harbor .harbor-submarine.is-sailing .harbor-progress{display:block}
+/* With the canvas scene the bar is drawn in pixel art instead, and a boat at sea only reacts to the
+   pointer on its lower part, so boats in neighbouring lanes each keep their own hover area. */
+#mini-harbor.has-scene .harbor-submarine.is-sailing .harbor-progress{display:none}
+#mini-harbor.has-scene .harbor-submarine.is-sailing{clip-path:inset(45% 8% 0 8%)}
+#mini-harbor .harbor-progress i{display:block;height:100%;width:calc(var(--progress,0)*100%);background:#5fe08a}
+#mini-harbor .harbor-submarine.is-returning .harbor-progress i{background:#ffc24a}
+
+@media(prefers-reduced-motion:reduce){
+  .harbor-caption,.harbor-caption.is-leaving{animation:none}
+  .harbor-caption.is-leaving{opacity:0}
+  .harbor-trail,.harbor-trail-ring{display:none}
+}
