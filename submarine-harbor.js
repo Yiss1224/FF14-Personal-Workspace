@@ -29,7 +29,8 @@
       '<div class="harbor-sprite"><span class="harbor-sub-hull"></span><span class="harbor-sub-fin"></span>'+
         '<span class="harbor-conning"></span><span class="harbor-periscope"></span>'+
         '<span class="harbor-sub-window w1"></span><span class="harbor-sub-window w2"></span>'+
-        '<span class="harbor-sub-flag"><span>'+(i+1)+'</span></span></div></div>'
+        '<span class="harbor-sub-flag"><span>'+(i+1)+'</span></span></div>'+
+      '<span class="harbor-progress" aria-hidden="true"><i></i></span></div>'
   ).join('');
   const boats=[...fleetEl.querySelectorAll('[data-harbor-ship]')];
   const running=Array.from({length:4},()=>null);
@@ -77,6 +78,7 @@
     tooltip.innerHTML='<strong>⚓ '+esc(name)+'</strong>'+
       '<dl><dt>目前狀態</dt><dd>'+esc(status)+'</dd>'+
       '<dt>航線／目的地</dt><dd>'+esc(active?route:'尚未出航')+'</dd>'+
+      '<dt>航程進度</dt><dd>'+esc(valid?Math.floor(Math.min(1,(now-departed)/(eta-departed))*100)+'%'+(now>=eta?'':now<(departed+eta)/2?'（去程）':'（回程）'):'—')+'</dd>'+
       '<dt>剩餘時間</dt><dd>'+esc(valid?remaining(eta-now):'—')+'</dd>'+
       '<dt>預計返航 ETA</dt><dd>'+esc(valid?fmt(eta):'—')+'</dd>'+
       '<dt>配置 '+esc(build)+'</dt><dd>'+esc(parts)+'</dd></dl>';
@@ -107,20 +109,31 @@
   // The offshore leg still follows the saved departure/ETA timestamps.
   // With a horizon (scene v4), each boat heads to its own lane far out at sea and
   // shrinks with distance, so boats at sea never stack on one spot.
+  const LANE_DEPTH=[.2,.46,.73,1];
   function voyagePath(i,width,duration,down,rise){
     const exit=Math.min(12000,duration*.1)/duration;
     const offshore=Math.min(90,quayPercent+6+i*1.5),turnaround=Math.min(96,Math.max(offshore+2,89-i*2));
     const x=percent=>width*(percent-starts[i])/100;
     if(rise>0){
+      // The open sea is the progress track: after a short run out of the dock, each boat
+      // crosses its own lane at constant speed, reaching the far right (toward the lighthouse) at
+      // half time and coming back the same way. Lanes sit at different distances
+      // (boat 1 nearest, boat 4 on the horizon), so boats never cover one another.
       const cruise=Math.min(.45,exit+Math.min(30000,duration*.15)/duration);
-      const lane=Math.min(97,quayPercent+(100-quayPercent)*(.1+.27*i)),far=-rise+(i%2)*3,s=.62;
+      const depth=LANE_DEPTH[i]??1,far=-rise*depth,s=1-.38*depth;
+      // Lanes are also staggered sideways (far boats further right), so a convoy that left
+      // together sails as a diagonal line instead of a pile.
+      // On narrow screens the sea is short, so the stagger gives way to travel distance.
+      const base=Math.min(88,quayPercent+5),end=95;
+      const gap=Math.min(Math.max(3.6,3800/Math.max(width,1)),(end-base)*.12);
+      const laneStart=base+i*gap,turn=Math.max(laneStart+2,end-(3-i)*gap);
       return [
         {phase:0,x:0,y:0,s:1},
         {phase:exit*.25,x:0,y:down,s:1},
         {phase:exit,x:x(offshore),y:down,s:1},
-        {phase:cruise,x:x(lane),y:far,s},
-        {phase:.5,x:x(Math.min(97,lane+2)),y:far,s},
-        {phase:1-cruise,x:x(lane),y:far,s},
+        {phase:cruise,x:x(laneStart+(turn-laneStart)*cruise*2),y:far,s},
+        {phase:.5,x:x(turn),y:far,s},
+        {phase:1-cruise,x:x(laneStart+(turn-laneStart)*cruise*2),y:far,s},
         {phase:1-exit,x:x(offshore),y:down,s:1},
         {phase:1-exit*.25,x:0,y:down,s:1},
         {phase:1,x:0,y:0,s:1}
@@ -199,6 +212,8 @@
       boat.classList.toggle('is-sailing',valid&&ratio<1);
       boat.classList.toggle('is-returning',valid&&ratio>.5&&ratio<1);
       boat.classList.toggle('is-awaiting',valid&&ratio>=1);
+      boat.style.setProperty('--progress',(valid?ratio:0).toFixed(4));
+      boat.style.zIndex=String(4-i); // nearer lanes on top
       if(!valid||ratio>=1||boat.hidden)stop(i);
       else animateBoat(i,depart,eta,now,ratio);
       if(hoveredIndex===i)showTooltip(i);

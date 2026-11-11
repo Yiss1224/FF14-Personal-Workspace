@@ -608,6 +608,7 @@
       const br=b.getBoundingClientRect(),scale=b.offsetWidth?br.width/b.offsetWidth:1;
       const restBottom=r.bottom-G.bottoms[i];
       return {i,x:(br.left+br.width/2-r.left)/PX,dy:(br.bottom-restBottom)/PX,scale,
+progress:parseFloat(b.style.getPropertyValue('--progress'))||0,
         sailing:b.classList.contains('is-sailing'),returning:b.classList.contains('is-returning'),awaiting:b.classList.contains('is-awaiting'),
         big:G.big[i]&&b.offsetWidth*scale>=36};
     });
@@ -652,6 +653,12 @@
     g.drawImage(spr,0,top,spr.width,visible-top,x0,y0+top,spr.width,visible-top);
     st.draw={i:info.i,x0,y0,w:spr.width,h:spr.height,flip,big,moored,awaiting:info.awaiting,waterY,cx,towerX};
     if(atSea){g.fillStyle='rgba(225,247,245,.5)';g.fillRect(towerX-4,waterY,1,1);g.fillRect(towerX+3,waterY,1,1)}
+    // Voyage progress bar above the tower: green on the way out, amber on the way home.
+    if(info.sailing&&!info.awaiting){
+      const bw=12,bx=towerX-Math.floor(bw/2)-1,by=y0+top-5,fill=Math.max(1,Math.round(bw*Math.min(1,info.progress)));
+      g.fillStyle='#0b1220';g.fillRect(bx,by,bw+2,4);g.fillStyle='#3d4d6b';g.fillRect(bx+1,by+1,bw,2);
+      g.fillStyle=info.returning?'#ffc24a':'#5fe08a';g.fillRect(bx+1,by+1,fill,2);
+    }
     // Hull number painted on the conning tower.
     if(big)drawDigit(g,info.i+1,x0+(flip?10:11),y0+3,'#f3e7c4');
     // Screw turning at the stern while under way on the surface.
