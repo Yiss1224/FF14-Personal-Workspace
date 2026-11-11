@@ -825,7 +825,8 @@ progress:parseFloat(b.style.getPropertyValue('--progress'))||0,
     if(document.hidden||reduced())return;
     const dt=last?Math.min(.25,(ts-last)/1000):1/FPS;
     acc+=dt;last=ts;
-    if(acc>=1/FPS){frame(frozen?0:acc);acc=0}
+    // Tucked away: tick once a second, enough to notice a return (chime, status) without drawing for nobody.
+    if(acc>=(dock.classList.contains('is-collapsed')?1:1/FPS)){frame(frozen?0:acc);acc=0}
     raf=requestAnimationFrame(loop);
   }
   function start(){
