@@ -157,6 +157,53 @@ async function test(name,fn){try{await fn();passed++;console.log('ok  '+name)}ca
     }
   });
 
+  await test('9 收合碼頭：收起後留一條狀態列，重新整理仍記得；展開後恢復，不改潛艇資料',async()=>{
+    const {ctx,page,errors}=await open();
+    const before=await page.evaluate(k=>localStorage.getItem(k),KEY);
+    const toggle=page.locator('.harbor-toggle');
+    assert.strictEqual(await toggle.getAttribute('aria-expanded'),'true');
+    const padOpen=await page.evaluate(()=>parseFloat(getComputedStyle(document.body).paddingBottom));
+    await toggle.click();
+    assert.strictEqual(await toggle.getAttribute('aria-expanded'),'false');
+    await page.waitForFunction(()=>getComputedStyle(document.getElementById('mini-harbor')).visibility==='hidden');
+    const text=await toggle.textContent();
+    assert.ok(text.includes('待結算 1')&&text.includes('航行中 2'),text);
+    assert.ok(await page.evaluate(()=>parseFloat(getComputedStyle(document.body).paddingBottom))<padOpen,'收合後頁面底部留白應縮小');
+    // Fleet moments make no caption while tucked away.
+    await page.evaluate(()=>window.dispatchEvent(new CustomEvent('harbor-submarine-arrived',{detail:{index:1}})));
+    assert.strictEqual(await page.locator('.harbor-caption').count(),0);
+    await page.reload();
+    await page.waitForFunction(()=>window.HarborLink&&window.HarborLink.collapsed()===true);
+    assert.strictEqual(await page.evaluate(()=>getComputedStyle(document.getElementById('mini-harbor')).visibility),'hidden');
+    await page.locator('.harbor-toggle').click();
+    await page.waitForFunction(()=>getComputedStyle(document.getElementById('mini-harbor')).visibility==='visible');
+    assert.strictEqual(await page.evaluate(()=>localStorage.getItem('ff14_harbor_collapsed')),null);
+    assert.strictEqual(await page.evaluate(k=>localStorage.getItem(k),KEY),before);
+    assert.deepStrictEqual(errors,[]);await ctx.close();
+  });
+
+  await test('10 頁面底部內容可以捲到碼頭棧橋上方；手機海面比棧橋寬',async()=>{
+    for(const viewport of [{width:1280,height:800},{width:390,height:844}]){
+      const {ctx,page}=await open({viewport});
+      await page.evaluate(()=>{document.documentElement.style.scrollBehavior='auto';window.scrollTo(0,document.documentElement.scrollHeight)});
+      await page.waitForTimeout(300);
+      const r=await page.evaluate(()=>{
+        const main=document.querySelector('main').getBoundingClientRect();
+        const walls=[...document.querySelectorAll('.harbor-slip-wall')].map(w=>w.getBoundingClientRect());
+        const dock=document.getElementById('mini-harbor').getBoundingClientRect();
+        const controls=document.querySelector('.harbor-controls')?.getBoundingClientRect();
+        return {mainBottom:main.bottom,pierTop:Math.min(...walls.map(w=>w.top)),pierRight:walls[walls.length-1].right,width:dock.width,
+          controlsLeft:controls?controls.left:null,controlsHeight:controls?controls.height:null};
+      });
+      assert.ok(r.mainBottom<=r.pierTop+2,'內容被棧橋蓋住：'+JSON.stringify(r));
+      if(viewport.width<500){
+        assert.ok(r.width-r.pierRight>r.width*.42,'手機海面太短：'+JSON.stringify(r));
+        assert.ok(r.controlsLeft>=r.pierRight-4&&r.controlsHeight<22,'手機控制列應為一排且不壓到棧橋：'+JSON.stringify(r));
+      }
+      await ctx.close();
+    }
+  });
+
   await browser.close();server.close();
   console.log(passed+' passed');
 })();

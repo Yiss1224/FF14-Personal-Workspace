@@ -1,9 +1,10 @@
-/* Harbor link v1: ties page actions to the harbor at the bottom of the screen.
+/* Harbor link v2: ties page actions to the harbor at the bottom of the screen.
    Display only. Reads fleet state, never writes it, and never delays planner actions.
    - Departure: a light trail flies from the 確認出航 button to the boat, then a caption follows the boat out.
    - Return: a caption over the berth; boats waiting for settlement carry a "!" marker (CSS).
    - Settlement: a caption with the rank change.
-   - Clicking a boat that waits for settlement jumps to 返航結算 with that boat selected. */
+   - Clicking a boat that waits for settlement jumps to 返航結算 with that boat selected.
+   - A toggle tucks the harbor away (remembered per browser) and leaves a one-line fleet status. */
 (function(){
   'use strict';
   const KEY='ff14_submarine_planner_v1';
@@ -163,5 +164,55 @@
     const b=event.target.closest?.('[data-harbor-ship]');
     if(b&&b.classList.contains('is-awaiting')){event.preventDefault();goSettle(Number(b.dataset.harborShip))}
   });
-  window.HarborLink={caption,captions:()=>[...captions.keys()]};
+
+  /* ---------- collapse: tuck the harbor away, keep a one-line fleet status ---------- */
+  const COLLAPSE_KEY='ff14_harbor_collapsed';
+  const toggle=document.createElement('button');
+  toggle.type='button';toggle.className='harbor-toggle';toggle.setAttribute('aria-controls','mini-harbor');
+  const toggleLabel=document.createElement('span'),toggleStatus=document.createElement('span');
+  toggleLabel.className='harbor-toggle-label';toggleStatus.className='harbor-toggle-status';
+  toggle.append(toggleLabel,toggleStatus);
+  dock.after(toggle);
+  let collapsed=false;
+  try{collapsed=localStorage.getItem(COLLAPSE_KEY)==='1'}catch{}
+  function fleetStatus(){
+    const now=Date.now();let sailing=0,waiting=0;
+    (read().ships||[]).forEach(ship=>{
+      if(!ship||!ship.voyaging)return;
+      const eta=Number(ship.voyage?.etaAt);
+      if(Number.isFinite(eta)&&eta>0&&now>=eta)waiting++;else sailing++;
+    });
+    return {sailing,waiting};
+  }
+  function syncToggle(){
+    const {sailing,waiting}=fleetStatus();
+    toggle.setAttribute('aria-expanded',String(!collapsed));
+    toggle.classList.toggle('has-waiting',waiting>0);
+    toggleLabel.textContent=collapsed?'⚓ 碼頭 ▴':'▾ 收合';
+    toggleStatus.textContent=collapsed?(waiting?'待結算 '+waiting:'')+(waiting&&sailing?'・':'')+(sailing?'航行中 '+sailing:'')||'全數停泊':'';
+    toggle.setAttribute('aria-label',collapsed?'展開碼頭動畫（'+toggleStatus.textContent+'）':'收合碼頭動畫');
+  }
+  function applyCollapse(animate){
+    dock.classList.toggle('no-collapse-motion',!animate);
+    dock.classList.toggle('is-collapsed',collapsed);
+    document.documentElement.classList.toggle('harbor-collapsed',collapsed);
+    if(collapsed){[...captions.keys()].forEach(remove);const tip=document.getElementById('harbor-tooltip');if(tip)tip.hidden=true}
+    syncToggle();
+    window.dispatchEvent(new CustomEvent('harbor-collapse-changed',{detail:{collapsed}}));
+  }
+  toggle.addEventListener('click',()=>{
+    collapsed=!collapsed;
+    try{if(collapsed)localStorage.setItem(COLLAPSE_KEY,'1');else localStorage.removeItem(COLLAPSE_KEY)}catch{}
+    applyCollapse(true);
+  });
+  ['submarine-state-updated','submarine-build-state-updated','submarine-settlement-saved','submarine-data-imported',
+   'submarine-voyage-started','harbor-submarine-arrived'].forEach(name=>window.addEventListener(name,syncToggle));
+  window.addEventListener('storage',event=>{
+    if(event.key===KEY)syncToggle();
+    if(event.key===COLLAPSE_KEY){collapsed=event.newValue==='1';applyCollapse(false)}
+  });
+  window.setInterval(()=>{if(!document.hidden&&collapsed)syncToggle()},30000);
+  applyCollapse(false);
+
+  window.HarborLink={caption,captions:()=>[...captions.keys()],collapsed:()=>collapsed};
 })();

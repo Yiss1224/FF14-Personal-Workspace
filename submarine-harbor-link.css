@@ -41,8 +41,42 @@
 #mini-harbor .harbor-progress i{display:block;height:100%;width:calc(var(--progress,0)*100%);background:#5fe08a}
 #mini-harbor .harbor-submarine.is-returning .harbor-progress i{background:#ffc24a}
 
+/* ---------- layout: the page keeps clear of the harbor; phones get a longer sea ---------- */
+/* Content can always be scrolled above the pier (the faded sky may still overlap it). */
+body{padding-bottom:132px}
+@media(max-width:700px){body{padding-bottom:112px}}
+@media(max-width:420px){body{padding-bottom:100px}}
+/* Phones: a shorter pier leaves more sea for the progress track; the controls fit in one row. */
+@media(max-width:520px){
+  #mini-harbor{--dock-width:min(clamp(190px,52vw,260px),calc(100% - 76px))}
+  #mini-harbor .harbor-controls{flex-wrap:nowrap;width:auto}
+  #mini-harbor .harbor-controls .harbor-wx{display:none}
+}
+
+/* ---------- collapse ---------- */
+#mini-harbor{transition:transform .38s cubic-bezier(.3,.8,.3,1),visibility 0s}
+#mini-harbor.is-collapsed{transform:translateY(102%);visibility:hidden;transition:transform .32s cubic-bezier(.5,0,.8,.4),visibility 0s .32s}
+#mini-harbor.no-collapse-motion{transition:none}
+html.harbor-collapsed body{padding-bottom:52px}
+html.harbor-collapsed .sub-toasts{bottom:52px}
+.harbor-toggle{position:fixed;left:6px;bottom:5px;z-index:22;display:inline-flex;align-items:center;gap:6px;
+  min-height:0;height:22px;padding:0 8px;border-radius:4px;cursor:pointer;white-space:nowrap;
+  background:rgba(14,24,40,.86);border:1px solid #b89a52;color:#f3e6c4;box-shadow:0 2px 0 rgba(10,16,28,.45);
+  font:650 11px/20px system-ui,sans-serif;transition:background .15s,transform .15s,height .2s,padding .2s}
+.harbor-toggle:hover{background:#26324a;border-color:#e2c377}
+.harbor-toggle:active{transform:translateY(1px)}
+.harbor-toggle:focus-visible{outline:2px solid #fff3c4;outline-offset:2px}
+.harbor-toggle-status:empty{display:none}
+.harbor-toggle-status{color:#cfe0ee;font-weight:550}
+.harbor-toggle[aria-expanded="false"]{height:32px;padding:0 12px;border-radius:16px;font-size:12px;
+  background:linear-gradient(180deg,#1f2f4d,#121c31);box-shadow:0 6px 18px rgba(0,0,0,.28)}
+.harbor-toggle.has-waiting[aria-expanded="false"]{border-color:#ffc24a}
+.harbor-toggle.has-waiting[aria-expanded="false"] .harbor-toggle-status{color:#ffd27a;font-weight:700}
+@media(pointer:coarse){.harbor-toggle{height:28px;padding:0 10px}.harbor-toggle[aria-expanded="false"]{height:36px}}
+
 @media(prefers-reduced-motion:reduce){
   .harbor-caption,.harbor-caption.is-leaving{animation:none}
   .harbor-caption.is-leaving{opacity:0}
   .harbor-trail,.harbor-trail-ring{display:none}
+  #mini-harbor,#mini-harbor.is-collapsed,.harbor-toggle{transition:none}
 }
