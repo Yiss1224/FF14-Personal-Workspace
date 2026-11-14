@@ -13,7 +13,8 @@ const config=Object.assign({apiBase:''},window.FF14_CONFIG||{});
 // 頁面以 <script src="ff14-data.js" data-scope="…"> 指定自己的資料範圍。
 const pageScope=document.currentScript?.dataset.scope||'';
 const ls=window.localStorage;
-const native={get:ls.getItem.bind(ls),set:ls.setItem.bind(ls),remove:ls.removeItem.bind(ls)};
+const storageProto=Object.getPrototypeOf(ls),nativeSetItem=storageProto.setItem,nativeRemoveItem=storageProto.removeItem;
+const native={get:ls.getItem.bind(ls),set:nativeSetItem.bind(ls),remove:nativeRemoveItem.bind(ls)};
 const listeners=new Set();
 let applying=false;
 
@@ -41,12 +42,19 @@ function notifyQuota(key){
  box.append(text,close);document.body.appendChild(box);quotaNotice=box;
 }
 // 舊模組仍直接呼叫 localStorage.setItem；在這裡統一攔截，登記過的資料鍵就會通知同步層。
-ls.setItem=function(k,v){
+// 攔截掛在 Storage.prototype 上：直接指定 localStorage.setItem=… 在 Firefox 會被當成「存一筆叫 setItem 的資料」，
+// 攔截不會生效。sessionStorage 也共用這個 prototype，所以只處理 localStorage 本身。
+storageProto.setItem=function(k,v){
+ if(this!==ls)return nativeSetItem.call(this,k,v);
+ k=String(k);
  try{native.set(k,v)}
  catch(e){if(isQuotaError(e)){if(scopeOf(k))notifyQuota(k);else console.warn('FF14 快取寫入失敗：儲存空間已滿',k)}throw e}
  if(scopeOf(k))emit(k,applying?'restore':'local');
 };
-ls.removeItem=function(k){native.remove(k);if(scopeOf(k))emit(k,applying?'restore':'local')};
+storageProto.removeItem=function(k){
+ if(this!==ls)return nativeRemoveItem.call(this,k);
+ k=String(k);native.remove(k);if(scopeOf(k))emit(k,applying?'restore':'local');
+};
 
 function readRaw(key){return native.get(key)}
 function read(key,fallback=null){try{const v=JSON.parse(native.get(key));return v??fallback}catch{return fallback}}

@@ -99,14 +99,6 @@ const rankRoutes=[
  [80,84,'翠浪海','A → C → G → K','若海域未開，先留在灰海'],
  [85,145,'溺沒海','O → J','3124（3004 加 1121）可開始穩定金策；非最快練等路線']
 ];
-const unlockGroups=[
- {name:'溺沒海 → 灰海（Rank 50）',steps:[['B',1],['E',7],['J',20],['N',27],['O',30],['S',37],['T',40],['Y',47],['Z',50],['AA',50],['AB',50],['AD',50]]},
- {name:'灰海 → 翠浪海（Rank 67）',steps:[['A',50],['B',50],['C',54],['F',57],['G',60],['H',60],['K',60],['L',63],['P',65],['R',67]]},
- {name:'翠浪海 → 塞壬海（Rank 90）',steps:[['A',70],['C',70],['E',72],['G',74],['J',75],['M',80],['R',88],['T',90]]},
- {name:'塞壬海 → 紫礁海（Rank 105）',steps:[['A',90],['B',90],['F',93],['J',97],['L',99],['P',102],['T',105]]},
- {name:'紫礁海 → 南蒼茫洋（Rank 120）',steps:[['A',105],['B',105],['F',108],['J',113],['L',115],['Q',119],['T',120]]},
- {name:'南蒼茫洋 → 北洋（Rank 135）',steps:[['A',120],['B',120],['F',123],['I',127],['M',130],['N',131],['R',134],['T',135]]}
-];
 function phase(rank){return rank<15?'1111':'1121'}
 function shipLabel(index,ship){
  const name=typeof ship?.name==='string'?ship.name.trim():'';
@@ -206,13 +198,6 @@ function renderFleet(){
 }
 function renderRoutes(){
  $('route-table').innerHTML=rankRoutes.map(r=>'<tr><td>'+r[0]+'–'+r[1]+'</td><td>'+r[2]+'</td><td><strong>'+r[3]+'</strong></td><td>'+r[4]+'</td></tr>').join('');
-}
-function renderUnlocks(){
- $('unlock-list').innerHTML=unlockGroups.map((g,gi)=>'<div class="unlock-group"><h3>'+g.name+'</h3>'+g.steps.map((s,si)=>{
-   const id=gi+'-'+si,key='u-'+id;
-   return '<label class="unlock-step"><input type="checkbox" data-unlock="'+key+'" '+(state.unlocks[key]?'checked':'')+'><span>'+s[0]+' 海域已開</span><small>Rank '+s[1]+'</small></label>'
- }).join('')+'</div>').join('');
- $('unlock-list').querySelectorAll('[data-unlock]').forEach(el=>el.onchange=()=>{state.unlocks[el.dataset.unlock]=el.checked;FF14Data.writeRaw(KEY,JSON.stringify(state))});
 }
 function renderLogs(){
  const runs=state.logs.length,fuelUsed=state.logs.reduce((a,l)=>a+(Number(l.fuel)||0),0),repairUsed=state.logs.reduce((a,l)=>a+(Number(l.repair)||0),0),xp=state.logs.reduce((a,l)=>a+(Number(l.exp)||0),0);

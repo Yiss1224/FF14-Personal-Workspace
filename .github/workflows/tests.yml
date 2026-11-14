@@ -1,0 +1,40 @@
+name: Tests
+# 每個 PR 與 main 的每次推送都跑 tests/ 底下全部測試（含需要瀏覽器的 Playwright 測試）。
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths-ignore:
+      - version.js
+      - version.json
+permissions:
+  contents: read
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  all:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: |
+          for f in *.js server/*.js; do node --check "$f"; done
+      - name: Install Playwright
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+      - name: Run every test
+        run: |
+          failed=0
+          for t in tests/*.cjs; do
+            echo "::group::$t"
+            if ! node "$t"; then failed=1; echo "::error::$t failed"; fi
+            echo "::endgroup::"
+          done
+          exit $failed
