@@ -3,7 +3,6 @@
 (function(){
   'use strict';
 
-  const headerVersion=(document.querySelector('header p')?.textContent.match(/v\d{4}\.\d{2}\.\d{2}\.\d+/)||[])[0]||'';
   let anchor=null;
   let catalogNode=null;
   let mounted=false;
@@ -14,21 +13,6 @@
   let catalogCacheStamp='';
   let scopeSyncTimer=null;
   let catalogRenderTask=null;
-
-  function enforceHeaderVersion(){
-    if(!headerVersion)return;
-    const line=document.querySelector('header p');
-    if(!line)return;
-    const next=line.textContent.replace(/v\d{4}\.\d{2}\.\d{2}\.\d+$/,headerVersion);
-    if(next!==line.textContent)line.textContent=next;
-  }
-
-  function installVersionGuard(){
-    const line=document.querySelector('header p');
-    if(!line||!headerVersion)return;
-    enforceHeaderVersion();
-    new MutationObserver(enforceHeaderVersion).observe(line,{childList:true,characterData:true,subtree:true});
-  }
 
   function notifyCatalogRendered(){
     try{document.dispatchEvent(new CustomEvent('ff14-fish-catalog-rendered'))}catch{}
@@ -171,7 +155,6 @@
   }
 
   detachInitialCatalog();
-  installVersionGuard();
   window.mountDeferredFishCatalog=renderScopedCatalog;
 
   // Opening the fishing tab itself must stay cheap. Do not mount the giant catalog here.
@@ -179,7 +162,6 @@
     const button=e.target?.closest?.('nav button[data-tab="fishing"]');
     if(!button)return;
     renderLightweightSummary();
-    enforceHeaderVersion();
   },true);
 
   // Mount only after the user narrows the scope. If the scope is cleared, detach before
@@ -202,7 +184,6 @@
   window.addEventListener('DOMContentLoaded',()=>{
     installRenderGuard();
     renderLightweightSummary();
-    enforceHeaderVersion();
 
     // fishing-guide.js builds the Session route controls immediately before #fish-catalog.
     // Temporarily mount the empty/lightweight catalog for the rest of DOMContentLoaded so

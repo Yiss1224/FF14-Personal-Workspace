@@ -2,10 +2,6 @@
 (function(){
   'use strict';
 
-  const APP_VERSION='v2026.09.07.54';
-  const version=document.querySelector('header p');
-  if(version)version.textContent=version.textContent.replace(/v\d{4}\.\d{2}\.\d{2}\.\d+$/,APP_VERSION);
-
   window.renderFish=function(){
     const result=document.getElementById('fish-result');
     const sum=document.getElementById('fish-summary');

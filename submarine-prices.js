@@ -5,7 +5,16 @@ const npc={'沉船戒指':8000,'沉船手鐲':9000,'沉船耳飾':10000,'沉船�
 const catalogue={"納夏薄絹":20270,"白雲花":20791,"紅蓮珊瑚":22441,"仿製財寶":17019,"石像的碎片":22442,"陳舊的樂譜：海中":23337,"天然綠水晶":24490,"天然青水晶":24505,"天然赤水晶":27287,"黃金水瓶":28136,"天然黃水晶":28980,"裝有結晶的背包":30386,"景觀樹":32248,"格斯塔拉的肖像畫":33287,"景觀樹":32248,"天然水晶":23875,"莫古力的王冠":12657,"壞掉的冰盒":33873,"精梳毛布":16906,"強化玻璃板":16908,"沉船戒指":22500,"沉船手鐲":22501,"沉船耳飾":22502,"沉船項鍊":22503,"上等沉船戒指":22504,"上等沉船手鐲":22505,"上等沉船耳飾":22506,"上等沉船項鍊":22507,"舞海月":21921,"南方度假獺獺":24902,"鮣魚級潛水艇":26802,"狐獴":28621,"銀山雀兒":30093,"紫漆油紙傘":31322,"管弦樂琴樂譜：宿命":31671,"希爾德拉級潛水艇P型":32848,"管弦樂琴樂譜：復仇":33120,"本本石":33695,"管弦樂琴樂譜：蓄意":33848,"無屬性水晶":10099,"紅莫柯草":12220,"鐵刀木":12221,"合成生物的粗皮":12222,"蒼天石原石":12223,"藍鐵礦":12224,"深紅水晶":12225,"深紅晶簇":12226,"深綠水晶":12227,"深綠晶簇":12228,"深藍水晶":12229,"深藍晶簇":12230,"天然黏土":12920,"石粉黏土":12921,"鍊金樹脂":12922,"竹片":12923,"輕木廢材":12924,"輕木木材":12925,"鍊金纖維":12926,"魔科學纖維":12927,"深色水晶":12928,"深色晶簇":12929,"鐵紋礦石":25008,"黃檀木材":26528,"柳杉原木":26529,"純鈦礦":26531,"海底黏土":29590,"海產油脂":23222,"打撈上來的古錢":24908,"海底的財寶":24503,"古董瓶":27293,"精梳毛布地毯":15976};
 const worlds={'陸行鳥資料中心':'陸行鳥','伊弗利特':'4028','迦樓羅':'4029','利維坦':'4030','鳳凰':'4031','奧汀':'4032','巴哈姆特':'4033','拉姆':'4034','泰坦':'4035'};
 const load=()=>{try{return JSON.parse(FF14Data.readRaw(KEY)||'{}')}catch{return {}}};
-let live={},pending=false;
+// 查到的市價另外存成快取（不屬於備份資料）：以前只放在記憶體，重新整理後帳本估值就變回「未查價」。
+const CACHE_KEY='ff14_submarine_market_cache',CACHE_MS=7*24*3600e3;
+let live={},liveAt=0,pending=false;
+function restoreLive(world){
+ try{const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
+  if(c&&c.world===world&&c.prices&&typeof c.prices==='object'&&Date.now()-Number(c.ts)<CACHE_MS){live=c.prices;liveAt=Number(c.ts)||0;return true}}catch{}
+ return false;
+}
+function saveLive(world){try{liveAt=Date.now();localStorage.setItem(CACHE_KEY,JSON.stringify({world,ts:liveAt,prices:live}))}catch{}}
+function cachedNote(){return liveAt?'顯示的是 '+new Date(liveAt).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})+' 查到的行情，按「更新材料市價」可重查。':''}
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function lookup(name){
  if(Object.prototype.hasOwnProperty.call(npc,name))return {price:npc[name],source:'NPC'};
@@ -30,7 +39,7 @@ async function refresh(){
  if(pending)return;pending=true;$('market-refresh').disabled=true;
  try{
   const state=load(),world=$('market-world').value;
-  if(state.marketWorld&&state.marketWorld!==world)live={};state.marketWorld=world;FF14Data.writeRaw(KEY,JSON.stringify(state));
+  if(state.marketWorld&&state.marketWorld!==world){live={};liveAt=0}state.marketWorld=world;FF14Data.writeRaw(KEY,JSON.stringify(state));
   const ids={...(window.SubmarineLootItemIds||{}),...catalogue,...(state.lootItemIds||{})};
   const inverse=new Map();
   for(const [name,id] of Object.entries(ids))if(Number.isSafeInteger(Number(id))&&Number(id)>0&&!Object.prototype.hasOwnProperty.call(npc,name)){
@@ -56,15 +65,17 @@ async function refresh(){
    }
   }
   $('market-status').textContent='已更新 '+updated+' 種材料行情，無價格 '+unavailable+' 種。市場售價為參考估值，不代表已售出。';
+  saveLive(world);
   window.dispatchEvent(new Event('submarine-prices-updated'));
   redraw();
  }catch(e){$('market-status').textContent='查價失敗：'+e.message+'。已保留手動價格與 NPC 定價。'}
  finally{pending=false;$('market-refresh').disabled=false}
 }
 const s=load();$('market-world').value=s.marketWorld&&Object.values(worlds).includes(s.marketWorld)?s.marketWorld:'陸行鳥';
+if(restoreLive($('market-world').value))$('market-status').textContent=cachedNote();
 $('market-refresh').onclick=refresh;
 $('ledger-details').addEventListener('toggle',()=>{if($('ledger-details').open)redraw()});
 window.addEventListener('submarine-settlement-saved',redraw);
-window.addEventListener('submarine-data-imported',()=>{live={};redraw()});
+window.addEventListener('submarine-data-imported',()=>{live={};liveAt=0;try{localStorage.removeItem(CACHE_KEY)}catch{}redraw()});
 window.SubmarinePrices={lookup,npc,refresh,itemIds:catalogue};
 })();
