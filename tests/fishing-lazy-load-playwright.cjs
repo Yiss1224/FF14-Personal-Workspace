@@ -46,7 +46,8 @@ const count=(hits,part)=>hits.filter(h=>h.includes(part)).length;
     for(const sheet of ['/sheet/FishParameter','/sheet/SpearfishingItem','/sheet/FishingSpot'])
       assert.strictEqual(count(a.hits,sheet),1,`${sheet} 應只下載一次，實際 ${count(a.hits,sheet)}`);
     assert.strictEqual(count(a.hits,'ffxiv-datamining-tc/main/Item.csv'),1,'台服 Item.csv 應只下載一次，實際 '+count(a.hits,'ffxiv-datamining-tc/main/Item.csv'));
-    assert.strictEqual(count(a.hits,'js-yaml'),1,'js-yaml 應在需要時載入一次');
+    assert.strictEqual(count(a.hits,'js-yaml'),0,'js-yaml 改由本站提供，不應再向 CDN 要');
+    assert.strictEqual(await a.page.evaluate(()=>typeof window.jsyaml?.load),'function','js-yaml 應在需要時從本站載入');
     assert.strictEqual(await a.page.evaluate(()=>JSON.parse(localStorage.getItem('fishCatalog')||'[]').length),40,'圖鑑應完整存下');
     assert.strictEqual(await a.page.evaluate(()=>localStorage.getItem('fishCatalogMapGroupingVersion')),'map-groups-v1','新下載的圖鑑已是地圖分組，應直接標記');
     await a.ctx.close();
@@ -63,7 +64,7 @@ const count=(hits,part)=>hits.filter(h=>h.includes(part)).length;
     const again=b.hits.filter(h=>/xivapi\.com\/api\/sheet\/(FishParameter|SpearfishingItem|FishingSpot)$|ffxiv-datamining-tc\/main\/(Item|PlaceName|Weather)\.csv$/.test(h));
     assert.deepStrictEqual(again,[],'快取新鮮時不應重抓：'+again.join(', '));
     // 連不上的資料（這裡的天氣資料被擋掉）不可以連續重試。
-    assert.ok(count(b.hits,'fish-tracker-app')<=1,'下載失敗後不應連續重試，實際 '+count(b.hits,'fish-tracker-app')+' 次');
+    assert.ok(count(b.hits,'/js/app/data.js')<=1,'下載失敗後不應連續重試，實際 '+count(b.hits,'/js/app/data.js')+' 次');
     await b.ctx.close();
     console.log('fishing lazy load ok');
   }finally{await browser.close();server.close()}
