@@ -848,7 +848,7 @@ progress:parseFloat(b.style.getPropertyValue('--progress'))||0,
     controls.className='harbor-controls';controls.setAttribute('role','group');controls.setAttribute('aria-label','碼頭顯示設定');
     controls.innerHTML='<span class="harbor-et" aria-label="艾歐澤亞時間"></span><span class="harbor-wx"></span>'
       +'<select class="harbor-zone" aria-label="天氣依據的住宅區">'+Object.entries(E.ZONES).map(([id,z])=>'<option value="'+id+'">'+z.name+'</option>').join('')+'</select>'
-      +'<button type="button" class="harbor-sound" aria-label="返航提示音"></button>';
+      +'<button type="button" class="harbor-sound" title="返航提示音"></button>';
     dock.appendChild(controls);
     controls.querySelector('.harbor-zone').addEventListener('change',e=>{prefs.zone=e.target.value;writePrefs(prefs);paletteAt=0;wxFastUntil=performance.now()+4000;syncControls();if(reduced())frame(0)});
     controls.querySelector('.harbor-sound').addEventListener('click',()=>{prefs.sound=!prefs.sound;writePrefs(prefs);syncControls()});
