@@ -307,6 +307,12 @@ $('import-data').onchange=async e=>{
  const f=e.target.files?.[0];if(!f)return;
  try{
   const parsed=JSON.parse(await f.text()),restored=importedState(parsed);
+  // 匯入會整份覆蓋且無法復原，先讓使用者看清楚備份內容與目前資料的差異再決定。
+  const when=parsed?.exportedAt&&!Number.isNaN(Date.parse(parsed.exportedAt))?new Date(parsed.exportedAt).toLocaleString('zh-TW',{hour12:false}):'（檔案沒有記錄時間）';
+  const count=s=>(s.ships||[]).filter(x=>x?.registered).length+' 艘已登記、'+(s.logs||[]).length+' 筆出航紀錄';
+  reload();
+  if(!await dialogs().confirm({title:'匯入完整備份',message:'會用這份備份整個取代目前的潛水艇資料，無法復原。\n不確定的話，先按取消並匯出一份目前的備份。',
+   details:[['備份匯出時間',when],['備份內容',count(restored)],['目前資料',count(state)]],ok:'覆蓋並匯入',danger:true})){e.target.value='';return}
   // 匯入是整份還原：直接覆寫儲存資料，不與現有資料合併。
   FF14Data.writeRaw(KEY,JSON.stringify(restored));
   state=restored;
