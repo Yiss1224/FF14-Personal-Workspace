@@ -38,6 +38,8 @@
    pointer on its lower part, so boats in neighbouring lanes each keep their own hover area. */
 #mini-harbor.has-scene .harbor-submarine.is-sailing .harbor-progress{display:none}
 #mini-harbor.has-scene .harbor-submarine.is-sailing{clip-path:inset(45% 8% 0 8%)}
+/* Phones draw boats at sea small with their number plate above: the touch area follows that shape. */
+@media(max-width:519.98px){#mini-harbor.has-scene .harbor-submarine.is-sailing{clip-path:inset(12% 18% 0 18%)}}
 #mini-harbor .harbor-progress i{display:block;height:100%;width:calc(var(--progress,0)*100%);background:#5fe08a}
 #mini-harbor .harbor-submarine.is-returning .harbor-progress i{background:#ffc24a}
 
