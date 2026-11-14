@@ -54,6 +54,14 @@
     if(current===VERSION)return;
     if(typeof refreshFishCatalog!=='function')return;
 
+    // app.js 可能正在下載（第一次造訪，或快取過期）。那次下載已經用上面的 locationParts 分組，
+    // 等它結束就好，不要同時再抓一次同樣的三張表。
+    for(let i=0;i<360&&window.__fishCatalogState==='loading';i++)await new Promise(r=>setTimeout(r,500));
+    if(window.__fishCatalogDownloadedAt){
+      try{localStorage.setItem(VERSION_KEY,VERSION)}catch{}
+      return;
+    }
+
     const status=document.getElementById('fish-catalog-status');
     if(status)status.textContent='正在依實際地圖重新整理釣場分組…';
 
@@ -68,6 +76,6 @@
   }
 
   window.addEventListener('DOMContentLoaded',()=>{
-    setTimeout(rebuildOnce,700);
+    window.FF14Fishing.whenActive().then(()=>setTimeout(rebuildOnce,700));
   });
 })();

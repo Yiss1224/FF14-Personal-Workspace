@@ -15,7 +15,7 @@
   function tc(v){try{return typeof ff14TcText==='function'?ff14TcText(v):String(v||'')}catch{return String(v||'')}}
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function readStore(key,def=[]){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
-  function catalog(){return readStore('fishCatalog',[])}
+  function catalog(){return window.FF14Fishing?window.FF14Fishing.catalog():readStore('fishCatalog',[])}
   function catalogLocations(){const rows=catalog();if(typeof window.expandFishLocations==='function')return window.expandFishLocations(rows);const out=[];for(const fish of rows){const spots=Array.isArray(fish?.spots)&&fish.spots.length?fish.spots:[fish];spots.forEach(loc=>out.push({...fish,...loc}))}return out}
   function value(el){return el?.value||''}
   function validName(v){const s=String(v||'').trim();return s&&!/^\d+$/.test(s)?s:''}
@@ -162,7 +162,9 @@
     const status=document.getElementById('fish-catalog-status');if(status)status.textContent='偵測到舊版數字釣點，正在重新建立釣點資料…';
     try{await refreshFishCatalog(true);refreshPicker();fixSpotSummaryNames()}catch(e){console.warn('repair fish catalog failed',e)}
   }
-  function refreshTc(){try{if(typeof ff14TcRefresh==='function')ff14TcRefresh(true);else if(typeof refreshFF14TcTerms==='function')refreshFF14TcTerms()}catch(e){console.warn('TC refresh failed',e)}}
+  // 不強制：這裡以前每次開頁都強制重抓台服名詞（好幾份 CSV，含整份 Item.csv），完全繞過 30 天快取。
+  // 快取過期或有缺名詞時 ff14TcRefresh(false) 自己會抓；要強制更新請按「台服繁中名詞」按鈕。
+  function refreshTc(){try{if(typeof ff14TcRefresh==='function')ff14TcRefresh(false)}catch(e){console.warn('TC refresh failed',e)}}
   function addStyles(){
     if(document.getElementById('fish-picker-style'))return;const s=document.createElement('style');s.id='fish-picker-style';s.textContent=`.fish-location-picker{margin:12px 0 16px;padding:14px}.fish-picker-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}.fish-picker-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.fish-picker-grid label{display:flex;flex-direction:column;gap:6px;font-weight:600}.fish-picker-grid select{width:100%;min-height:40px}.fish-picker-current{margin-top:10px}@media(max-width:980px){.fish-picker-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.fish-picker-grid label:nth-child(3){grid-column:1/-1}.fish-location-picker{padding:12px}}@media(max-width:700px){.fish-picker-grid{grid-template-columns:1fr}.fish-picker-grid label:nth-child(3){grid-column:auto}.fish-picker-head{flex-direction:column}.fish-picker-head button{width:100%;min-height:40px}.fish-location-picker{padding:10px}}`;document.head.appendChild(s);
   }
@@ -170,9 +172,9 @@
   window.addEventListener('DOMContentLoaded',()=>{
     addStyles();ensurePicker();refreshPicker();fixSpotSummaryNames();
     document.addEventListener('click',interceptCaughtClick,true);
-    setTimeout(repairCatalogIfNeeded,600);
+    window.FF14Fishing.whenActive().then(()=>{setTimeout(repairCatalogIfNeeded,600);setTimeout(refreshTc,2500)});
     setTimeout(()=>{refreshPicker();fixSpotSummaryNames()},1500);
-    setTimeout(()=>{refreshTc();refreshPicker();fixSpotSummaryNames()},2500);
+    setTimeout(()=>{refreshPicker();fixSpotSummaryNames()},2500);
     setTimeout(()=>{refreshPicker();fixSpotSummaryNames()},7000);
   });
   const observer=new MutationObserver(()=>{
