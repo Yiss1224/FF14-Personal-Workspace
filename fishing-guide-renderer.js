@@ -12,7 +12,8 @@
 
   function readJson(key,def){try{return JSON.parse(localStorage.getItem(key)||'null')??def}catch{return def}}
   function writeJson(key,value){try{localStorage.setItem(key,JSON.stringify(value))}catch{}}
-  function catalog(){return readJson('fishCatalog',[])||[]}
+  // 共用的已解析圖鑑（fishing-shared.js，內容沒變就不重新 JSON.parse）。以前每畫一列魚就把整份 500KB 以上的圖鑑重新解析一次。回傳的陣列是共用的，只能讀。
+  function catalog(){return window.FF14Fishing?window.FF14Fishing.catalog():(readJson('fishCatalog',[])||[])}
   function tc(v){try{return typeof window.ff14TcText==='function'?window.ff14TcText(v):String(v??'')}catch{return String(v??'')}}
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
@@ -36,6 +37,7 @@
 
     enLoadPromise=(async()=>{
       try{
+        await window.FF14Fishing.whenActive();   // 英文 Item.csv 很大，釣魚分頁打開後才抓
         const status=document.getElementById('fish-method-status');
         if(status&&!status.textContent.includes('英文名稱'))status.textContent+=' · 正在建立釣法英文名稱索引…';
         const r=await fetch(EN_ITEM_URL,{cache:'force-cache'});

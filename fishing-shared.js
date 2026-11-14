@@ -34,5 +34,18 @@
   function isOceanOnlyItem(itemId,rows=catalog()){const id=Number(itemId);return isOceanOnlyFish(rows.find(fish=>Number(fish?.itemId)===id))}
   function recommendationEligible(fish){return Number(fish?.itemId)>0&&fish?.type!=='spearfishing'&&!isOceanOnlyFish(fish)}
 
-  window.FF14Fishing=Object.freeze({read,catalog,idOf,idSet,caughtIds,skippedIds,locations,locationsForWindow,isOceanLocation,isOceanOnlyFish,isOceanOnlyItem,recommendationEligible});
+  // 釣魚資料很大（XIVAPI 三張表、台服 Item.csv、釣法與 NPC 資料），只看首頁或練等的人不需要。
+  // 各模組的下載一律等「釣魚分頁第一次被打開」才開始；whenActive() 在那一刻兌現，之後永遠是已兌現。
+  let fishingOpen=false;const fishingWaiters=[];
+  function openFishing(){if(fishingOpen)return;fishingOpen=true;for(const done of fishingWaiters.splice(0)){try{done()}catch(e){console.error(e)}}}
+  function whenActive(){return fishingOpen?Promise.resolve():new Promise(done=>fishingWaiters.push(done))}
+  (function watchFishingTab(){
+    if(typeof document==='undefined'||typeof MutationObserver==='undefined'){openFishing();return}
+    const section=document.getElementById('fishing');let hash='';try{hash=decodeURIComponent(location.hash)}catch{}
+    if(!section||section.classList.contains('active')||hash==='#fishing'){openFishing();return}
+    const watcher=new MutationObserver(()=>{if(section.classList.contains('active')){watcher.disconnect();openFishing()}});
+    watcher.observe(section,{attributes:true,attributeFilter:['class']});
+  })();
+
+  window.FF14Fishing=Object.freeze({whenActive,isActive:()=>fishingOpen,read,catalog,idOf,idSet,caughtIds,skippedIds,locations,locationsForWindow,isOceanLocation,isOceanOnlyFish,isOceanOnlyItem,recommendationEligible});
 })();

@@ -113,6 +113,7 @@
     if(!force&&cached?.ts&&Date.now()-Number(cached.ts)<NPC_TC_CACHE_MS){installRenderer();return npcById}
     loadPromise=(async()=>{
       try{
+        await window.FF14Fishing.whenActive();   // 釣魚分頁打開後才抓
         const r=await fetch(NPC_TC_URL,{cache:'force-cache'});
         if(!r.ok)throw new Error(`ENpcResident ${r.status}`);
         const rows=parseNpcCsv(await r.text());

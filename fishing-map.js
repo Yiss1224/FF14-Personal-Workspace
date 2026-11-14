@@ -10,7 +10,7 @@
   let mapIndexPromise=null;
 
   function readStore(key,def=[]){try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}}
-  function catalog(){return readStore('fishCatalog',[])}
+  function catalog(){return window.FF14Fishing?window.FF14Fishing.catalog():readStore('fishCatalog',[])}
   function catalogLocations(){const rows=catalog();if(typeof window.expandFishLocations==='function')return window.expandFishLocations(rows);const out=[];for(const fish of rows){const spots=Array.isArray(fish?.spots)&&fish.spots.length?fish.spots:[fish];spots.forEach(loc=>out.push({...fish,...loc}))}return out}
   function val(id){return document.getElementById(id)?.value||''}
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}

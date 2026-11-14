@@ -5,7 +5,7 @@
   function readJson(key,def){
     try{return JSON.parse(localStorage.getItem(key)||'null')??def}catch{return def}
   }
-  function readCatalog(){return readJson('fishCatalog',[])||[]}
+  function readCatalog(){return window.FF14Fishing?window.FF14Fishing.catalog():(readJson('fishCatalog',[])||[])}
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function norm(v){return String(v??'').trim().toLowerCase()}
   function tc(v){try{return typeof ff14TcText==='function'?ff14TcText(v):String(v??'')}catch{return String(v??'')}}

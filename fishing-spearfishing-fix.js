@@ -163,5 +163,6 @@
 
   // Wait for app.js's own catalog download so the two never race; if it just re-downloaded, redo the spear merge.
   const start=()=>{let sawLoading=false,tries=0;const tick=()=>{if(window.__fishCatalogState==='loading'&&tries++<360){sawLoading=true;setTimeout(tick,500);return}rebuild(sawLoading)};setTimeout(tick,0)};
-  if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',start,{once:true});else start();
+  // 跟魚圖鑑一樣，等釣魚分頁第一次打開才開始（app.js 的下載先登記，所以會先進入 loading 狀態）。
+  window.FF14Fishing.whenActive().then(start);
 })();
