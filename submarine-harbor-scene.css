@@ -22,6 +22,12 @@
 #mini-harbor.has-scene .harbor-submarine{filter:none;transform-origin:50% 100%}
 #mini-harbor.has-scene .harbor-sprite{visibility:hidden;animation:none}
 #mini-harbor.has-scene .harbor-sprite *{animation:none}
+/* Pseudo-elements of the hidden DOM art kept looping forever behind the canvas (wake pulse, footsteps). */
+#mini-harbor.has-scene .harbor-sprite::before,#mini-harbor.has-scene .harbor-sprite::after,
+#mini-harbor.has-scene .harbor-sprite *::before,#mini-harbor.has-scene .harbor-sprite *::after,
+#mini-harbor.has-scene .harbor-yard-props *::before,#mini-harbor.has-scene .harbor-yard-props *::after,
+#mini-harbor.has-scene .harbor-sea *,#mini-harbor.has-scene .harbor-quay *,
+#mini-harbor.has-scene .harbor-quay *::before,#mini-harbor.has-scene .harbor-quay *::after{animation:none}
 #mini-harbor.has-scene .harbor-submarine:focus-visible{outline:2px dashed #fff3c4;outline-offset:2px}
 /* One boat size everywhere: matches the canvas sprite and gives touch screens a larger target. */
 #mini-harbor.has-scene .harbor-submarine{width:44px;height:38px}

@@ -1,0 +1,32 @@
+/* Section folding v1. Folding only ever applies at phone width; the rules outside the media query
+   just keep the toggle out of the way on wider screens. */
+.fold-toggle{display:none}
+@media(max-width:740px){
+  .fold-ready main > section.panel[id] > .fold-head{cursor:pointer;padding-right:44px;-webkit-tap-highlight-color:transparent}
+  .fold-ready main > section.panel[id] > .fold-toggle{display:grid;place-items:center;position:absolute;top:9px;right:8px;width:40px;height:40px;min-height:0;
+    padding:0;margin:0;border:0;border-radius:50%;background:transparent;box-shadow:none;color:var(--ui-muted,#5b6b7c);cursor:pointer}
+  .fold-toggle:hover{background:rgba(0,140,121,.08)}
+  .fold-toggle:focus-visible{outline:2px solid var(--ui-teal,#008c79);outline-offset:1px}
+  .fold-toggle span{width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;
+    transform:translateY(-2px) rotate(45deg);transition:transform .22s cubic-bezier(.3,.8,.3,1)}
+  .fold-toggle[aria-expanded="false"] span{transform:translateX(-2px) rotate(-45deg)}
+  section.panel.is-folded > :not(.fold-head):not(.fold-toggle):not(dialog){display:none!important}
+  section.panel.is-folded{padding-bottom:2px}
+  section.panel.is-folded > h2.fold-head,section.panel.is-folded > .section-title.fold-head{margin-bottom:15px}
+  section.panel.is-folded > .fold-head::after{content:"展開";margin-left:auto;font-size:12px;font-weight:550;color:var(--ui-muted,#5b6b7c);white-space:nowrap}
+  section.panel.is-folded > .section-title.fold-head{display:flex;align-items:center}
+  /* Opening: the content settles in instead of popping. */
+  section.panel.fold-opening > .fold-toggle ~ *{animation:fold-open .26s cubic-bezier(.2,.8,.3,1) both}
+
+  /* The four per-ship build cards: one swipeable row instead of four screens of selects. */
+  #ship-builds.build-grid{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;
+    margin-inline:-14px;padding:2px 14px 10px;scroll-padding-inline:14px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+  #ship-builds.build-grid > *{flex:0 0 86%;min-width:0;scroll-snap-align:start}
+  #ship-builds.build-grid > :only-child{flex-basis:100%}
+}
+@keyframes fold-open{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){
+  .fold-toggle span{transition:none}
+  section.panel > .fold-toggle ~ *{animation:none!important}
+}
+@media print{section.panel.is-folded > *{display:revert!important}}
