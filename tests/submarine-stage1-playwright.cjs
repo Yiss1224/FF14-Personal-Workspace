@@ -259,6 +259,17 @@ async function main(){
     backup.logs=[{date:'2026-09-09',ship:4,route:'X',exp:1,fuel:0,repair:0}];
     await page.setInputFiles('#import-data',{name:'backup.json',mimeType:'application/json',
       buffer:Buffer.from(JSON.stringify({schema:2,app:'ff14-submarine-planner',data:backup}))});
+    // 匯入前先確認：對話框列出備份與目前資料，按下確認前不得寫入。
+    await page.waitForSelector('#sub-dialog[open]');
+    assert.ok(/1 筆出航紀錄/.test(await page.textContent('#sub-dialog')),'確認視窗應列出備份內容');
+    assert.notStrictEqual((await stored(page)).fuel,4321,'確認前不應覆蓋');
+    await page.click('#sub-dialog [data-dialog-cancel]');
+    await page.waitForFunction(()=>!document.querySelector('#sub-dialog[open]'));
+    assert.notStrictEqual((await stored(page)).fuel,4321,'取消後不應覆蓋');
+    await page.setInputFiles('#import-data',{name:'backup.json',mimeType:'application/json',
+      buffer:Buffer.from(JSON.stringify({schema:2,app:'ff14-submarine-planner',data:backup}))});
+    await page.waitForSelector('#sub-dialog[open]');
+    await page.click('#sub-dialog [data-dialog-ok]');
     await page.waitForFunction(()=>document.getElementById('fuel-stock').value==='4321');
     const s=await stored(page);
     assert.strictEqual(s.ships[3].name,'匯入艇');assert.strictEqual(s.logs.length,1);

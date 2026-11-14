@@ -56,6 +56,13 @@
   // ff14TcReplaceTextNode lives in tc-terms.js (longest-name-first). An older override here
   // replaced names in ID order and produced "Northeast 石綠湖"; do not re-add it.
 
+  // The picker lives in fishing-ui-v2.js; read its selects directly. (This used to call a helper that
+  // was never defined, so every picker change threw before the route refresh below could run.)
+  function pickerSelection(){
+    const v=id=>String(document.getElementById(id)?.value||'');
+    return {region:v('fish-picker-region'),zone:v('fish-picker-zone'),spot:v('fish-picker-spot')};
+  }
+
   function hasCurrentSessionRoute(){
     const model=window.__fishingSessionRouteModel,p=pickerSelection();
     return !!(model?.stops?.length&&(!p.region||!model.region||model.region===p.region)&&(!p.zone||!model.zone||model.zone===p.zone));
