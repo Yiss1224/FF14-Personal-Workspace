@@ -284,7 +284,7 @@ function renderSectors(){
   const name=sectorName(map,p.letter);
   return '<button type="button" class="map-point '+(on?'is-open':'is-closed')+'" style="left:'+xy[0]+'%;top:'+xy[1]+'%" data-sector="'+p.id+'" data-tip-code="'+esc(p.letter)+'" data-tip-name="'+esc(name)+'" data-tip-meta="'+esc('Rank '+p.rank+' · '+(on?'已開啟':'未開啟')+' · 點擊切換')+'" aria-pressed="'+on+'" aria-label="'+esc(label+(name?' '+name:'')+'，Rank '+p.rank+'，'+(on?'已開啟':'未開啟')+'；點擊切換')+'">'+esc(p.letter)+'</button>'
  }).join('');
- $('sector-unlocks').innerHTML='<div class="map-tabs" role="tablist" aria-label="海圖">'+tabs+'</div><div class="map-heading"><strong>'+maps[map]+'</strong><span>'+opened+' / '+items.length+' 個海域已開</span><small>滑鼠移到圓點上可看中文點名</small></div><div class="map-stage is-wiki" style="aspect-ratio:'+(mapAspect[map]||1)+'"><img src="'+mapImage(map)+'" alt="'+seaName(map)+'潛水艇海域地圖" loading="lazy"><div class="map-points">'+points+'</div><div class="map-tip" role="tooltip" hidden></div></div><div class="map-legend"><span><i class="legend-dot is-open"></i>已開啟</span><span><i class="legend-dot is-closed"></i>未開啟</span><small>海圖來源：<a href="https://ff14.huijiwiki.com/wiki/%E9%83%A8%E9%98%9F%E6%BD%9C%E6%B0%B4%E8%89%87" target="_blank" rel="noreferrer">灰機 wiki · 部隊潛水艇</a></small></div>';
+ $('sector-unlocks').innerHTML='<div class="map-tabs" role="group" aria-label="海圖">'+tabs+'</div><div class="map-heading"><strong>'+maps[map]+'</strong><span>'+opened+' / '+items.length+' 個海域已開</span><small>滑鼠移到圓點上可看中文點名</small></div><div class="map-stage is-wiki" style="aspect-ratio:'+(mapAspect[map]||1)+'"><img src="'+mapImage(map)+'" alt="'+seaName(map)+'潛水艇海域地圖" loading="lazy"><div class="map-points">'+points+'</div><div class="map-tip" role="tooltip" hidden></div></div><div class="map-legend"><span><i class="legend-dot is-open"></i>已開啟</span><span><i class="legend-dot is-closed"></i>未開啟</span><small>海圖來源：<a href="https://ff14.huijiwiki.com/wiki/%E9%83%A8%E9%98%9F%E6%BD%9C%E6%B0%B4%E8%89%87" target="_blank" rel="noreferrer">灰機 wiki · 部隊潛水艇</a></small></div>';
  $('sector-unlocks').querySelectorAll('[data-map-tab]').forEach(el=>el.onclick=()=>{persist(s=>{s.activeSectorMap=Number(el.dataset.mapTab)});renderSectors()});
  bindMapTips($('sector-unlocks'));
  $('sector-unlocks').querySelectorAll('[data-sector]').forEach(el=>el.onclick=()=>{
@@ -1285,7 +1285,10 @@ async function init(){
    $('calc-departure-time').value=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   }
   function updatePlanner(){savePlannerSettings(manuallySelectedDeparture);calculate()}
-  $('calc-routes').onclick=()=>{refreshDepartureClock();updatePlanner()};
+  $('calc-routes').onclick=()=>{refreshDepartureClock();updatePlanner();
+   // 手機上按鈕和建議之間隔著四艘船的配置（約一千多 px），算完直接帶到建議；結果已在畫面內就不動。
+   const out=$('calc-result');if(out&&out.getBoundingClientRect().top>window.innerHeight)
+    out.scrollIntoView({behavior:window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'})};
   $('pin-add').onclick=addPin;
   $('pin-ships').onchange=()=>{persist(st=>{st.plannerSettings={...(st.plannerSettings||{}),pinShips:Number($('pin-ships').value)===2?2:1}});calculate()};
   ['calc-hours','calc-target-rank','calc-explorers','calc-explore-mode','daily-pickup','pickup-start','pickup-end'].forEach(id=>{

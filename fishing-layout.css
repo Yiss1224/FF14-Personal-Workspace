@@ -62,3 +62,5 @@
 #fishing .fish-spinner{width:16px;height:16px;flex:none;border:2px solid var(--fish-accent-line);border-top-color:var(--fish-accent);border-radius:50%;animation:fish-spin .8s linear infinite}
 @keyframes fish-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){#fishing .fish-spinner{animation:none}}
+/* 手機：主要的「匯入」佔一整排，另外兩顆並排，少佔一排高度。 */
+@media(max-width:700px){#fishing .fish-progress-actions>button:not(.fish-primary){flex:1 1 calc(50% - 6px);padding-left:8px;padding-right:8px}}

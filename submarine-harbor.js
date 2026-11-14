@@ -25,7 +25,7 @@
   fleetEl.innerHTML=starts.map((start,i)=>
     '<div class="harbor-submarine" data-harbor-ship="'+i+'" style="left:'+start+
     '%;--boat-bottom:'+(27+(i%2)*2)+'px;--boat-bottom-mobile:'+
-    (22+(i%2)*2)+'px" tabindex="0" aria-label="潛水艇 '+(i+1)+'，查看航行資訊">'+
+    (22+(i%2)*2)+'px" tabindex="0" role="button" aria-label="潛水艇 '+(i+1)+'，查看航行資訊">'+
       '<div class="harbor-sprite"><span class="harbor-sub-hull"></span><span class="harbor-sub-fin"></span>'+
         '<span class="harbor-conning"></span><span class="harbor-periscope"></span>'+
         '<span class="harbor-sub-window w1"></span><span class="harbor-sub-window w2"></span>'+

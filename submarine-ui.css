@@ -2,8 +2,8 @@
    Does not modify persisted fleet data, route logic, or settlement handlers. */
 :root {
   --ui-bg:#f1f5f8; --ui-surface:#fff; --ui-surface-soft:#f6f9fb;
-  --ui-ink:#1a2d42; --ui-muted:#63758a; --ui-border:#dfe7ee;
-  --ui-navy:#102c47; --ui-navy-deep:#0b1b31; --ui-teal:#007f86;
+  --ui-ink:#1a2d42; --ui-muted:#586a7e; --ui-border:#dfe7ee;
+  --ui-navy:#102c47; --ui-navy-deep:#0b1b31; --ui-teal:#00747b;
   --ui-teal-soft:#e9f7f5; --ui-gold:#e7b970; --ui-shadow:0 10px 36px rgba(15,35,54,.055);
   --ui-ring:rgba(0,137,145,.25); --ui-danger:#ba4143;
   color-scheme:light;
@@ -183,7 +183,10 @@ tbody tr:hover{background:var(--ui-teal-soft);}
   .ops-overview{gap:8px;}
   .ops-metric{padding:12px;}
   .ops-metric-value{font-size:21px;}
-  .stock-grid,.calc-controls{grid-template-columns:1fr;}
+  .stock-grid{grid-template-columns:1fr;}
+  /* 派船設定在手機上維持兩欄，少捲四百多 px；整排的項目另外指定。 */
+  .calc-controls{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+  .calc-controls .build-check{grid-column:1/-1;}
   .settlement-form{grid-template-columns:1fr;}
   .settle-route-select,.settle-loot-section,.settle-wide,.settle-sector-field{grid-column:1;}
   .settle-sector-picker{flex-wrap:wrap;}
@@ -279,3 +282,5 @@ label .hint{font-weight:400}
 .pin-chip.is-done{border-color:var(--ui-border,#dfe7ee);opacity:.75}
 .pin-chip button{min-width:28px;min-height:28px;padding:0;border-radius:50%;line-height:1}
 @media(max-width:700px){.pin-planner-controls{grid-template-columns:1fr}.pin-chip{border-radius:12px}}
+/* 觸控裝置：勾選框放大到好點的尺寸。 */
+@media (pointer:coarse){input[type=checkbox]{width:20px;height:20px;}}
