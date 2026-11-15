@@ -1,6 +1,6 @@
 const fs=require('fs');
 
-const src=fs.readFileSync('fishing-performance-fix.js','utf8');
+const src=fs.readFileSync('fishing-browse.js','utf8');
 
 if(!src.includes('if(scopeSyncTimer!==null)clearTimeout(scopeSyncTimer)')){
   throw new Error('scope updates are not debounced');

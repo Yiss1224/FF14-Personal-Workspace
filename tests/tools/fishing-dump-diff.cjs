@@ -1,16 +1,19 @@
 // 逐字比對兩份完整快照（node tests/fishing-golden-playwright.cjs --dump 產生的檔案）。
 // 重構釣魚頁時用：先對改之前的程式碼錄一份，改完再錄一份，兩份的 HTML、文字、控制項、儲存內容都要一模一樣。
-//   node tests/tools/fishing-dump-diff.cjs before.json after.json [--ignore styles,requests]
+//   node tests/tools/fishing-dump-diff.cjs before.json after.json [--ignore styles,requests] [--strip 'regex']
 'use strict';
 const fs=require('fs');
 const[a,b]=[process.argv[2],process.argv[3]].map(f=>JSON.parse(fs.readFileSync(f,'utf8')));
 const i=process.argv.indexOf('--ignore'),ignore=new Set(i>0?process.argv[i+1].split(','):[]);
+// --strip 'regex'：比對前先從兩邊的 HTML 拿掉符合的片段（例如這次重構刻意移除的屬性）。
+const si=process.argv.indexOf('--strip'),strip=si>0?new RegExp(process.argv[si+1],'g'):null;
 const problems=[];
 function hint(x,y){
   if(typeof x!=='string'||typeof y!=='string')return`\n    前 ${JSON.stringify(x)?.slice(0,300)}\n    後 ${JSON.stringify(y)?.slice(0,300)}`;
   let k=0;while(k<x.length&&k<y.length&&x[k]===y[k])k++;const from=Math.max(0,k-80);
   return`（第 ${k} 個字開始，長度 ${x.length} → ${y.length}）\n    前 …${x.slice(from,k+200)}\n    後 …${y.slice(from,k+200)}`;
 }
+const clean=(part,v)=>strip&&part==='html'&&typeof v==='string'?v.replace(strip,''):v;
 const seen=new Set();
 function same(where,x,y,once){if(JSON.stringify(x)===JSON.stringify(y))return;if(once){if(seen.has(once))return;seen.add(once)}problems.push(`${where}${hint(typeof x==='string'?x:JSON.stringify(x),typeof y==='string'?y:JSON.stringify(y))}`)}
 const byName=list=>new Map(list.map(s=>[s.name,s]));
@@ -26,7 +29,7 @@ for(const name of new Set([...A.keys(),...B.keys()])){
     const p=x.steps[s],q=y.steps[s],at=`${name}/${p.name}`;
     for(const part of ['html','text','controls','storage','globals']){
       if(ignore.has(part))continue;
-      for(const k of new Set([...Object.keys(p[part]||{}),...Object.keys(q[part]||{})]))same(`${at}: ${part}.${k}`,p[part]?.[k]??null,q[part]?.[k]??null,part==='storage'?`${name}|${k}|${p.storage?.[k]}|${q.storage?.[k]}`:null);
+      for(const k of new Set([...Object.keys(p[part]||{}),...Object.keys(q[part]||{})]))same(`${at}: ${part}.${k}`,clean(part,p[part]?.[k]??null),clean(part,q[part]?.[k]??null),part==='storage'?`${name}|${k}|${p.storage?.[k]}|${q.storage?.[k]}`:null);
     }
     if(!ignore.has('styles'))same(`${at}: 注入的樣式`,p.styles,q.styles);
   }

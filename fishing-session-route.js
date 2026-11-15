@@ -2,7 +2,6 @@
 (function(){
   'use strict';
 
-  const APP_VERSION='v2026.09.07.54';
   const DEFAULT_SESSION_MIN=90;
   const ORDINARY_FISH_MIN=5;
   const MOVE_MIN=3;
@@ -50,12 +49,19 @@
   function rankLess(a,b){for(let i=0;i<a.length;i++){if(a[i]===b[i])continue;return a[i]<b[i]}return false}
 
   function ensureUi(){
-    const version=document.querySelector('header p');if(version)version.textContent=version.textContent.replace(/v\d{4}\.\d{2}\.\d{2}\.\d+$/,APP_VERSION);
-    const result=document.getElementById('fish-route-result');if(!result)return null;
-    const section=result.closest('.fishing-route-section'),head=section?.querySelector('.section-head');
-    const title=head?.querySelector('h3');if(title)title.textContent='這張圖怎麼釣';
-    const hint=head?.querySelector('.hint');if(hint)hint.textContent='決定好要刷哪張圖後按「規劃這張圖路線」，會依可釣時間排出先去哪個釣點、等哪隻魚開窗。';
-    const button=document.getElementById('refresh-route-plan');if(button)button.textContent='規劃這張圖路線';
+    let result=document.getElementById('fish-route-result');
+    if(!result){
+      // 路線區塊放在魚清單正上方。
+      const catalog=document.getElementById('fish-catalog');if(!catalog)return null;
+      const created=document.createElement('div');created.className='fishing-route-section';
+      created.innerHTML='<div class="section-head"><div><h3>這張圖怎麼釣</h3><p class="hint">決定好要刷哪張圖後按「規劃這張圖路線」，會依可釣時間排出先去哪個釣點、等哪隻魚開窗。</p></div><button id="refresh-route-plan">規劃這張圖路線</button></div><div class="bait-toolbar"><label class="inline-check"><input id="fish-route-ready-only" type="checkbox"> 只看餌已備妥的釣點</label></div><div id="fish-route-result" class="result"></div>';
+      catalog.insertAdjacentElement('beforebegin',created);
+      const ready=document.getElementById('fish-route-ready-only'),saved=store.get('fishRouteReadyOnly',null);
+      ready.checked=saved===null?false:!!saved;
+      ready.addEventListener('change',e=>{store.set('fishRouteReadyOnly',e.target.checked);preserveOrReady()});
+      result=document.getElementById('fish-route-result');
+    }
+    const section=result.closest('.fishing-route-section');
     const toolbar=section?.querySelector('.bait-toolbar');
     if(toolbar&&!document.getElementById('fish-route-session')){
       const label=document.createElement('label');label.className='fish-route-session-label';
@@ -307,6 +313,14 @@
     const result=document.getElementById('fish-route-result');if(result){restoreObserver=new MutationObserver(()=>{if(snapshotMatchesCurrent()&&!result.querySelector('.session-route-list'))queueMicrotask(restoreSnapshot)});restoreObserver.observe(result,{childList:true})}
     restoreTimer=setInterval(()=>{if(snapshotMatchesCurrent()){const box=document.getElementById('fish-route-result');if(box&&!box.querySelector('.session-route-list'))restoreSnapshot()}},1000);preserveOrReady();
   }
+
+  // 換地區／地圖／釣點之後：手上的路線還是這張圖的就只更新地圖上的標記，否則回到「請按規劃」的提示。
+  function hasCurrentRoute(){const model=window.__fishingSessionRouteModel,p=pickerMap();return !!(model?.stops?.length&&(!p.region||!model.region||model.region===p.region)&&(!p.zone||!model.zone||model.zone===p.zone))}
+  function refreshAfterPickerChange(){
+    try{if(hasCurrentRoute())window.refreshFishingSessionRouteMap?.();else preserveOrReady()}catch(e){console.warn('route planner refresh failed',e)}
+    setTimeout(()=>{try{if(typeof window.ff14TcApply==='function')window.ff14TcApply()}catch{}},0);
+  }
+  document.addEventListener('change',e=>{if(['fish-picker-region','fish-picker-zone','fish-picker-spot'].includes(e.target?.id))setTimeout(refreshAfterPickerChange,0)});
 
   window.renderSessionFishingRoute=render;window.renderRoutePlanner=preserveOrReady;window.resetSessionFishingRoute=preserveOrReady;window.preserveSessionFishingRoute=restoreSnapshot;
   window.addEventListener('DOMContentLoaded',init);window.addEventListener('pagehide',()=>{if(restoreTimer)clearInterval(restoreTimer);restoreObserver?.disconnect()},{once:true});
