@@ -18,7 +18,7 @@ jobs:
       - name: Syntax check
         run: |
           node --check fishing-session-route.js
-          node --check fishing-guide-scope.js
+          node --check fishing-guide.js
           node --check fishing-session-route-map.js
       - name: Session route smoke test
         run: node tests/session-route-smoke.cjs
@@ -26,7 +26,7 @@ jobs:
         run: |
           node <<'NODE'
           const fs=require('fs');
-          const scope=fs.readFileSync('fishing-guide-scope.js','utf8');
+          const scope=fs.readFileSync('fishing-guide.js','utf8');
           const map=fs.readFileSync('fishing-session-route-map.js','utf8');
           if(scope.includes('fish-route-result'))throw new Error('guide scope must not write or clear Session route result');
           if(!map.includes("observe(result,{childList:true,subtree:true})"))throw new Error('route map observer must stay scoped to Session result');

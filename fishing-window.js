@@ -1,4 +1,13 @@
+// 魚窗：每條魚什麼時候釣得到（ET 時段 × 天氣），以及魚清單上的即時顯示。
+// 天氣用遊戲的天氣演算法從現實時間算出來；每條魚的條件與各地天氣機率來自 ff14-fish-tracker-app 的 data.js。
+//
+// 對外：
+//   await window.ff14FishingWindowInfo(itemId, now)   {restricted,current,next,waitMs,currentLeftMs,…}；
+//                                                     restricted=false 表示隨時可釣，出海垂釣限定的魚回 null
+//   await window.ff14FishingPrerequisites(itemId)     直感前置魚 [{itemId,count}]
+// 畫面：每列魚的釣法面板多一行「🟢 現在可釣…／⏳ …後開窗」，每個釣點標題多一個窗口摘要。
 (function(){'use strict';
+const shared=window.FF14Fishing;
 const SOURCE='https://raw.githubusercontent.com/icykoneko/ff14-fish-tracker-app/5b293c630987f816ad76bab52cae2c0d5d016c9a/js/app/data.js';
 const WEATHER_PERIOD_SEC=1400,EORZEA_HOUR_SEC=175,EORZEA_DAY_SEC=4200,MAX_PERIODS=2500;
 const WINDOW_CACHE_BUCKET_MS=60*1000,WINDOW_CACHE_MAX=4096,WEATHER_CACHE_MAX=50000;
@@ -62,13 +71,12 @@ function visibleRows(){const root=document.getElementById('fish-catalog');if(!ro
 function applyRows(){if(!data)return;const now=Date.now();for(const row of visibleRows()){const grid=row.querySelector('.fish-method-grid');if(!grid)continue;const id=itemIdFromRow(row),i=info(id,now),text=i?describe(id,now,i):null;if(!text)continue;let el=grid.querySelector('.fish-window-live');if(!el){el=document.createElement('span');el.className='fish-window-live';grid.appendChild(el)}if(el.textContent!==text)el.textContent=text}}
 async function refresh(){await loadData();if(data)applyRows()}
 async function sharedInfo(itemId,now=Date.now()){
-  if(window.FF14Fishing?.isOceanOnlyItem(itemId))return null;
+  if(shared.isOceanOnlyItem(itemId))return null;
   await loadData();if(!data)return null;
   const known=info(itemId,now);if(known)return known;
   const id=Number(itemId)||0;
   return{itemId:id,locationId:0,territoryId:0,restricted:false,timeUnlimited:true,weatherLimited:false,startHour:0,endHour:24,current:null,next:null,waitMs:0,currentLeftMs:null,nextDurationMs:null,fallback:true};
 }
-async function sharedDescribe(itemId,now=Date.now()){await loadData();if(!data)return null;const i=info(itemId,now);return i?describe(itemId,now,i):null}
 async function sharedPrerequisites(itemId){await loadData();return data?prerequisites(itemId):[]}
 function schedule(delay=60){clearTimeout(refreshTimer);refreshTimer=setTimeout(refresh,delay)}
 function bindCatalogObserver(){
@@ -87,6 +95,66 @@ function init(){
   document.addEventListener('toggle',e=>{if(e.target?.closest?.('#fish-catalog'))schedule(20)},true);
   setInterval(()=>{if(document.getElementById('fishing')?.classList.contains('active'))applyRows()},15000);
 }
-window.ff14FishingWindowInfo=sharedInfo;window.ff14FishingWindowDescribe=sharedDescribe;window.ff14FishingPrerequisites=sharedPrerequisites;window.preloadFishingWindows=loadData;
-window.addEventListener('DOMContentLoaded',init);window.refreshFishingWindows=refresh;
+
+// ---- 每個釣點標題上的窗口摘要（「🟢 2 條開窗 · 最快 12 分後關」） ----
+let spotToken=0,spotTimer=null;
+  function fmtHoursMinutes(ms){
+    if(!Number.isFinite(ms)||ms<0)return'—';
+    const min=Math.max(0,Math.round(ms/60000));
+    if(min<60)return`${min} 分`;
+    const h=Math.floor(min/60),m=min%60;
+    return m?`${h} 小時 ${m} 分`:`${h} 小時`;
+  }
+  function ensureStyle(){
+    if(document.getElementById('fish-spot-window-style'))return;
+    const style=document.createElement('style');style.id='fish-spot-window-style';style.textContent=`
+      .fish-spot-window-summary{margin-left:auto;display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;background:rgba(127,127,127,.10)}
+      .fish-spot-window-summary.current{background:rgba(52,168,83,.13)}
+      .fish-spot-window-summary.soon{background:rgba(245,166,35,.13)}
+      .fish-spot-window-summary.none{opacity:.62;font-weight:600}
+      @media(max-width:700px){.fish-spot-window-summary{margin-left:0;flex-basis:auto;max-width:100%;white-space:normal}}
+    `;document.head.appendChild(style);
+  }
+  function setSummary(details,text,state='none'){
+    const summary=details?.querySelector?.(':scope > summary');if(!summary)return;
+    let el=summary.querySelector('.fish-spot-window-summary');
+    if(!el){el=document.createElement('span');el.className='fish-spot-window-summary';summary.appendChild(el)}
+    el.className=`fish-spot-window-summary ${state}`;
+    if(el.textContent!==text)el.textContent=text;
+  }
+
+  async function refreshSpotSummaries(){
+    const token=++spotToken,done=shared.caughtIds(),skip=shared.skippedIds(),byId=new Map(shared.catalog().map(f=>[Number(f?.itemId),f])),hideBig=!!document.getElementById('fish-hide-big')?.checked,now=Date.now();
+    const spots=[...document.querySelectorAll('#fish-catalog details.spot')];
+    for(const details of spots){
+      if(token!==spotToken)return;
+      const ids=[...new Set([...details.querySelectorAll('.fish-row')].map(itemIdFromRow).filter(id=>id>0&&!done.has(id)&&!skip.has(id)&&!(hideBig&&byId.get(id)?.bigFish)))];
+      if(!ids.length){setSummary(details,'⚪ 無待處理窗口魚','none');continue}
+      const infos=(await Promise.all(ids.map(async id=>({id,info:await sharedInfo(id,now)})))).filter(x=>x.info?.restricted);
+      if(token!==spotToken)return;
+      if(!infos.length){setSummary(details,'⚪ 無窗口魚','none');continue}
+      const current=infos.filter(x=>x.info.current),future=infos.filter(x=>!x.info.current&&x.info.next).sort((a,b)=>(a.info.waitMs??Infinity)-(b.info.waitMs??Infinity));
+      if(current.length){
+        const close=Math.min(...current.map(x=>Number(x.info.currentLeftMs)).filter(Number.isFinite));
+        let text=`🟢 ${current.length} 條開窗`;
+        if(Number.isFinite(close))text+=` · 最快 ${fmtHoursMinutes(close)}後關`;
+        if(future.length)text+=` · ⏳ ${fmtHoursMinutes(future[0].info.waitMs)}後`;
+        setSummary(details,text,'current');
+      }else if(future.length){
+        setSummary(details,`⏳ ${fmtHoursMinutes(future[0].info.waitMs)}後開窗`,'soon');
+      }else setSummary(details,'⚪ 暫無未來窗口','none');
+    }
+  }
+
+  function scheduleSpotSummaries(){clearTimeout(spotTimer);spotTimer=setTimeout(refreshSpotSummaries,100)}
+  function initSpotSummaries(){
+    ensureStyle();
+    const root=document.getElementById('fish-catalog');if(root)new MutationObserver(scheduleSpotSummaries).observe(root,{childList:true,subtree:true});
+    for(const id of ['fish-hide-big','fish-only-missing','fish-hide-skipped','fish-search','fish-picker-region','fish-picker-zone','fish-picker-spot'])document.getElementById(id)?.addEventListener('change',scheduleSpotSummaries);
+    document.getElementById('fish-search')?.addEventListener('input',scheduleSpotSummaries);
+    scheduleSpotSummaries();
+    setInterval(()=>{if(document.getElementById('fishing')?.classList.contains('active'))refreshSpotSummaries()},15000);
+  }
+window.ff14FishingWindowInfo=sharedInfo;window.ff14FishingPrerequisites=sharedPrerequisites;
+window.addEventListener('DOMContentLoaded',()=>{init();initSpotSummaries()});
 })();

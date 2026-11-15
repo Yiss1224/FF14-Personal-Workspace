@@ -8,12 +8,12 @@ let ff14TcCache={ts:0,items:{},places:{},weather:{},itemEnglish:{},unresolved:[]
 function ff14TcLoadCache(){try{const x=JSON.parse(localStorage.getItem(FF14_TC_CACHE_KEY)||'null');if(x&&typeof x==='object')ff14TcCache={ts:Number(x.ts)||0,items:x.items||{},places:x.places||{},weather:x.weather||{},itemEnglish:x.itemEnglish||{},unresolved:Array.isArray(x.unresolved)?x.unresolved:[]}}catch{}return ff14TcCache}
 function ff14TcSaveCache(){try{localStorage.setItem(FF14_TC_CACHE_KEY,JSON.stringify(ff14TcCache))}catch(e){console.warn('TC term cache save failed',e)}}
 function ff14TcCsvLine(line){const out=[];let cur='',quoted=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(quoted&&line[i+1]==='"'){cur+='"';i++}else quoted=!quoted}else if(c===','&&!quoted){out.push(cur);cur=''}else cur+=c}out.push(cur);return out}
-function ff14TcCsvMeta(text){const lines=String(text||'').replace(/^\uFEFF/,'').split(/\r?\n/),heads=ff14TcCsvLine(lines[1]||'');let nameIndex=heads.indexOf('Name');if(nameIndex<0)nameIndex=heads.indexOf('Singular');if(nameIndex<0)nameIndex=1;return{lines,nameIndex}}
+function ff14TcCsvMeta(text){const lines=String(text||'').replace(/^\uFEFF/,'').split(/\r?\n/),heads=ff14TcCsvLine(lines[1]||'');let nameIndex=heads.indexOf('Singular');if(nameIndex<0)nameIndex=heads.indexOf('Name');if(nameIndex<0)nameIndex=1;return{lines,nameIndex}}
 function ff14TcNamesById(text,neededIds=null){const{lines,nameIndex}=ff14TcCsvMeta(text),out={};for(let i=3;i<lines.length;i++){if(!lines[i])continue;const row=ff14TcCsvLine(lines[i]),id=Number(row[0]);if(!Number.isFinite(id))continue;if(neededIds&&!neededIds.has(id))continue;const name=String(row[nameIndex]||'').trim();if(name)out[id]=name}return out}
 function ff14TcPairNames(enText,tcText){const en=ff14TcNamesById(enText),tc=ff14TcNamesById(tcText),out={};for(const[id,enName]of Object.entries(en)){const tcName=tc[id];if(enName&&tcName&&enName!==tcName)out[enName]=tcName}return out}
 async function ff14TcFetchText(url){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error(`${r.status} ${url.split('/').pop()}`);return r.text()}
 function ff14TcNeededFishIds(){return new Set((store.get('fishCatalog',[])||[]).map(x=>Number(x.itemId)).filter(Number.isFinite))}
-async function ff14TcResolveVisibleBaits(){if(typeof fgResolveBaitItemId!=='function'||typeof fgPathNames!=='function'||typeof fgMethodForName!=='function')return new Map();const names=new Set();for(const fish of(store.get('fishCatalog',[])||[])){const m=fgMethodForName(fish.name);if(!m)continue;for(const n of fgPathNames(m.bestCatchPath))if(n&&n!==fish.name)names.add(n)}const list=[...names].slice(0,180),result=new Map(),workers=6;let cursor=0;async function work(){while(cursor<list.length){const name=list[cursor++];try{const id=await fgResolveBaitItemId(name);if(id)result.set(name,id)}catch{}}}await Promise.all(Array.from({length:workers},work));return result}
+async function ff14TcResolveVisibleBaits(){const guide=window.FF14FishGuide;if(!guide)return new Map();const names=new Set();for(const fish of(store.get('fishCatalog',[])||[])){const m=guide.methodForName(fish.name);if(!m)continue;for(const n of guide.pathNames(m.bestCatchPath))if(n&&n!==fish.name)names.add(n)}const list=[...names].slice(0,180),result=new Map(),workers=6;let cursor=0;async function work(){while(cursor<list.length){const name=list[cursor++];try{const id=await guide.resolveBaitItemId(name);if(id)result.set(name,id)}catch{}}}await Promise.all(Array.from({length:workers},work));return result}
 async function ff14TcRefresh(force=false){if(ff14TcBusy)return;ff14TcBusy=true;
 // 魚圖鑑還在下載時先等它：否則會先用空的魚清單抓一次台服 Item.csv，圖鑑到了再整包重抓一次。
 if(!force){for(let i=0;i<360&&window.__fishCatalogState==='loading';i++)await new Promise(r=>setTimeout(r,500))}
@@ -40,6 +40,66 @@ function ff14TcApply(){if(ff14TcApplying)return;ff14TcApplying=true;try{ff14TcLo
 function ff14TcScheduleApply(){if(ff14TcApplying)return;clearTimeout(ff14TcApplyTimer);ff14TcApplyTimer=setTimeout(ff14TcApply,40)}
 function ff14TcInit(){ff14TcLoadCache();const refresh=document.getElementById('refresh-fish-data');if(refresh&&!document.getElementById('refresh-tc-terms')){const b=document.createElement('button');b.id='refresh-tc-terms';b.textContent='台服繁中名詞';b.title='重新下載台服繁中遊戲資料並更新顯示名稱';b.onclick=()=>ff14TcRefresh(true);refresh.insertAdjacentElement('afterend',b)}const target=document.getElementById('fishing');if(target){ff14TcObserver=new MutationObserver(ff14TcScheduleApply);ff14TcObserver.observe(target,{childList:true,subtree:true})}ff14TcApply();
 // 台服名詞要下載好幾份 CSV，等釣魚分頁第一次打開才抓。
-(window.FF14Fishing?window.FF14Fishing.whenActive():Promise.resolve()).then(()=>{setTimeout(()=>ff14TcRefresh(false),1200);setTimeout(()=>ff14TcRefresh(false),8000)})}
+(window.FF14Fishing?window.FF14Fishing.whenActive():Promise.resolve()).then(()=>{for(const delay of[1200,2500,8000])setTimeout(()=>ff14TcRefresh(false),delay)})}
 window.addEventListener('DOMContentLoaded',ff14TcInit);
 window.refreshFF14TcTerms=()=>ff14TcRefresh(true);
+
+// ---- NPC 名稱（賣魚餌的商人） ----
+// NPC 在 ENpcResident 這張表，跟物品是不同的資料，不能拿物品／魚的字典來翻。用 NPC 的 ID 查。
+// 對外：window.ff14TcNpc.name(npc) / .title(npc)，npc 是 {id,name,title}，查不到就回原本的英文。
+(function(){
+  'use strict';
+  const NPC_TC_URL=`${FF14_TC_BASE}/ENpcResident.csv`;
+  const NPC_TC_CACHE_KEY='ff14TcNpcResidentV1';
+  let npcById=new Map(),loadPromise=null;
+
+  function parseNpcCsv(text){
+    // 台服表格格式：第 1 行 Key,0,1…／第 2 行欄位名（#,Singular,…,Title）／第 3 行型別／第 4 行起是資料
+    const lines=String(text||'').replace(/^﻿/,'').split(/\r?\n/),out={};
+    const header=ff14TcCsvLine(lines[1]||''),nameIndex=header.indexOf('Singular'),titleIndex=header.indexOf('Title');
+    if(nameIndex<0)throw new Error('ENpcResident 欄位格式異常');
+    for(let i=2;i<lines.length;i++){
+      if(!lines[i])continue;
+      const row=ff14TcCsvLine(lines[i]),id=Number(row[0]);
+      if(!Number.isFinite(id))continue;
+      const name=String(row[nameIndex]||'').trim(),title=titleIndex>=0?String(row[titleIndex]||'').trim():'';
+      if(name||title)out[String(id)]={name,title};
+    }
+    return out;
+  }
+  function readCache(){
+    try{
+      const x=JSON.parse(localStorage.getItem(NPC_TC_CACHE_KEY)||'null');
+      if(x?.rows&&typeof x.rows==='object'){npcById=new Map(Object.entries(x.rows));return x}
+    }catch{}
+    return null;
+  }
+  const entry=v=>npcById.get(String(Number(v?.id)||''));
+  // NPC 名稱到了之後，採買清單要重畫才看得到譯名。
+  function rerender(){
+    try{window.renderBaitShoppingList?.()}catch(e){console.warn('NPC TC bait rerender failed',e)}
+    try{window.renderVendorPlan?.()}catch(e){console.warn('NPC TC vendor rerender failed',e)}
+  }
+  async function load(force=false){
+    if(loadPromise)return loadPromise;
+    const cached=readCache();
+    if(!force&&cached?.ts&&Date.now()-Number(cached.ts)<FF14_TC_CACHE_MS)return npcById;
+    loadPromise=(async()=>{
+      try{
+        await window.FF14Fishing.whenActive();   // 釣魚分頁打開後才抓
+        const r=await fetch(NPC_TC_URL,{cache:'force-cache'});
+        if(!r.ok)throw new Error(`ENpcResident ${r.status}`);
+        const rows=parseNpcCsv(await r.text());
+        npcById=new Map(Object.entries(rows));
+        try{localStorage.setItem(NPC_TC_CACHE_KEY,JSON.stringify({ts:Date.now(),rows}))}catch{}
+        rerender();
+      }catch(e){console.warn('NPC TC data load failed',e)}
+      finally{loadPromise=null}
+      return npcById;
+    })();
+    return loadPromise;
+  }
+  window.ff14TcNpc=Object.freeze({name:v=>entry(v)?.name||String(v?.name||''),title:v=>entry(v)?.title||String(v?.title||'')});
+  readCache();
+  window.addEventListener('DOMContentLoaded',()=>{load(false).then(rerender)});
+})();
