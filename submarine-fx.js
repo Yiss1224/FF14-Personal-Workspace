@@ -82,17 +82,25 @@
         if(b.r>2.6){ctx.fillStyle='rgba(255,255,255,'+(fade*.55).toFixed(3)+')';ctx.fillRect(b.x-b.r*.4,b.y-b.r*.45,1,1)}
       }
     }
+    // Full rate only while someone is around: every frame for a minute after the last input, then
+    // 12 fps, then 4 fps once the page has sat untouched for five minutes (a tab left open for hours).
+    let timer=0,lastInput=performance.now(),slow=0;
     function loop(ts){
       raf=0;
       if(document.hidden||reduced()||!onScreen)return;
-      const dt=last?Math.min(.05,(ts-last)/1000):0;last=ts;
+      const dt=last?Math.min(slow?.3:.05,(ts-last)/1000):0;last=ts;
       nextPing-=dt;
       if(nextPing<=0){const p=anchorPoint();ping(p.x,p.y,false);nextPing=rand(6,10)}
       draw(dt);
-      raf=requestAnimationFrame(loop);
+      const idle=performance.now()-lastInput;
+      slow=idle<60000?0:idle<300000?83:250;
+      if(slow)timer=window.setTimeout(()=>{timer=0;raf=requestAnimationFrame(loop)},slow-16);
+      else raf=requestAnimationFrame(loop);
     }
-    function start(){if(!raf&&!reduced()&&!document.hidden&&onScreen){last=0;raf=requestAnimationFrame(loop)}}
-    function stop(){if(raf){cancelAnimationFrame(raf);raf=0}}
+    function start(){if(!raf&&!timer&&!reduced()&&!document.hidden&&onScreen){last=0;raf=requestAnimationFrame(loop)}}
+    function stop(){if(raf){cancelAnimationFrame(raf);raf=0}if(timer){window.clearTimeout(timer);timer=0}}
+    function wake(){lastInput=performance.now();if(timer){window.clearTimeout(timer);timer=0;slow=0;raf=requestAnimationFrame(loop)}}
+    ['pointermove','pointerdown','keydown','wheel','touchstart','scroll'].forEach(name=>window.addEventListener(name,wake,{passive:true,capture:true}));
     header.addEventListener('pointermove',e=>{const r=header.getBoundingClientRect();pointer={x:e.clientX-r.left,y:e.clientY-r.top}},{passive:true});
     header.addEventListener('pointerleave',()=>{pointer=null},{passive:true});
     header.addEventListener('click',e=>{
@@ -110,7 +118,7 @@
     document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();else start()});
     motion.addEventListener('change',()=>{stop();if(reduced()){ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height)}else start()});
     resize();start();
-    window.BridgeFx=Object.assign(window.BridgeFx||{},{hero:()=>({running:Boolean(raf),bubbles:bubbles.length,pings:pings.length})});
+    window.BridgeFx=Object.assign(window.BridgeFx||{},{hero:()=>({running:Boolean(raf||timer),slow,bubbles:bubbles.length,pings:pings.length}),idleFor:ms=>{lastInput=performance.now()-ms}});
   })();
 
   /* ---------- 2. Navigation: sliding highlight and page progress ---------- */

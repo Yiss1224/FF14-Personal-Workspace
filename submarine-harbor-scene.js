@@ -500,14 +500,14 @@
   function berthX(i){return G&&G.piers[i+1]!==undefined?Math.round((G.piers[i]+G.piers[i+1])/2):null}
   // Departure: the berth signal turns green, two blasts of steam from the tower, the deck crew waves.
   function departRitual(i){
-    signalAt(i,'#5fe08a',6);
+    wake();signalAt(i,'#5fe08a',6);
     const x=berthX(i);if(x!==null)waveAt(x,3);
     [0.15,0.9].forEach(at=>setTimeout(()=>{const d=boatState[i]?.draw;if(d)for(let k=0;k<6;k++)puffs.push({x:d.towerX+(Math.random()-.5)*2,y:d.y0-1,vx:(Math.random()-.5)*3+wind,vy:-4-Math.random()*3,life:0,max:1.4+Math.random()*.6})},at*1000));
     horn();
   }
   // Return: amber signal and a wave from the deck crew.
   function welcome(i){
-    signalAt(i,'#ffc24a',7);
+    wake();signalAt(i,'#ffc24a',7);
     const x=berthX(i);if(x!==null)waveAt(x,3.5);
   }
   function drawSignals(g,lights,dt,t){
@@ -613,6 +613,7 @@ progress:parseFloat(b.style.getPropertyValue('--progress'))||0,
         big:G.big[i]&&b.offsetWidth*scale>=36};
     });
   }
+  const labels=[];
   function drawBoat(g,lights,info,P,t,dt){
     const st=boatState[info.i],flip=info.returning;
     const nowAtSea=info.dy<-2;
@@ -623,14 +624,15 @@ progress:parseFloat(b.style.getPropertyValue('--progress'))||0,
     if(st.lastX!==null)st.vx=st.vx*.8+((info.x-st.lastX)/Math.max(dt,.001))*.2;st.lastX=info.x;
     const moving=Math.abs(st.vx)>.6,atSea=info.dy<-2,moored=!info.sailing&&!atSea;
     const colors={...BASE,S:SHIP_COLORS[info.i],w:P.light>.3?'#ffd98a':BASE.w};
-    const big=info.big||atSea,rows=big?SUB_BIG:SUB_SMALL,spr=big?subSprite(builds[info.i],SHIP_COLORS[info.i],P.light>.3,flip):sprite(rows,colors,flip);
+    // Phones (compact): boats out at sea use the small sprite, so four lanes fit in the short water.
+    const compact=W<520,big=atSea?!compact:info.big,rows=big?SUB_BIG:SUB_SMALL,spr=big?subSprite(builds[info.i],SHIP_COLORS[info.i],P.light>.3,flip):sprite(rows,colors,flip);
     // Surfaced and moored: hull and portholes above water, periscope retracted.
     // Out at sea: periscope depth, only the tower, its number and the hull's crown show.
     const top=moored&&big?2:0,wl=atSea?(big?8.5:4.5):moored?(big?12.5:6.5):(big?11.5:5.5),visible=atSea?(big?9:5):spr.height;
     const bob=Math.round(Math.sin(t*st.f+st.ph)*(atSea?.5:.6)+Math.sin(t*st.f*2.3+st.ph2)*.4);
     const cx=Math.round(info.x),waterY=Math.round(G.waterline+info.dy);
     const x0=cx-Math.floor(spr.width/2),y0=waterY-Math.ceil(wl)+bob;
-    const towerX=x0+(flip?spr.width-1-12:12);
+    const towerCol=big?12:5,towerX=x0+(flip?spr.width-1-towerCol:towerCol);
     st.draw=null;
     // Wake: from the stern when surfaced, from the conning tower at periscope depth.
     if(info.sailing&&!info.awaiting){
@@ -654,10 +656,22 @@ progress:parseFloat(b.style.getPropertyValue('--progress'))||0,
     st.draw={i:info.i,x0,y0,w:spr.width,h:spr.height,flip,big,moored,awaiting:info.awaiting,waterY,cx,towerX};
     if(atSea){g.fillStyle='rgba(225,247,245,.5)';g.fillRect(towerX-4,waterY,1,1);g.fillRect(towerX+3,waterY,1,1)}
     // Voyage progress bar above the tower: green on the way out, amber on the way home.
+    // Queued and painted after every hull, so a neighbour never covers a bar.
     if(info.sailing&&!info.awaiting){
-      const bw=12,bx=towerX-Math.floor(bw/2)-1,by=y0+top-5,fill=Math.max(1,Math.round(bw*Math.min(1,info.progress)));
-      g.fillStyle='#0b1220';g.fillRect(bx,by,bw+2,4);g.fillStyle='#3d4d6b';g.fillRect(bx+1,by+1,bw,2);
-      g.fillStyle=info.returning?'#ffc24a':'#5fe08a';g.fillRect(bx+1,by+1,fill,2);
+      const done=Math.min(1,info.progress),tone=info.returning?'#ffc24a':'#5fe08a';
+      if(compact&&atSea)labels.push(()=>{
+        // Small boats carry no hull number, so the plate shows it next to the bar.
+        const lw=14,lx=clamp(towerX-7,0,w-lw),ly=y0-8;
+        g.fillStyle='#0b1220';g.fillRect(lx,ly,lw,7);
+        drawDigit(g,info.i+1,lx+1,ly+1,SHIP_COLORS[info.i]);
+        g.fillStyle='#3d4d6b';g.fillRect(lx+5,ly+2,8,3);
+        g.fillStyle=tone;g.fillRect(lx+5,ly+2,Math.max(1,Math.round(8*done)),3);
+      });
+      else labels.push(()=>{
+        const bw=12,bx=towerX-Math.floor(bw/2)-1,by=y0+top-5,fill=Math.max(1,Math.round(bw*done));
+        g.fillStyle='#0b1220';g.fillRect(bx,by,bw+2,4);g.fillStyle='#3d4d6b';g.fillRect(bx+1,by+1,bw,2);
+        g.fillStyle=tone;g.fillRect(bx+1,by+1,fill,2);
+      });
     }
     // Hull number painted on the conning tower.
     if(big)drawDigit(g,info.i+1,x0+(flip?10:11),y0+3,'#f3e7c4');
@@ -678,7 +692,7 @@ progress:parseFloat(b.style.getPropertyValue('--progress'))||0,
   }
 
   /* ---------- frame ---------- */
-  let last=0,acc=0,raf=0,t=Math.random()*100,frameMs=[],P=palette(nowHour()),paletteAt=0;
+  let last=0,raf=0,t=Math.random()*100,frameMs=[],P=palette(nowHour()),paletteAt=0;
   function frame(dt){
     const t0=performance.now();
     if(performance.now()-paletteAt>(performance.now()<wxFastUntil?250:3000)||!paletteAt){
@@ -707,7 +721,9 @@ progress:parseFloat(b.style.getPropertyValue('--progress'))||0,
     drawAetheryte(g,t);
     for(const wk of workers){if(wk.wave>0)wk.wave-=dt;updateWorker(wk,dt);drawWorker(g,wk)}
     drawFisher(g,t,dt);drawSmoke(g,P,dt);
+    labels.length=0;
     for(const info of (env?env.boats:boatsInfo()))if(info)drawBoat(g,lights,info,P,t,dt);
+    for(const paint of labels)paint();
     drawSignals(g,lights,dt,t);drawPuffs(g,dt);
     if(events)events.draw('actors',g,env);
     if(P.tint[3]>0){g.globalCompositeOperation='source-atop';g.fillStyle=css(P.tint,P.tint[3]*.85);g.fillRect(0,0,w,h);g.globalCompositeOperation='source-over'}
@@ -820,15 +836,40 @@ progress:parseFloat(b.style.getPropertyValue('--progress'))||0,
     grd.addColorStop(0,'rgba('+c+','+a.toFixed(2)+')');grd.addColorStop(1,'rgba('+c+',0)');
     ctx.fillStyle=grd;ctx.fillRect(x-r,y-r,r*2,r*2);
   }
+  // Pacing. The scene is decoration on a page people leave open for hours, so it only runs at full
+  // rate while someone is around: 20 fps for a minute after the last input (or fleet moment), then 10,
+  // then 4 once the page has sat untouched for five minutes. Tucked away it ticks once a second, enough
+  // to notice a return (chime, status). Frames are asked for one at a time through a timer, so the
+  // browser is not woken 60 times a second just to skip two frames out of three.
+  const PACE=[[60000,1000/FPS],[300000,100],[Infinity,250]];
+  let timer=0,lastInput=performance.now(),paceMs=1000/FPS;
+  function pace(){
+    if(dock.classList.contains('is-collapsed'))return 1000;
+    const idle=performance.now()-lastInput;
+    for(const [until,ms] of PACE)if(idle<until)return ms;
+    return 250;
+  }
+  function queue(){
+    if(raf||timer||document.hidden||reduced())return;
+    paceMs=pace();
+    timer=window.setTimeout(()=>{timer=0;raf=requestAnimationFrame(loop)},Math.max(0,paceMs-16));
+  }
   function loop(ts){
     raf=0;
     if(document.hidden||reduced())return;
-    const dt=last?Math.min(.25,(ts-last)/1000):1/FPS;
-    acc+=dt;last=ts;
-    // Tucked away: tick once a second, enough to notice a return (chime, status) without drawing for nobody.
-    if(acc>=(dock.classList.contains('is-collapsed')?1:1/FPS)){frame(frozen?0:acc);acc=0}
-    raf=requestAnimationFrame(loop);
+    const dt=last?Math.min(paceMs>=1000?1.2:.3,(ts-last)/1000):1/FPS;
+    last=ts;
+    frame(frozen?0:dt);
+    queue();
   }
+  // Someone is here (or the fleet is doing something worth watching): back to full rate at once.
+  function wake(){
+    lastInput=performance.now();
+    if(paceMs>1000/FPS&&timer&&!dock.classList.contains('is-collapsed')){window.clearTimeout(timer);timer=0;paceMs=1000/FPS;raf=requestAnimationFrame(loop)}
+  }
+  ['pointermove','pointerdown','keydown','wheel','touchstart','scroll'].forEach(name=>window.addEventListener(name,wake,{passive:true,capture:true}));
+  // Opening or tucking the harbor away changes the pace straight away, not after the pending tick.
+  window.addEventListener('harbor-collapse-changed',()=>{lastInput=performance.now();if(timer){window.clearTimeout(timer);timer=0;raf=requestAnimationFrame(loop)}});
   function start(){
     // Apply the scene layout first (boat size), then measure; undo if the stage has no size yet.
     dock.classList.add('has-scene');
@@ -836,9 +877,9 @@ progress:parseFloat(b.style.getPropertyValue('--progress'))||0,
     if(!far.placed){placeWorkers();far.placed=true}
     buildControls();
     if(reduced()){frame(0);return}            // still image; refreshed on data updates
-    if(!raf){last=0;raf=requestAnimationFrame(loop)}
+    if(!raf&&!timer){last=0;lastInput=performance.now();paceMs=1000/FPS;raf=requestAnimationFrame(loop)}
   }
-  function stop(){if(raf){cancelAnimationFrame(raf);raf=0}}
+  function stop(){if(raf){cancelAnimationFrame(raf);raf=0}if(timer){window.clearTimeout(timer);timer=0}}
   /* ---------- controls: Eorzea clock, weather, housing district, sound ---------- */
   let controls=null;
   function buildControls(){
@@ -877,7 +918,9 @@ progress:parseFloat(b.style.getPropertyValue('--progress'))||0,
   // Read-only diagnostics for performance checks.
   window.HarborScene={events:events?events.publicApi:null,
     time:()=>{const E=window.HarborEorzea;return {et:E?E.eorzeaTime(Date.now()):null,hour:nowHour(),weather:weatherId,zone:prefs.zone,sound:Boolean(prefs.sound),builds:builds.slice()}},
+    // Test hook: pretend the last input was this long ago.
+    idleFor:ms=>{lastInput=performance.now()-ms},
     fleet:()=>({signals:signals.map(s=>({i:s.i,color:s.color})),waving:workers.some(wk=>wk.wave>0),puffs:puffs.length}),
-    stats:()=>{const s=frameMs.slice().sort((a,b)=>a-b);return {frames:s.length,medianMs:s[s.length>>1]||0,p95Ms:s[Math.floor(s.length*.95)]||0,artSize:[w,h]}}};
+    stats:()=>{const s=frameMs.slice().sort((a,b)=>a-b);return {paceMs,idleMs:Math.round(performance.now()-lastInput),frames:s.length,medianMs:s[s.length>>1]||0,p95Ms:s[Math.floor(s.length*.95)]||0,artSize:[w,h]}}};
   if(document.readyState==='complete')start();else window.addEventListener('load',start);
 })();

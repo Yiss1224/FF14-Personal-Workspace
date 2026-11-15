@@ -110,6 +110,10 @@
   // With a horizon (scene v4), each boat heads to its own lane far out at sea and
   // shrinks with distance, so boats at sea never stack on one spot.
   const LANE_DEPTH=[.2,.46,.73,1];
+  // Phones: the sea is only ~150px wide, so boats at sea are drawn small (scene: compact) and the
+  // lanes are spread evenly and staggered by a full label width. A convoy that left together then
+  // reads as four separate boats instead of one pile.
+  const COMPACT_WIDTH=520,LANE_DEPTH_COMPACT=[.14,.43,.72,1];
   function voyagePath(i,width,duration,down,rise){
     const exit=Math.min(12000,duration*.1)/duration;
     const offshore=Math.min(90,quayPercent+6+i*1.5),turnaround=Math.min(96,Math.max(offshore+2,89-i*2));
@@ -120,12 +124,14 @@
       // half time and coming back the same way. Lanes sit at different distances
       // (boat 1 nearest, boat 4 on the horizon), so boats never cover one another.
       const cruise=Math.min(.45,exit+Math.min(30000,duration*.15)/duration);
-      const depth=LANE_DEPTH[i]??1,far=-rise*depth,s=1-.38*depth;
+      const compact=width<COMPACT_WIDTH;
+      const depth=(compact?LANE_DEPTH_COMPACT:LANE_DEPTH)[i]??1,far=-rise*depth,s=1-.38*depth;
       // Lanes are also staggered sideways (far boats further right), so a convoy that left
       // together sails as a diagonal line instead of a pile.
       // On narrow screens the sea is short, so the stagger gives way to travel distance.
-      const base=Math.min(88,quayPercent+5),end=95;
-      const gap=Math.min(Math.max(3.6,3800/Math.max(width,1)),(end-base)*.12);
+      const base=Math.min(88,quayPercent+(compact?3.5:5)),end=compact?96.5:95;
+      const gap=compact?Math.min(3000/Math.max(width,1),(end-base)*.22)
+        :Math.min(Math.max(3.6,3800/Math.max(width,1)),(end-base)*.12);
       const laneStart=base+i*gap,turn=Math.max(laneStart+2,end-(3-i)*gap);
       return [
         {phase:0,x:0,y:0,s:1},
@@ -171,7 +177,8 @@
     // Keep the hull inside the water strip on desktop and mobile.
     const bottom=parseFloat(window.getComputedStyle(boat).bottom)||0;
     const horizon=parseFloat(window.getComputedStyle(dock).getPropertyValue('--horizon'))||0;
-    const rise=horizon>0?Math.max(0,horizon-bottom-22):0;
+    // Small boats (phones) leave more of the water usable, so the far lane sits closer to the horizon.
+    const rise=horizon>0?Math.max(0,horizon-bottom-(width<COMPACT_WIDTH?14:22)):0;
     const down=rise>0?Math.min(4,bottom):Math.max(0,bottom-(6+i*2)),duration=eta-depart;
     const key=depart+':'+eta+':'+Math.round(width)+':'+down+':'+rise+':'+starts[i].toFixed(3);
     if(!reduced()&&typeof boat.animate==='function'&&width>0){

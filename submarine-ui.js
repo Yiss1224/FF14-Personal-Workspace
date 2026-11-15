@@ -43,7 +43,9 @@
         else visible.delete(entry.target.id);
       });
       if (visible.size) {
-        const top = [...visible].sort((a,b) => Math.abs(a[1]-95) - Math.abs(b[1]-95))[0][0];
+        // A folded section (phones) is only a heading: it does not take the highlight from the open section below it.
+        const open = [...visible].filter(([id]) => !document.getElementById(id)?.classList.contains('is-folded'));
+        const top = (open.length ? open : [...visible]).sort((a,b) => Math.abs(a[1]-95) - Math.abs(b[1]-95))[0][0];
         highlight(top);
       }
     }, {rootMargin:'-75px 0px -58% 0px', threshold:0});
