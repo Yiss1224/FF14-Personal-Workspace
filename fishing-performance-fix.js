@@ -9,8 +9,6 @@
   let wrapperInstalled=false;
   let originalRender=null;
   let guardedRender=null;
-  let catalogCache=null;
-  let catalogCacheStamp='';
   let scopeSyncTimer=null;
   let catalogRenderTask=null;
 
@@ -32,13 +30,9 @@
     try{return JSON.parse(localStorage.getItem(key))??def}catch{return def}
   }
 
-  function readCatalog(){
-    const stamp=`${localStorage.getItem('fishCatalogUpdatedAt')||''}|${localStorage.getItem('fishCatalogSchema')||''}`;
-    if(catalogCache&&catalogCacheStamp===stamp)return catalogCache;
-    catalogCache=readStore('fishCatalog',[]);
-    catalogCacheStamp=stamp;
-    return catalogCache;
-  }
+  // 共用的已解析圖鑑：內容一變就會重讀。以前這裡自己用「更新時間＋版本」當快取鍵，
+  // 補刺魚之類不改這兩個值的寫入就看不到，摘要會停在舊的魚種數。
+  function readCatalog(){return window.FF14Fishing.catalog()}
 
   function uniqCount(rows){
     return new Set((rows||[]).map(x=>`${x.type||'fish'}:${Number(x.itemId)||0}`)).size;
@@ -81,7 +75,8 @@
     originalRender=fn;
     guardedRender=function(){
       const box=document.getElementById('fish-catalog');
-      if(!box)return;
+      // 清單還沒掛上頁面（沒選地圖）時，圖鑑下載完也要更新上面那行摘要；以前直接返回，第一次進來會一直顯示「圖鑑：0 種」。
+      if(!box){renderLightweightSummary();return}
       if(!hasNarrowScope()){
         renderLightweightSummary();
         box.innerHTML='<div class="empty">先選到地圖／釣點，或搜尋魚名，再顯示魚清單。</div>';
