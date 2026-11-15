@@ -93,7 +93,8 @@ function snapshotInPage(roots){
   // 物件的鍵依字母排序：有些快取是好幾個下載同時寫的，鍵的先後每次不同，但內容一樣。
   const canon=v=>Array.isArray(v)?v.map(canon):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canon(v[k])])):v;
   const storage={};
-  for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k==='__fishingTestSeeded')continue;const raw=localStorage.getItem(k);try{storage[k]=JSON.stringify(canon(JSON.parse(raw)))}catch{storage[k]=raw}}
+  // 練功職業 id 由 Math.random 產生，首頁動態特效也會吃亂數，順序不固定，所以 focusJobId 只比對「有選」。
+  for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k==='__fishingTestSeeded')continue;const raw=localStorage.getItem(k);try{const v=canon(JSON.parse(raw));if(k==='tonightSettings'&&v&&v.focusJobId)v.focusJobId='(random)';storage[k]=JSON.stringify(v)}catch{storage[k]=raw}}
   const styles=[...document.head.querySelectorAll('style[id]')].map(s=>s.id).sort();
   return{html,text,controls:ctl,storage:Object.fromEntries(Object.entries(storage).sort(([a],[b])=>a<b?-1:1)),styles,
     globals:{catalogState:window.__fishCatalogState||null,routeModel:window.__fishingSessionRouteModel?JSON.stringify(window.__fishingSessionRouteModel):null}};
